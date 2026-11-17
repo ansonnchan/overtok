@@ -1,0 +1,1 @@
+{"type":"assistant","sessionId":"synthetic-desktop-cowork","requestId":"synthetic-request-desktop-cowork","timestamp":"2026-01-03T05:04:05Z","message":{"id":"synthetic-message-desktop-cowork","model":"claude-sonnet-synthetic","usage":{"input_tokens":25,"cache_read_input_tokens":5,"output_tokens":9}}}

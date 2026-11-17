@@ -1,0 +1,3 @@
+{"type":"assistant","sessionId":"synthetic-claude-malformed","requestId":"synthetic-request-before","timestamp":"2026-01-02T05:00:00Z","message":{"id":"synthetic-message-before","model":"claude-sonnet-synthetic","usage":{"input_tokens":5,"output_tokens":2}}}
+{"type":"assistant","synthetic_broken":
+{"type":"assistant","sessionId":"synthetic-claude-malformed","requestId":"synthetic-request-after","timestamp":"2026-01-02T05:01:00Z","message":{"id":"synthetic-message-after","model":"claude-sonnet-synthetic","usage":{"input_tokens":7,"output_tokens":3}}}
