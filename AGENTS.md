@@ -66,9 +66,13 @@ Unknown and unavailable values are not zero. Preserve the distinction between re
 - Use the repository's configured author for all commits.
 - Do not add `Co-authored-by`, generated-by, or agent-attribution trailers.
 - Keep commit subjects concise and avoid noisy checkpoint commits.
-- Agents may push, open, monitor, and merge their own PRs after required checks pass and no review or user decision is pending.
-- Prefer rebase merge to retain meaningful commits in a linear history. Delete the remote branch after merging.
-- Never merge a draft PR, a PR with failing checks, or a PR with unresolved review feedback.
+- Agents may push, open, and monitor PRs, but must not merge them without an explicit user request for that PR.
+- Leave completed PRs open and report their URLs, check status, dependencies, and review notes to the user.
+- When sequential work must continue before review, use stacked PRs: branch from the preceding unmerged branch and set that branch as the PR base.
+- Keep each stacked PR limited to its incremental diff and state its parent PR dependency clearly.
+- After the user merges a parent PR, rebase or retarget its child PR as needed and wait for the user to merge it.
+- When merging is explicitly requested, prefer rebase merge to retain meaningful commits in a linear history and delete the remote branch afterward.
+- Never merge a draft PR, a PR with failing checks, or a PR with unresolved review feedback, even when a general merge request exists.
 - Direct commits to `main` are reserved for small repository-policy or documentation adjustments explicitly requested by the user.
 - Do not rewrite or discard unrelated user changes.
 - Run relevant formatting, tests, and `git diff --check` before committing.
