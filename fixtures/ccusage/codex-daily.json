@@ -1,0 +1,42 @@
+{
+  "daily": [
+    {
+      "date": "2026-01-04",
+      "inputTokens": 160,
+      "outputTokens": 60,
+      "cacheCreationTokens": 0,
+      "cacheReadTokens": 40,
+      "reasoningOutputTokens": 20,
+      "totalTokens": 260,
+      "models": {
+        "gpt-5-synthetic": {
+          "inputTokens": 130,
+          "outputTokens": 45,
+          "cacheCreationTokens": 0,
+          "cacheReadTokens": 30,
+          "reasoningOutputTokens": 15,
+          "totalTokens": 205,
+          "isFallback": false
+        },
+        "gpt-6-synthetic": {
+          "inputTokens": 30,
+          "outputTokens": 15,
+          "cacheCreationTokens": 0,
+          "cacheReadTokens": 10,
+          "reasoningOutputTokens": 5,
+          "totalTokens": 55,
+          "missingPricing": true
+        }
+      }
+    }
+  ],
+  "totals": {
+    "inputTokens": 160,
+    "outputTokens": 60,
+    "cacheCreationTokens": 0,
+    "cacheReadTokens": 40,
+    "reasoningOutputTokens": 20,
+    "totalTokens": 260,
+    "unpricedModels": ["gpt-6-synthetic"]
+  }
+}

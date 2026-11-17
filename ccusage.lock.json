@@ -1,0 +1,9 @@
+{
+  "tool": "ccusage",
+  "version": "20.0.51",
+  "schema": "daily-agent-contract-v1",
+  "commands": {
+    "claude": ["daily", "--json", "--no-cost", "--offline", "--timezone", "UTC"],
+    "codex": ["codex", "daily", "--json", "--no-cost", "--offline", "--timezone", "UTC"]
+  }
+}
