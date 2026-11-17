@@ -216,7 +216,7 @@ It must not include:
 
 ## Milestones and PR-sized workstreams
 
-The identifiers below are planning IDs for branches and PRs. GitHub issues are optional; preserve each workstream's acceptance criteria and dependencies in its PR description.
+The identifiers below exist only for internal roadmap cross-references. Do not copy them into branch names, PR titles, commit subjects, or trailers. GitHub issues are optional; preserve the relevant acceptance criteria and dependencies in each focused PR description.
 
 ### M0 — Feasibility and foundations
 

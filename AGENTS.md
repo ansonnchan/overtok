@@ -57,12 +57,19 @@ Unknown and unavailable values are not zero. Preserve the distinction between re
 
 ## Git workflow
 
-- Use a short-lived `codex/` branch for each cohesive workstream.
-- Prefer one focused PR over a long-running feature branch.
-- GitHub issues are optional; the roadmap workstream IDs are sufficient for planning.
+- Use short-lived branches named `<type>/<short-kebab-description>`, such as `feat/local-collector`, `fix/community-invites`, or `docs/privacy-model`.
+- Keep PRs focused and small enough to review as one coherent change.
+- GitHub issues are optional; the roadmap is the planning source.
+- Do not include roadmap or workstream IDs in branch names, PR titles, commit subjects, or trailers.
+- Use conventional commit subjects: `<type>(<optional-scope>): <imperative summary>`, such as `fix(web): validate community invites`.
+- Multiple commits are welcome when they separate meaningful implementation, specification, architecture, or design steps within the same focused PR.
 - Use the repository's configured author for all commits.
 - Do not add `Co-authored-by`, generated-by, or agent-attribution trailers.
-- Keep commit subjects imperative and concise.
+- Keep commit subjects concise and avoid noisy checkpoint commits.
+- Agents may push, open, monitor, and merge their own PRs after required checks pass and no review or user decision is pending.
+- Prefer rebase merge to retain meaningful commits in a linear history. Delete the remote branch after merging.
+- Never merge a draft PR, a PR with failing checks, or a PR with unresolved review feedback.
+- Direct commits to `main` are reserved for small repository-policy or documentation adjustments explicitly requested by the user.
 - Do not rewrite or discard unrelated user changes.
 - Run relevant formatting, tests, and `git diff --check` before committing.
 
