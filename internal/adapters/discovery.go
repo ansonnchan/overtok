@@ -44,15 +44,16 @@ type Candidate struct {
 }
 
 type Finding struct {
-	Kind        RootKind
-	Source      normalize.Source
-	Surface     normalize.Surface
-	Status      normalize.HealthStatus
-	Format      string
-	RecordCount uint64
-	Candidates  []Candidate
-	Warnings    []normalize.Warning
-	SharedRoot  bool
+	Kind         RootKind
+	Source       normalize.Source
+	Surface      normalize.Surface
+	Status       normalize.HealthStatus
+	Format       string
+	RecordCount  uint64
+	Candidates   []Candidate
+	Warnings     []normalize.Warning
+	SharedRoot   bool
+	Capabilities normalize.Capabilities
 }
 
 type Discoverer struct {
@@ -69,7 +70,10 @@ func (d Discoverer) Discover(ctx context.Context) []Finding {
 }
 
 func discoverRoot(ctx context.Context, root RootSpec) Finding {
-	finding := Finding{Kind: root.Kind, Source: root.Source, Surface: root.Surface, Format: root.Format}
+	finding := Finding{
+		Kind: root.Kind, Source: root.Source, Surface: root.Surface, Format: root.Format,
+		Capabilities: root.Capabilities,
+	}
 	info, err := os.Lstat(root.Path)
 	if err != nil {
 		finding.Status = statusForError(err)
