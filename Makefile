@@ -1,5 +1,7 @@
 .PHONY: build check fmt test test-race vet
 
+# Keep build artifacts out of user-global caches so clean-checkout verification
+# behaves consistently in local sandboxes and CI.
 GOCACHE ?= /tmp/overtok-go-cache
 GOPATH ?= /tmp/overtok-gopath
 export GOCACHE

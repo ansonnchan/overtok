@@ -218,40 +218,40 @@ It must not include:
 
 The identifiers below exist only for internal roadmap cross-references. Do not copy them into branch names, PR titles, commit subjects, or trailers. GitHub issues are optional; preserve the relevant acceptance criteria and dependencies in each focused PR description.
 
-### M0 — Feasibility and foundations
+### M0 — Feasibility and foundations (complete)
 
 Goal: prove that the required local evidence exists and freeze the internal contract before building cloud infrastructure.
 
-- [ ] **OVT-001: Initialize the Go workspace and repository layout**
+- [x] **OVT-001: Initialize the Go workspace and repository layout**
   - Create CLI, internal packages, API placeholder, migrations, fixtures, and documentation directories.
   - Add formatting, linting, unit-test, and race-test commands.
   - Acceptance: a clean checkout builds and tests with one documented command.
 
-- [ ] **OVT-002: Define normalized observation and capability contracts**
+- [x] **OVT-002: Define normalized observation and capability contracts**
   - Represent count semantics, model-resolution quality, nullable categories, adapter health, and warnings.
   - Acceptance: schema tests cover reported, inferred, unknown, cumulative, and incremental records.
   - Depends on: OVT-001.
 
-- [ ] **OVT-003: Create sanitized compatibility fixtures**
+- [x] **OVT-003: Create sanitized compatibility fixtures**
   - Capture representative Claude Code CLI, Claude Desktop local-agent, Codex CLI, and Codex Desktop records.
   - Remove prompts, responses, paths, identities, repository metadata, and credentials.
   - Acceptance: fixtures preserve token/model/counter behavior without private content.
   - Depends on: OVT-001.
 
-- [ ] **OVT-004: Spike pinned ccusage execution and JSON validation**
+- [x] **OVT-004: Spike pinned ccusage execution and JSON validation**
   - Resolve and execute a pinned ccusage binary.
   - Reject unsupported versions and malformed output safely.
   - Determine which required per-model and per-period fields are available.
   - Acceptance: Claude Code and Codex fixtures produce validated structured output in tests.
   - Depends on: OVT-002, OVT-003.
 
-- [ ] **OVT-005: Discover Claude Desktop local coding sessions**
+- [x] **OVT-005: Discover Claude Desktop local coding sessions**
   - Implement macOS path discovery for local Code/Agent/Cowork sessions.
   - Determine whether ccusage can parse explicit discovered roots or a small Go adapter is required.
   - Acceptance: a desktop fixture is discovered, classified as a desktop surface, and parsed without reading ordinary chat data.
   - Depends on: OVT-003, OVT-004.
 
-- [ ] **OVT-006: Verify cumulative and duplicate semantics**
+- [x] **OVT-006: Verify cumulative and duplicate semantics**
   - Test rescans, partially written JSONL, cumulative Codex counters, repeated Claude request rows, and desktop/CLI overlap.
   - Acceptance: rescanning unchanged fixtures never increases normalized totals.
   - Depends on: OVT-004, OVT-005.
@@ -472,4 +472,4 @@ Each source must ship with:
 
 ## Immediate starting sequence
 
-Start with OVT-001 through OVT-006. Do not build the API, authentication, groups, Terraform, or npm platform packages until M0 exit criteria are satisfied. The highest-risk question is whether real Claude/Codex desktop and CLI records can be normalized without double counting; the roadmap deliberately resolves that first.
+M0 is complete. Begin M1 with local SQLite storage, then connect the proven discovery and normalization pipeline to transactional collection orchestration. Do not begin the API, authentication, groups, Terraform, or npm platform packages before the corresponding later milestone.

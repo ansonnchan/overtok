@@ -6,8 +6,20 @@ This directory owns decisions that cross package boundaries. Package-specific im
 
 - [Architecture](./architecture.md) defines system boundaries, data flow, persistence and synchronization direction, deployment constraints, and privacy invariants.
 - [TUI design direction](./design.md) defines interaction, responsive layout, visual restraint, accessibility, and content language for the future terminal interface.
+- [Development guide](./development.md) explains prerequisites, commands, test boundaries, CI, and contribution workflow.
 - [Roadmap](../ROADMAP.md) defines scope, delivery order, dependencies, and acceptance criteria.
 - [Contributor guidance](../AGENTS.md) defines implementation, documentation, review, privacy, and Git workflow rules.
+
+## Subsystem documentation
+
+- [Internal package map](../internal/README.md)
+- [Source adapters](../internal/adapters/README.md)
+- [Pinned ccusage contract](../internal/adapters/ccusage/README.md)
+- [Normalized usage contract](../internal/normalize/README.md)
+- [Collection semantics](../internal/collect/README.md)
+- [Source diagnostics](../internal/doctor/README.md)
+- [Compatibility fixtures](../fixtures/README.md)
+- [Server boundary](../server/README.md)
 
 ## Where new documentation belongs
 

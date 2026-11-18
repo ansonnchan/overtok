@@ -88,6 +88,7 @@ Package-level navigation and ownership are documented in [internal/README.md](./
 ## Documentation
 
 - [Documentation index](./docs/README.md)
+- [Development guide](./docs/development.md)
 - [Roadmap](./ROADMAP.md)
 - [Architecture](./docs/architecture.md)
 - [TUI design direction](./docs/design.md)
