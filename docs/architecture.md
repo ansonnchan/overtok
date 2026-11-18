@@ -25,7 +25,7 @@ cmd/
 internal/
   adapters/                Source-specific discovery and parsing
   collect/                 Deduplication, counter reduction, and summaries
-  doctor/                  Privacy-safe source diagnostics
+  doctor/                  Privacy-safe source and storage diagnostics
   fixturecheck/            Fixture privacy enforcement
   modelcatalog/            Model resolution and pricing revisions
   normalize/               Canonical usage records
@@ -125,6 +125,12 @@ checksummed migrations are contiguous and run as one immediate transaction.
 Owner-only directory and file permissions are established before SQLite opens
 the database. Connection-local foreign-key and busy-timeout settings are
 applied to every pooled connection.
+
+Local diagnostics read only allowlisted operational metadata from storage:
+integrity and schema compatibility, collection freshness, adapter health,
+checkpoint count, and pending-outbox count. The renderer distinguishes the
+default and a custom database location without revealing its path. Diagnostic
+checks never render observations, source identities, or database contents.
 
 ### Local usage buckets
 

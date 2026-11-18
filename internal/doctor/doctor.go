@@ -6,10 +6,12 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/ansonnchan/overtok/internal/adapters"
 	"github.com/ansonnchan/overtok/internal/adapters/ccusage"
 	"github.com/ansonnchan/overtok/internal/normalize"
+	"github.com/ansonnchan/overtok/internal/store"
 )
 
 // DiscoveryProbe supplies source health without requiring usage collection.
@@ -37,20 +39,27 @@ type Report struct {
 	GOARCH   string
 	Parser   ParserStatus
 	Findings []adapters.Finding
+	Database DatabaseStatus
 }
 
 // Diagnose gathers discovery and parser health under the caller's context.
-func Diagnose(ctx context.Context, discovery DiscoveryProbe, parser ParserProbe) Report {
+func Diagnose(ctx context.Context, discovery DiscoveryProbe, parser ParserProbe, database DatabaseProbe) Report {
 	report := Report{GOOS: runtime.GOOS, GOARCH: runtime.GOARCH, Findings: discovery.Discover(ctx)}
 	if parser != nil {
 		report.Parser = parser.Check(ctx)
 	}
+	if database != nil {
+		report.Database = database.Check(ctx)
+	}
 	return report
 }
 
-// ExitCode returns non-zero for unsupported platforms or unhealthy present sources.
+// ExitCode returns 1 for actionable warnings and 2 for unusable storage.
 // Missing optional sources do not make the diagnostic fail.
 func (r Report) ExitCode() int {
+	if r.Database.State != "" && r.Database.State != DatabaseReady && r.Database.State != DatabaseNotInitialized {
+		return 2
+	}
 	if r.GOOS != "darwin" {
 		return 1
 	}
@@ -59,6 +68,15 @@ func (r Report) ExitCode() int {
 	}
 	for _, finding := range r.Findings {
 		switch finding.Status {
+		case normalize.HealthPermissionDenied, normalize.HealthUnsupported, normalize.HealthDegraded, normalize.HealthError:
+			return 1
+		}
+	}
+	if r.Database.State == DatabaseNotInitialized || r.Database.Stale {
+		return 1
+	}
+	for _, health := range r.Database.AdapterHealth {
+		switch health.Health.Status {
 		case normalize.HealthPermissionDenied, normalize.HealthUnsupported, normalize.HealthDegraded, normalize.HealthError:
 			return 1
 		}
@@ -105,12 +123,59 @@ func (r Report) Render() string {
 			fmt.Fprintf(&output, "    warning: %s\n", warningText(warning.Code))
 		}
 	}
+	if r.Database.State != "" {
+		r.renderDatabase(&output)
+	}
 	if r.ExitCode() == 0 {
 		fmt.Fprintln(&output, "Result: ready; missing optional sources are not errors")
 	} else {
 		fmt.Fprintln(&output, "Result: issues found; review the warnings above")
 	}
 	return output.String()
+}
+
+func (r Report) renderDatabase(output *strings.Builder) {
+	database := r.Database
+	fmt.Fprintln(output, "Database:")
+	fmt.Fprintf(output, "  Location: %s (path redacted)\n", database.Location)
+	switch database.State {
+	case DatabaseReady:
+		fmt.Fprintln(output, "  Open: ok")
+		fmt.Fprintln(output, "  Integrity: ok")
+		fmt.Fprintf(output, "  Schema: %d (compatible; supported %d)\n", database.SchemaVersion, database.SupportedVersion)
+	case DatabaseNotInitialized:
+		fmt.Fprintln(output, "  Open: not initialized; run `overtok` to create local storage")
+	case DatabaseLocked:
+		fmt.Fprintln(output, "  Open: locked; close other Overtok processes and retry")
+	case DatabaseCorrupt:
+		fmt.Fprintln(output, "  Integrity: failed; restore or replace the local database")
+	case DatabaseIncompatible:
+		fmt.Fprintf(output, "  Schema: incompatible (supported %d); update Overtok before retrying\n", database.SupportedVersion)
+	default:
+		fmt.Fprintln(output, "  Open: failed; check application-data permissions and retry")
+	}
+	if database.State != DatabaseReady {
+		return
+	}
+	if database.LastSuccessfulCollection == nil {
+		fmt.Fprintln(output, "  Last collection: never; run a local refresh")
+	} else if database.Stale {
+		fmt.Fprintf(output, "  Last collection: %s (stale; run a local refresh)\n", database.LastSuccessfulCollection.UTC().Format(time.RFC3339))
+	} else {
+		fmt.Fprintf(output, "  Last collection: %s\n", database.LastSuccessfulCollection.UTC().Format(time.RFC3339))
+	}
+	fmt.Fprintf(output, "  Source checkpoints: %d\n", database.CheckpointCount)
+	health := append([]store.StoredAdapterHealth(nil), database.AdapterHealth...)
+	sort.Slice(health, func(i, j int) bool {
+		if health[i].Health.Source != health[j].Health.Source {
+			return health[i].Health.Source < health[j].Health.Source
+		}
+		return health[i].Health.Surface < health[j].Health.Surface
+	})
+	for _, record := range health {
+		fmt.Fprintf(output, "  Adapter %s/%s: %s\n", record.Health.Source, record.Health.Surface, record.Health.Status)
+	}
+	fmt.Fprintf(output, "  Pending local outbox: %d\n", database.PendingOutbox)
 }
 
 func statusText(finding adapters.Finding) string {

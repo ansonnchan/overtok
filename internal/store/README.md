@@ -32,6 +32,11 @@ one immediate transaction, so a failed upgrade cannot leave a checkpoint ahead
 of its schema. A newer, reordered, renamed, or edited applied migration is an
 incompatible database rather than something Overtok repairs silently.
 
+`Diagnostics` reads a privacy-safe operational snapshot for `overtok doctor`:
+integrity and schema compatibility, checkpoint and pending-outbox counts, the
+last successful collection time, and adapter health. It never exposes database
+rows, source identifiers, or filesystem paths.
+
 ## Observation commits
 
 `CommitObservations` writes normalized observations, the matching source

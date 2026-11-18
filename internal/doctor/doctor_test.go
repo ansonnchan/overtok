@@ -77,7 +77,7 @@ func TestDiagnoseDiscoversSyntheticHome(t *testing.T) {
 		}
 	}
 	discovery := adapters.Discoverer{Roots: adapters.DefaultMacRoots(home, "")}
-	report := Diagnose(context.Background(), discovery, fakeParser{status: ParserStatus{Found: true, Compatible: true}})
+	report := Diagnose(context.Background(), discovery, fakeParser{status: ParserStatus{Found: true, Compatible: true}}, nil)
 	if len(report.Findings) != 5 {
 		t.Fatalf("findings = %d, want 5", len(report.Findings))
 	}

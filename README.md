@@ -55,7 +55,10 @@ Run the source diagnostic:
 ./bin/overtok doctor
 ```
 
-`doctor` reports source types, health, candidate-file availability, capabilities, and parser compatibility. It intentionally does not print local source paths or parse session contents.
+`doctor` reports source types, health, candidate-file availability,
+capabilities, parser compatibility, and privacy-safe local database health. It
+intentionally does not print local source or database paths, parse session
+contents, or expose persisted observations.
 
 ## Repository guide
 
@@ -65,10 +68,11 @@ Run the source diagnostic:
 | `internal/adapters` | Source discovery, ccusage validation, and source-specific parsers |
 | `internal/normalize` | Provider-neutral observations, capabilities, and invariants |
 | `internal/collect` | Parsing orchestration, deduplication, cumulative reduction, and summaries |
-| `internal/doctor` | Privacy-safe diagnostic reporting |
+| `internal/doctor` | Privacy-safe source and storage diagnostic reporting |
 | `internal/fixturecheck` | Automated fixture privacy validation |
 | `internal/modelcatalog` | Reserved boundary for model aliases and pricing resolution |
-| `internal/store`, `internal/sync`, `internal/tui` | Reserved boundaries for later roadmap stages |
+| `internal/store` | Local SQLite lifecycle, observations, aggregates, and diagnostics |
+| `internal/sync`, `internal/tui` | Reserved boundaries for later roadmap stages |
 | `fixtures` | Synthetic compatibility and regression data |
 | `server` and `migrations` | Reserved server and database boundaries |
 | `docs` | Cross-cutting architecture and design decisions |
