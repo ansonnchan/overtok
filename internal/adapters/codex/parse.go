@@ -139,6 +139,8 @@ func uncachedInput(total, cached *uint64) (*uint64, bool) {
 }
 
 func recordID(session string, timestamp time.Time, model string, tokens normalize.TokenCounts) string {
+	// Overlapping CLI/Desktop roots produce the same identity because only source
+	// semantics participate; storage paths and raw event content do not.
 	parts := []string{
 		"codex-rollout-v1", session, timestamp.UTC().Format(time.RFC3339Nano), model,
 		pointerValue(tokens.InputUncached), pointerValue(tokens.InputCacheRead),

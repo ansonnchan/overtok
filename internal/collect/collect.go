@@ -92,6 +92,8 @@ func incrementalizeWithWarnings(observations []normalize.Observation, warnings [
 }
 
 func logicalFileID(candidate adapters.Candidate) string {
+	// Relative identity is stable across equivalent roots. The absolute-path
+	// fallback is hashed immediately and remains local to cumulative-state isolation.
 	identity := candidate.RelativePath
 	if identity == "" {
 		identity = candidate.Path
@@ -195,6 +197,8 @@ func usageQuality(tokens normalize.TokenCounts) (int, uint64) {
 }
 
 func surfaceRank(surface normalize.Surface) int {
+	// Surface rank is only a deterministic duplicate tie-breaker. It does not
+	// claim that one product surface is more accurate than another.
 	switch surface {
 	case normalize.SurfaceDesktopCode:
 		return 0

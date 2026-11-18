@@ -540,6 +540,8 @@ func (r codexReport) observations(surface normalize.Surface) ([]normalize.Observ
 }
 
 func baseObservation(source normalize.Source, surface normalize.Surface, date string, occurredAt time.Time, model string, resolution normalize.ModelResolution, tokens normalize.TokenCounts, warnings []normalize.Warning) normalize.Observation {
+	// A daily report is an absolute aggregate for that period, not usage newly
+	// contributed by this invocation. Preserve cumulative semantics for safe replay.
 	return normalize.Observation{
 		Source: source, Surface: surface, SourceVersion: "ccusage/" + PinnedVersion,
 		SourceRecordID: stableID(source, surface, date, model), OccurredAt: occurredAt,

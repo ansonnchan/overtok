@@ -26,7 +26,9 @@ type ParserProbe interface {
 type ParserStatus struct {
 	Found      bool
 	Compatible bool
-	Issue      string
+	// Issue is empty, "timeout", or "execution_failed"; incompatibility is
+	// represented by Found without Compatible so no external output is retained.
+	Issue string
 }
 
 // Report is a path-redacted snapshot of platform, parser, and source health.
