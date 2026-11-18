@@ -31,3 +31,18 @@ checksums are recorded in `schema_migrations`. All pending migrations run in
 one immediate transaction, so a failed upgrade cannot leave a checkpoint ahead
 of its schema. A newer, reordered, renamed, or edited applied migration is an
 incompatible database rather than something Overtok repairs silently.
+
+## Observation commits
+
+`CommitObservations` writes normalized observations, the matching source
+checkpoint, and adapter health in one transaction. Observation uniqueness is a
+SHA-256 fingerprint of source and source-record identity, so rescanning the
+same evidence is a no-op. Source-root, session, and last-record identifiers are
+also fingerprinted before SQL execution; the schema has no path or raw
+source-identifier fields.
+
+Token categories use nullable decimal text. This preserves unavailable versus
+reported zero and supports the complete `uint64` range that SQLite's signed
+integer storage cannot represent. Model resolution, observed and canonical
+identifiers, pricing keys, measurement quality, counter semantics, versions,
+capabilities, and safe warnings remain separate fields.

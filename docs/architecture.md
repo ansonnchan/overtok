@@ -55,7 +55,8 @@ Narrow read-only source discovery
     -> deterministic per-model summaries
 ```
 
-Persistence begins in M1. Its target flow remains:
+The storage boundary now accepts normalized observations through this flow;
+application-level collection orchestration is the next integration step:
 
 ```text
 Normalized observations
@@ -113,6 +114,11 @@ SQLite runs in WAL mode and stores:
 - adapter health and last-success state.
 
 Observation and checkpoint writes share a transaction. A source checkpoint cannot advance without the matching normalized state being durable.
+
+Stored observation, source-root, session, and checkpoint identities are
+one-way fingerprints. Raw filesystem paths and provider session identifiers do
+not have schema columns. Nullable token categories use decimal text to preserve
+both unknown values and the complete unsigned 64-bit range.
 
 The local database uses the CGO-free `github.com/ncruces/go-sqlite3` driver and
 lives under the platform user-configuration directory by default. Embedded,
