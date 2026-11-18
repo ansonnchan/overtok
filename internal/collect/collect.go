@@ -22,6 +22,14 @@ import (
 type Result struct {
 	Observations []normalize.Observation
 	Warnings     []normalize.Warning
+	SourceIssues []SourceIssue
+}
+
+// SourceIssue attributes a safe collection warning without retaining a path.
+type SourceIssue struct {
+	Source  normalize.Source
+	Surface normalize.Surface
+	Warning normalize.Warning
 }
 
 // Collector reads discovered local candidates using their provider adapters.
@@ -45,31 +53,35 @@ func (c Collector) Collect(ctx context.Context, candidates []adapters.Candidate)
 			break
 		}
 		if !strings.EqualFold(filepath.Ext(candidate.Path), ".jsonl") {
-			result.Warnings = append(result.Warnings, normalize.Warning{Code: "unsupported_record_container"})
+			result.addIssue(candidate, normalize.Warning{Code: "unsupported_record_container"})
 			continue
 		}
 		file, err := os.Open(candidate.Path)
 		if err != nil {
-			result.Warnings = append(result.Warnings, normalize.Warning{Code: "source_file_unreadable"})
+			result.addIssue(candidate, normalize.Warning{Code: "source_file_unreadable"})
 			continue
 		}
 		switch candidate.Source {
 		case normalize.SourceClaude:
 			parsed, parseErr := claude.Parse(file, candidate.Surface, version)
 			rawObservations = append(rawObservations, parsed.Observations...)
-			result.Warnings = append(result.Warnings, parsed.Warnings...)
+			for _, warning := range parsed.Warnings {
+				result.addIssue(candidate, warning)
+			}
 			if parseErr != nil {
-				result.Warnings = append(result.Warnings, normalize.Warning{Code: "source_parse_failed"})
+				result.addIssue(candidate, normalize.Warning{Code: "source_parse_failed"})
 			}
 		case normalize.SourceCodex:
 			parsed, parseErr := codex.Parse(file, candidate.Surface, version, logicalFileID(candidate))
 			rawObservations = append(rawObservations, parsed.Observations...)
-			result.Warnings = append(result.Warnings, parsed.Warnings...)
+			for _, warning := range parsed.Warnings {
+				result.addIssue(candidate, warning)
+			}
 			if parseErr != nil {
-				result.Warnings = append(result.Warnings, normalize.Warning{Code: "source_parse_failed"})
+				result.addIssue(candidate, normalize.Warning{Code: "source_parse_failed"})
 			}
 		default:
-			result.Warnings = append(result.Warnings, normalize.Warning{Code: "unsupported_source"})
+			result.addIssue(candidate, normalize.Warning{Code: "unsupported_source"})
 		}
 		_ = file.Close()
 	}
@@ -83,7 +95,27 @@ func (c Collector) Collect(ctx context.Context, candidates []adapters.Candidate)
 		}
 		return result.Warnings[i].Message < result.Warnings[j].Message
 	})
+	sort.SliceStable(result.SourceIssues, func(i, j int) bool {
+		left, right := result.SourceIssues[i], result.SourceIssues[j]
+		if left.Source != right.Source {
+			return left.Source < right.Source
+		}
+		if left.Surface != right.Surface {
+			return left.Surface < right.Surface
+		}
+		if left.Warning.Code != right.Warning.Code {
+			return left.Warning.Code < right.Warning.Code
+		}
+		return left.Warning.Message < right.Warning.Message
+	})
 	return result
+}
+
+func (r *Result) addIssue(candidate adapters.Candidate, warning normalize.Warning) {
+	r.Warnings = append(r.Warnings, warning)
+	r.SourceIssues = append(r.SourceIssues, SourceIssue{
+		Source: candidate.Source, Surface: candidate.Surface, Warning: warning,
+	})
 }
 
 func incrementalizeWithWarnings(observations []normalize.Observation, warnings []normalize.Warning) ([]normalize.Observation, []normalize.Warning) {

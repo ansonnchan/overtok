@@ -20,7 +20,7 @@ fixturecheck protects committed test data independently of runtime collection
 | --- | --- | --- |
 | `adapters` | Source discovery, source formats, and external parser contracts | Cross-source totals, persistence, or UI |
 | `normalize` | Provider-neutral records, capability vocabulary, and validation | Filesystem discovery or provider parsing |
-| `collect` | Adapter coordination, deduplication, cumulative reduction, and summaries | Database transactions or uploads |
+| `collect` | Application scan orchestration, deduplication, cumulative reduction, and summaries | SQL implementation or uploads |
 | `doctor` | Redacted source and parser diagnostics | Usage collection or repair |
 | `fixturecheck` | Privacy validation for committed fixtures | Runtime validation of user data |
 | `modelcatalog` | Future canonical model and pricing resolution | Source parsing |
