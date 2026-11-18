@@ -8,9 +8,10 @@ local evidence
     -> normalize
     -> collect
     -> store
-    -> future sync and TUI
+    -> application
+    -> TUI
 
-doctor reads discovery health and parser compatibility without collecting records
+doctor reads discovery, parser, and storage health without collecting records
 fixturecheck protects committed test data independently of runtime collection
 ```
 
@@ -21,12 +22,13 @@ fixturecheck protects committed test data independently of runtime collection
 | `adapters` | Source discovery, source formats, and external parser contracts | Cross-source totals, persistence, or UI |
 | `normalize` | Provider-neutral records, capability vocabulary, and validation | Filesystem discovery or provider parsing |
 | `collect` | Application scan orchestration, deduplication, cumulative reduction, and summaries | SQL implementation or uploads |
-| `doctor` | Redacted source and parser diagnostics | Usage collection or repair |
+| `application` | Committed dashboard queries and manual refresh sequencing | Source parsing, SQL, or terminal rendering |
+| `doctor` | Redacted source, parser, and storage diagnostics | Usage collection or repair |
 | `fixturecheck` | Privacy validation for committed fixtures | Runtime validation of user data |
 | `modelcatalog` | Versioned canonical model and API-equivalent pricing resolution | Source parsing |
 | `store` | SQLite lifecycle, migrations, and local persistence | Source-specific behavior |
 | `sync` | Future privacy-limited synchronization | Raw local records |
-| `tui` | Future presentation of committed local state | Collection or synchronization logic |
+| `tui` | Keyboard-first presentation of committed local state | Collection, SQL, or synchronization logic |
 
 Interfaces should be declared at the package that consumes them. Provider-specific identifiers may pass through normalized contracts as observed values, but provider-specific filesystem and schema rules stay in adapters.
 

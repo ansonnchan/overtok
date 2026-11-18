@@ -119,6 +119,32 @@ func TestUsageBucketsSurviveRestart(t *testing.T) {
 	}
 }
 
+func TestNextUsageBucketRevisionUsesStoredMaximum(t *testing.T) {
+	t.Parallel()
+	db := openStoreForTest(t)
+	if revision, err := db.NextUsageBucketRevision(t.Context()); err != nil || revision != 1 {
+		t.Fatalf("empty NextUsageBucketRevision() = %d, %v", revision, err)
+	}
+	start := time.Date(2026, 11, 17, 20, 0, 0, 0, time.UTC)
+	buckets := []UsageBucket{
+		completeBucket(start, normalize.SourceClaude, normalize.SurfaceCLI, "model-a", 1, 3),
+		completeBucket(start, normalize.SourceCodex, normalize.SurfaceSharedLocal, "model-b", 1, 9),
+	}
+	if _, err := db.ApplyBucketRevisions(t.Context(), buckets); err != nil {
+		t.Fatal(err)
+	}
+	if revision, err := db.NextUsageBucketRevision(t.Context()); err != nil || revision != 10 {
+		t.Fatalf("NextUsageBucketRevision() = %d, %v; want 10, nil", revision, err)
+	}
+	exhausted := completeBucket(start.Add(time.Minute), normalize.SourceClaude, normalize.SurfaceCLI, "model-c", 1, math.MaxUint64)
+	if _, err := db.ApplyBucketRevisions(t.Context(), []UsageBucket{exhausted}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.NextUsageBucketRevision(t.Context()); err == nil {
+		t.Fatal("NextUsageBucketRevision() succeeded after maximum revision")
+	}
+}
+
 func TestTimezoneAwarePeriodsAndBreakdowns(t *testing.T) {
 	t.Parallel()
 	location, err := time.LoadLocation("America/Vancouver")

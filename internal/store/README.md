@@ -68,6 +68,10 @@ Only the newest pending revision for each bucket remains in the local outbox.
 Its JSON is built from an explicit aggregate payload and has no source record,
 session, or path fields. This package does not implement a network client.
 
+Manual application refreshes choose the next revision by parsing every stored
+decimal revision as an unsigned 64-bit value. This avoids SQLite signed-integer
+coercion and fails visibly if the revision space is exhausted.
+
 Each token category and API-equivalent estimate carries `complete`, `partial`,
 or `unavailable` coverage. Period queries add `empty` when no bucket exists.
 Aggregation returns an error on unsigned overflow rather than saturating or

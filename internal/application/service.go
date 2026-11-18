@@ -1,0 +1,112 @@
+package application
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/ansonnchan/overtok/internal/collect"
+	"github.com/ansonnchan/overtok/internal/store"
+)
+
+// Dashboard is a consistent snapshot of local usage and operational health.
+type Dashboard struct {
+	GeneratedAt time.Time
+	Timezone    string
+	Today       store.UsageSummary
+	Week        store.UsageSummary
+	Last30Days  store.UsageSummary
+	AllTime     store.UsageSummary
+	Diagnostics store.DiagnosticSnapshot
+}
+
+// Storage is the committed local-state boundary consumed by Service.
+type Storage interface {
+	QueryUsage(context.Context, store.Period, time.Time, *time.Location) (store.UsageSummary, error)
+	Diagnostics(context.Context) (store.DiagnosticSnapshot, error)
+	NextUsageBucketRevision(context.Context) (uint64, error)
+	RebuildUsageBuckets(context.Context, uint64, store.PriceEstimator) (store.BucketApplyResult, error)
+}
+
+// Collector owns discovery, parsing, normalization, and atomic persistence.
+type Collector interface {
+	Scan(context.Context) (collect.ScanResult, error)
+}
+
+// Service coordinates local application actions for presentation consumers.
+type Service struct {
+	mu        sync.RWMutex
+	storage   Storage
+	collector Collector
+	estimator store.PriceEstimator
+	location  *time.Location
+	now       func() time.Time
+}
+
+// NewService constructs a local-only application service.
+func NewService(storage Storage, collector Collector, estimator store.PriceEstimator, location *time.Location, now func() time.Time) (*Service, error) {
+	if storage == nil || collector == nil {
+		return nil, errors.New("application service requires storage and collection")
+	}
+	if location == nil {
+		return nil, errors.New("application service requires a timezone")
+	}
+	if now == nil {
+		now = time.Now
+	}
+	return &Service{storage: storage, collector: collector, estimator: estimator, location: location, now: now}, nil
+}
+
+// Load reads usage periods and health from already committed local state.
+func (s *Service) Load(ctx context.Context) (Dashboard, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	now := s.now()
+	dashboard := Dashboard{GeneratedAt: now, Timezone: s.location.String()}
+	queries := []struct {
+		period store.Period
+		target *store.UsageSummary
+	}{
+		{store.PeriodToday, &dashboard.Today},
+		{store.PeriodWeek, &dashboard.Week},
+		{store.PeriodLast30Days, &dashboard.Last30Days},
+		{store.PeriodAllTime, &dashboard.AllTime},
+	}
+	for _, query := range queries {
+		summary, err := s.storage.QueryUsage(ctx, query.period, now, s.location)
+		if err != nil {
+			return Dashboard{}, fmt.Errorf("load %s local usage: %w", query.period, err)
+		}
+		*query.target = summary
+	}
+	diagnostics, err := s.storage.Diagnostics(ctx)
+	if err != nil {
+		return Dashboard{}, fmt.Errorf("load local health: %w", err)
+	}
+	dashboard.Diagnostics = diagnostics
+	return dashboard, nil
+}
+
+// Refresh collects local evidence, commits it, and then rebuilds absolute
+// usage buckets. Presentation never observes uncommitted collection output.
+func (s *Service) Refresh(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	result, err := s.collector.Scan(ctx)
+	if err != nil {
+		return fmt.Errorf("refresh local collection: %w", err)
+	}
+	if !result.Persisted {
+		return errors.New("refresh local collection did not commit state")
+	}
+	revision, err := s.storage.NextUsageBucketRevision(ctx)
+	if err != nil {
+		return err
+	}
+	if _, err := s.storage.RebuildUsageBuckets(ctx, revision, s.estimator); err != nil {
+		return fmt.Errorf("rebuild local usage: %w", err)
+	}
+	return nil
+}

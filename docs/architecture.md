@@ -1,7 +1,7 @@
 # Architecture
 
-Status: implemented local-collection boundaries plus target MVP architecture
-Last updated: November 17, 2026
+Status: local native MVP implemented; network architecture remains planned
+Last updated: November 18, 2026
 
 ## System goals
 
@@ -24,6 +24,7 @@ cmd/
   overtok/                 Native CLI entry point
 internal/
   adapters/                Source-specific discovery and parsing
+  application/             Local refresh and dashboard orchestration
   collect/                 Deduplication, counter reduction, and summaries
   doctor/                  Privacy-safe source and storage diagnostics
   fixturecheck/            Fixture privacy enforcement
@@ -60,16 +61,32 @@ Persistence follows this transaction flow:
 ```text
 Normalized observations
     -> model resolution
-    -> SQLite transaction
+    -> observation transaction
          - observation
          - source checkpoint
-         - revised usage bucket
-         - outbox revision
+         - adapter health
+    -> read committed observations
+    -> aggregate transaction
+         - absolute usage bucket revision
+         - matching outbox revision
 ```
 
 Collection never depends on the server. The TUI reads derived local state
 through an application interface and does not parse source files or query
 SQLite directly.
+
+### Local application boundary
+
+The application service is the only bridge used by the interactive TUI. A
+manual refresh runs discovery, parsing, normalization, and the atomic
+observation commit before rebuilding absolute usage buckets from committed
+observations. Presentation retains its last stable page while that work runs.
+
+Dashboard loads query Today, This week, 30 days, and All time using the local
+timezone, then attach the privacy-safe database diagnostic snapshot. The TUI
+receives no source paths, record identities, observation rows, or raw provider
+content. Startup and refresh failures are reduced to stable messages and refer
+users to `overtok doctor` for path-redacted detail.
 
 ### Source adapters
 

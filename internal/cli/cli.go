@@ -25,6 +25,8 @@ type dependencies struct {
 	homeDir  func() (string, error)
 	getenv   func(string) string
 	diagnose func(context.Context, string, string) doctor.Report
+	input    io.Reader
+	launch   func(context.Context, string, string, io.Reader, io.Writer, bool) error
 	timeout  time.Duration
 }
 
@@ -32,6 +34,8 @@ func defaultDependencies() dependencies {
 	return dependencies{
 		homeDir: os.UserHomeDir,
 		getenv:  os.Getenv,
+		input:   os.Stdin,
+		launch:  launchLocalTUI,
 		timeout: 5 * time.Second,
 		diagnose: func(ctx context.Context, home, codexHome string) doctor.Report {
 			discovery := adapters.Discoverer{Roots: adapters.DefaultMacRoots(home, codexHome)}
@@ -66,8 +70,30 @@ func run(args []string, stdout, stderr io.Writer, deps dependencies) int {
 		return 2
 	}
 
-	fmt.Fprintln(stdout, "Overtok local collection is not configured yet.")
-	fmt.Fprintln(stdout, "Run `overtok --version` to inspect this build.")
+	return runTUI(stdout, stderr, deps)
+}
+
+func runTUI(stdout, stderr io.Writer, deps dependencies) int {
+	home, err := deps.homeDir()
+	if err != nil {
+		fmt.Fprintln(stderr, "could not resolve the local home directory")
+		return 1
+	}
+	codexHome := deps.getenv("CODEX_HOME")
+	if codexHome != "" && !filepath.IsAbs(codexHome) {
+		fmt.Fprintln(stderr, "CODEX_HOME must be an absolute directory")
+		return 1
+	}
+	if deps.launch == nil {
+		fmt.Fprintln(stderr, "could not start the local application")
+		return 1
+	}
+	if err := deps.launch(context.Background(), home, codexHome, deps.input, stdout, deps.getenv("NO_COLOR") != ""); err != nil {
+		// Runtime errors can wrap private local paths. Keep CLI output stable and
+		// direct detailed investigation through the redacted doctor report.
+		fmt.Fprintln(stderr, "could not start the local application; run `overtok doctor`")
+		return 1
+	}
 	return 0
 }
 

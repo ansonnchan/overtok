@@ -1,6 +1,6 @@
 # TUI design direction
 
-Status: application shell implemented; local views in progress
+Status: local native application shell and views implemented
 Last updated: November 18, 2026
 
 ## Intent

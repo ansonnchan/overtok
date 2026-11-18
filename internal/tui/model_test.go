@@ -5,21 +5,25 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/ansonnchan/overtok/internal/application"
+	"github.com/ansonnchan/overtok/internal/normalize"
+	"github.com/ansonnchan/overtok/internal/store"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 type fakeApplication struct {
-	pages      map[Section]Page
+	dashboard  application.Dashboard
 	loadError  error
 	refreshErr error
-	loads      []Section
+	loads      int
 	refreshes  int
 }
 
-func (a *fakeApplication) Load(_ context.Context, section Section) (Page, error) {
-	a.loads = append(a.loads, section)
-	return a.pages[section], a.loadError
+func (a *fakeApplication) Load(context.Context) (application.Dashboard, error) {
+	a.loads++
+	return a.dashboard, a.loadError
 }
 
 func (a *fakeApplication) Refresh(context.Context) error {
@@ -29,15 +33,15 @@ func (a *fakeApplication) Refresh(context.Context) error {
 
 func TestModelLoadsAndNavigatesWithKeyboard(t *testing.T) {
 	t.Parallel()
-	app := &fakeApplication{pages: map[Section]Page{
-		OverviewSection: {Lines: []string{"Today 42 tokens"}},
-		SourcesSection:  {Warning: "Codex needs attention", Lines: []string{"Codex: degraded"}},
+	app := &fakeApplication{dashboard: usageDashboard(store.AvailabilityComplete, 42)}
+	app.dashboard.Diagnostics.AdapterHealth = []store.StoredAdapterHealth{{
+		Health: normalize.SourceHealth{Source: normalize.SourceCodex, Surface: normalize.SurfaceCLI, Status: normalize.HealthDegraded},
 	}}
 	model := NewModel(t.Context(), app, Config{NoColor: true})
 	message := model.Init()()
 	updated, command := model.Update(message)
 	model = updated.(Model)
-	if command != nil || model.state != StateReady || !strings.Contains(model.View(), "Today 42 tokens") {
+	if command != nil || model.state != StateWarning || !strings.Contains(model.View(), "Total tokens: 42") {
 		t.Fatalf("initial model = %#v view=%q", model, model.View())
 	}
 
@@ -48,7 +52,7 @@ func TestModelLoadsAndNavigatesWithKeyboard(t *testing.T) {
 	}
 	updated, _ = model.Update(command())
 	model = updated.(Model)
-	if model.state != StateWarning || !strings.Contains(model.View(), "[warning] Codex needs attention") {
+	if model.state != StateWarning || !strings.Contains(model.View(), "[warning] 1 local adapter state(s) need attention") {
 		t.Fatalf("warning model = %#v view=%q", model, model.View())
 	}
 
@@ -64,11 +68,11 @@ func TestModelLoadsAndNavigatesWithKeyboard(t *testing.T) {
 
 func TestModelIgnoresStaleLoadsAndRefreshesThroughApplication(t *testing.T) {
 	t.Parallel()
-	app := &fakeApplication{pages: map[Section]Page{OverviewSection: {Lines: []string{"fresh"}}}}
+	app := &fakeApplication{dashboard: usageDashboard(store.AvailabilityComplete, 1)}
 	model := NewModel(t.Context(), app, Config{NoColor: true})
 	updated, _ := model.Update(key('2'))
 	model = updated.(Model)
-	updated, command := model.Update(loadResult{section: OverviewSection, page: Page{Lines: []string{"stale"}}})
+	updated, command := model.Update(loadResult{section: OverviewSection, requestID: 1, dashboard: usageDashboard(store.AvailabilityComplete, 99)})
 	model = updated.(Model)
 	if command != nil || strings.Contains(model.View(), "stale") || model.section != SourcesSection {
 		t.Fatalf("stale result changed model = %#v", model)
@@ -93,10 +97,10 @@ func TestModelStatesRemainExplicitWithoutColor(t *testing.T) {
 		message loadResult
 		want    string
 	}{
-		{name: "empty", message: loadResult{section: OverviewSection}, want: "[empty]"},
-		{name: "error", message: loadResult{section: OverviewSection, err: errors.New("private detail")}, want: "[error]"},
-		{name: "warning", message: loadResult{section: OverviewSection, page: Page{Warning: "partial"}}, want: "[warning]"},
-		{name: "ready", message: loadResult{section: OverviewSection, page: Page{Lines: []string{"value"}}}, want: "[ready]"},
+		{name: "empty", message: loadResult{section: OverviewSection, requestID: 1}, want: "[empty]"},
+		{name: "error", message: loadResult{section: OverviewSection, requestID: 1, err: errors.New("private detail")}, want: "[error]"},
+		{name: "warning", message: loadResult{section: OverviewSection, requestID: 1, dashboard: usageDashboard(store.AvailabilityPartial, 1)}, want: "[warning]"},
+		{name: "ready", message: loadResult{section: OverviewSection, requestID: 1, dashboard: usageDashboard(store.AvailabilityComplete, 1)}, want: "[ready]"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -150,6 +154,42 @@ func TestRefreshFailureIsActionable(t *testing.T) {
 	}
 }
 
+func TestNarrowSettingsContentWrapsWithoutLosingPrivacyMeaning(t *testing.T) {
+	t.Parallel()
+	app := &fakeApplication{dashboard: usageDashboard(store.AvailabilityComplete, 1)}
+	model := NewModel(t.Context(), app, Config{NoColor: true})
+	updated, _ := model.Update(tea.WindowSizeMsg{Width: MinimumWidth, Height: 30})
+	updated, command := updated.(Model).Update(key('4'))
+	updated, _ = updated.(Model).Update(command())
+	view := updated.(Model).View()
+	if !strings.Contains(view, "Never stored: prompts") || !strings.Contains(view, "repository") || !strings.Contains(view, "branch names") {
+		t.Fatalf("settings View() lost privacy explanation: %q", view)
+	}
+	for _, line := range strings.Split(view, "\n") {
+		if len([]rune(line)) > MinimumWidth {
+			t.Fatalf("settings line is %d columns: %q", len([]rune(line)), line)
+		}
+	}
+}
+
 func key(value rune) tea.KeyMsg {
 	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{value}}
+}
+
+func usageDashboard(state store.Availability, input uint64) application.Dashboard {
+	zero := uint64(0)
+	breakdown := store.TokenBreakdown{
+		InputUncached:   store.AggregateValue{Value: &input, State: state},
+		InputCacheRead:  store.AggregateValue{Value: &zero, State: store.AvailabilityComplete},
+		InputCacheWrite: store.AggregateValue{Value: &zero, State: store.AvailabilityComplete},
+		Output:          store.AggregateValue{Value: &zero, State: store.AvailabilityComplete},
+		ReasoningOutput: store.AggregateValue{Value: &zero, State: store.AvailabilityComplete},
+	}
+	estimate := store.AggregateValue{Value: &zero, State: store.AvailabilityComplete}
+	summary := store.UsageSummary{Tokens: breakdown, APIEstimate: estimate}
+	return application.Dashboard{
+		GeneratedAt: time.Date(2026, 11, 18, 0, 0, 0, 0, time.UTC),
+		Timezone:    "UTC", Today: summary, Week: summary, Last30Days: summary, AllTime: summary,
+		Diagnostics: store.DiagnosticSnapshot{IntegrityOK: true, SchemaVersion: 3, SupportedSchemaVersion: 3},
+	}
 }

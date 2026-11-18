@@ -1,0 +1,301 @@
+package tui
+
+import (
+	"fmt"
+	"math/big"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/ansonnchan/overtok/internal/application"
+	"github.com/ansonnchan/overtok/internal/normalize"
+	"github.com/ansonnchan/overtok/internal/store"
+)
+
+func buildPage(section Section, dashboard application.Dashboard) Page {
+	switch section {
+	case OverviewSection:
+		return overviewPage(dashboard)
+	case SourcesSection:
+		return sourcesPage(dashboard)
+	case ModelsSection:
+		return modelsPage(dashboard)
+	case SettingsSection:
+		return settingsPage(dashboard)
+	default:
+		return Page{Warning: "Unknown local view"}
+	}
+}
+
+func overviewPage(dashboard application.Dashboard) Page {
+	if summaryEmpty(dashboard.AllTime) && len(dashboard.Diagnostics.AdapterHealth) == 0 {
+		return Page{}
+	}
+	page := Page{Lines: []string{
+		"Current period · Today · " + dashboard.Timezone,
+		"Total tokens: " + totalTokens(dashboard.Today.Tokens),
+		"Input uncached: " + formatValue(dashboard.Today.Tokens.InputUncached),
+		"Cache read: " + formatValue(dashboard.Today.Tokens.InputCacheRead),
+		"Cache write: " + formatValue(dashboard.Today.Tokens.InputCacheWrite),
+		"Output: " + formatValue(dashboard.Today.Tokens.Output),
+		"Reasoning output: " + formatValue(dashboard.Today.Tokens.ReasoningOutput),
+		"API-equivalent estimate: " + formatEstimate(dashboard.Today.APIEstimate),
+		"",
+		"Recent periods",
+		periodLine("Today", dashboard.Today),
+		periodLine("This week", dashboard.Week),
+		periodLine("30 days", dashboard.Last30Days),
+		periodLine("All time", dashboard.AllTime),
+		"",
+		"Collection: " + collectionFreshness(dashboard.Diagnostics.LastSuccessfulCollection, dashboard.GeneratedAt),
+		fmt.Sprintf("Database: integrity %s · schema %d/%d · %d source checkpoints", integrityText(dashboard.Diagnostics.IntegrityOK), dashboard.Diagnostics.SchemaVersion, dashboard.Diagnostics.SupportedSchemaVersion, dashboard.Diagnostics.CheckpointCount),
+		fmt.Sprintf("Pending local buckets: %d", dashboard.Diagnostics.PendingOutbox),
+	}}
+	if summaryIncomplete(dashboard.Today) {
+		page.Warning = "Today includes partial or unavailable values"
+	} else if unhealthyAdapters(dashboard.Diagnostics.AdapterHealth) > 0 {
+		page.Warning = "One or more local sources need attention"
+	}
+	return page
+}
+
+func sourcesPage(dashboard application.Dashboard) Page {
+	health := dashboard.Diagnostics.AdapterHealth
+	if len(health) == 0 && len(dashboard.Today.Sources) == 0 {
+		return Page{}
+	}
+	page := Page{Lines: []string{"Adapter health"}}
+	for _, record := range health {
+		count := "unavailable"
+		if record.Health.RecordCount != nil {
+			count = formatUint(*record.Health.RecordCount)
+		}
+		lastSuccess := "never"
+		if record.LastSuccessAt != nil {
+			lastSuccess = record.LastSuccessAt.UTC().Format(time.RFC3339)
+		}
+		page.Lines = append(page.Lines, fmt.Sprintf(
+			"%s/%s · %s · records %s · last success %s",
+			record.Health.Source, record.Health.Surface, record.Health.Status, count, lastSuccess,
+		))
+	}
+	if len(dashboard.Today.Sources) > 0 {
+		page.Lines = append(page.Lines, "", "Usage today by source")
+		for _, source := range dashboard.Today.Sources {
+			page.Lines = append(page.Lines, fmt.Sprintf("%s · %s tokens · API-equivalent estimate %s", source.Name, totalTokens(source.Tokens), formatEstimate(source.APIEstimate)))
+		}
+	}
+	if count := unhealthyAdapters(health); count > 0 {
+		page.Warning = fmt.Sprintf("%d local adapter state(s) need attention; run `overtok doctor`", count)
+	}
+	return page
+}
+
+func modelsPage(dashboard application.Dashboard) Page {
+	models := append([]store.ModelBreakdown(nil), dashboard.AllTime.Models...)
+	if len(models) == 0 {
+		return Page{}
+	}
+	sort.SliceStable(models, func(i, j int) bool {
+		return knownTokenTotal(models[i].Tokens).Cmp(knownTokenTotal(models[j].Tokens)) > 0
+	})
+	page := Page{Lines: []string{"All-time model usage"}}
+	for _, model := range models {
+		name := model.ObservedModelID + " (canonical unavailable)"
+		if model.CanonicalModelID != nil {
+			name = *model.CanonicalModelID
+			if *model.CanonicalModelID != model.ObservedModelID {
+				name += " · observed " + model.ObservedModelID
+			}
+		}
+		page.Lines = append(page.Lines,
+			fmt.Sprintf("%s · attribution %s", name, model.Resolution),
+			fmt.Sprintf("  %s tokens · API-equivalent estimate %s", totalTokens(model.Tokens), formatEstimate(model.APIEstimate)),
+		)
+		if model.Resolution == normalize.ModelUnknown || model.Resolution == normalize.ModelInferred {
+			page.Warning = "Some model attribution is inferred or unavailable"
+		}
+	}
+	return page
+}
+
+func settingsPage(dashboard application.Dashboard) Page {
+	return Page{Lines: []string{
+		"Local mode",
+		"No account, server, group, or synchronization is required.",
+		"",
+		"Privacy",
+		"Overtok stores normalized usage counts only.",
+		"Never stored: prompts, responses, source code, command text, or credentials.",
+		"Never stored: paths, project names, repository names, or branch names.",
+		"",
+		"Controls",
+		"1–4 switch views · tab/arrows navigate · r collect and refresh · ? help · q quit",
+		"",
+		fmt.Sprintf("Timezone: %s", dashboard.Timezone),
+		fmt.Sprintf("Database schema: %d (supported %d)", dashboard.Diagnostics.SchemaVersion, dashboard.Diagnostics.SupportedSchemaVersion),
+		"Collection freshness: " + collectionFreshness(dashboard.Diagnostics.LastSuccessfulCollection, dashboard.GeneratedAt),
+		"Run `overtok doctor` for detailed, path-redacted diagnostics.",
+	}}
+}
+
+func summaryEmpty(summary store.UsageSummary) bool {
+	values := breakdownValues(summary.Tokens)
+	for _, value := range values {
+		if value.State != "" && value.State != store.AvailabilityEmpty {
+			return false
+		}
+	}
+	return true
+}
+
+func summaryIncomplete(summary store.UsageSummary) bool {
+	for _, value := range append(breakdownValues(summary.Tokens), summary.APIEstimate) {
+		if value.State == store.AvailabilityPartial || value.State == store.AvailabilityUnavailable {
+			return true
+		}
+	}
+	return false
+}
+
+func breakdownValues(tokens store.TokenBreakdown) []store.AggregateValue {
+	return []store.AggregateValue{tokens.InputUncached, tokens.InputCacheRead, tokens.InputCacheWrite, tokens.Output, tokens.ReasoningOutput}
+}
+
+func totalValues(tokens store.TokenBreakdown) []store.AggregateValue {
+	return []store.AggregateValue{tokens.InputUncached, tokens.InputCacheRead, tokens.InputCacheWrite, tokens.Output}
+}
+
+func totalTokens(tokens store.TokenBreakdown) string {
+	values := totalValues(tokens)
+	seen, known, incomplete := false, false, false
+	total := new(big.Int)
+	for _, value := range values {
+		if value.State == "" || value.State == store.AvailabilityEmpty {
+			continue
+		}
+		seen = true
+		if value.Value != nil {
+			known = true
+			total.Add(total, new(big.Int).SetUint64(*value.Value))
+		}
+		if value.State != store.AvailabilityComplete {
+			incomplete = true
+		}
+	}
+	switch {
+	case !seen:
+		return "no data"
+	case !known:
+		return "unavailable"
+	case incomplete:
+		return formatDigits(total.String()) + " (partial)"
+	default:
+		return formatDigits(total.String())
+	}
+}
+
+func knownTokenTotal(tokens store.TokenBreakdown) *big.Int {
+	total := new(big.Int)
+	for _, value := range totalValues(tokens) {
+		if value.Value != nil {
+			total.Add(total, new(big.Int).SetUint64(*value.Value))
+		}
+	}
+	return total
+}
+
+func formatValue(value store.AggregateValue) string {
+	switch value.State {
+	case store.AvailabilityEmpty:
+		return "no data"
+	case store.AvailabilityUnavailable:
+		return "unavailable"
+	case store.AvailabilityPartial:
+		if value.Value == nil {
+			return "unavailable"
+		}
+		return formatUint(*value.Value) + " (partial)"
+	default:
+		if value.Value == nil {
+			return "unavailable"
+		}
+		return formatUint(*value.Value)
+	}
+}
+
+func formatEstimate(value store.AggregateValue) string {
+	if value.State == store.AvailabilityEmpty {
+		return "no data"
+	}
+	if value.Value == nil {
+		return "unavailable"
+	}
+	dollars, micros := *value.Value/1_000_000, *value.Value%1_000_000
+	result := fmt.Sprintf("$%s.%06d (estimate)", formatUint(dollars), micros)
+	if value.State == store.AvailabilityPartial {
+		result += " (partial)"
+	}
+	return result
+}
+
+func periodLine(label string, summary store.UsageSummary) string {
+	return fmt.Sprintf("%s · %s tokens · API-equivalent estimate %s", label, totalTokens(summary.Tokens), formatEstimate(summary.APIEstimate))
+}
+
+func collectionFreshness(last *time.Time, now time.Time) string {
+	if last == nil {
+		return "never"
+	}
+	age := now.Sub(*last)
+	if age < 0 {
+		age = 0
+	}
+	if age < time.Minute {
+		return "just now"
+	}
+	if age < time.Hour {
+		return fmt.Sprintf("%dm ago", int(age.Minutes()))
+	}
+	return fmt.Sprintf("%dh ago · %s", int(age.Hours()), last.UTC().Format(time.RFC3339))
+}
+
+func unhealthyAdapters(records []store.StoredAdapterHealth) int {
+	count := 0
+	for _, record := range records {
+		switch record.Health.Status {
+		case normalize.HealthPermissionDenied, normalize.HealthUnsupported, normalize.HealthDegraded, normalize.HealthError:
+			count++
+		}
+	}
+	return count
+}
+
+func integrityText(ok bool) string {
+	if ok {
+		return "ok"
+	}
+	return "failed"
+}
+
+func formatUint(value uint64) string {
+	return formatDigits(strconv.FormatUint(value, 10))
+}
+
+func formatDigits(value string) string {
+	if len(value) <= 3 {
+		return value
+	}
+	var groups []string
+	for len(value) > 3 {
+		index := len(value) - 3
+		groups = append(groups, value[index:])
+		value = value[:index]
+	}
+	groups = append(groups, value)
+	for left, right := 0, len(groups)-1; left < right; left, right = left+1, right-1 {
+		groups[left], groups[right] = groups[right], groups[left]
+	}
+	return strings.Join(groups, ",")
+}
