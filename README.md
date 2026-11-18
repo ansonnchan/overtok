@@ -6,10 +6,10 @@ normalizes token and model metadata, persists privacy-safe aggregates, reports
 installation health, and provides a keyboard-first application shell without
 reading ordinary chat data.
 
-The hosted PostgreSQL data model and migration runner now provide the server
-persistence foundation. Network synchronization, authentication, groups, and
-multiplayer leaderboards remain future roadmap stages and are not required by
-the local application.
+The hosted PostgreSQL data model, HTTP API foundation, and GitHub device login
+now provide account and independently revocable device identity. Network
+synchronization, groups, and multiplayer leaderboards remain later roadmap
+stages and are not required by the local application.
 
 ## Privacy boundary
 
@@ -29,7 +29,8 @@ The native Go command currently provides:
 - deterministic per-model normalization, cumulative-counter reduction, recovery from partial records, and deduplication;
 - transactional local SQLite observations, checkpoints, health, and absolute usage buckets;
 - timezone-aware local totals with explicit complete, partial, unavailable, and empty states;
-- a keyboard-first Overview, Sources, Models, and Settings TUI with manual collection; and
+- a keyboard-first Overview, Sources, Models, and Settings TUI with manual collection;
+- GitHub device-flow `login` and revoking `logout` commands backed by the OS credential vault; and
 - privacy-safe source and storage diagnostics through `overtok doctor`.
 
 Model names are not allowlisted. A previously unseen, non-empty observed identifier can retain its token counts while canonical resolution and pricing remain unavailable. Reported, resolved, inferred, and unknown attribution are separate states.
@@ -42,6 +43,17 @@ Model names are not allowlisted. A previously unseen, non-empty observed identif
 - ccusage 20.0.51 only when exercising the optional ccusage integration. Overtok does not download it at runtime.
 
 The pnpm workspace is reserved for later npm release tooling; it is not needed to build the native command today.
+
+Account commands require an Overtok API origin:
+
+```sh
+OVERTOK_API_URL=https://api.example.test overtok login
+OVERTOK_API_URL=https://api.example.test overtok logout
+```
+
+Login requests public GitHub identity only. The CLI never receives a GitHub
+access token, and the API uses it only in memory to resolve the stable numeric
+GitHub identity before discarding it.
 
 ## Build and verify
 
@@ -85,6 +97,7 @@ contents, or expose persisted observations.
 | `internal/normalize` | Provider-neutral observations, capabilities, and invariants |
 | `internal/collect` | Parsing orchestration, deduplication, cumulative reduction, and summaries |
 | `internal/application` | Local refresh sequencing and committed dashboard queries |
+| `internal/account` | Device login, rotation, revocation, and OS credential-vault storage |
 | `internal/doctor` | Privacy-safe source and storage diagnostic reporting |
 | `internal/fixturecheck` | Automated fixture privacy validation |
 | `internal/modelcatalog` | Versioned model aliases and API-equivalent pricing resolution |
@@ -93,6 +106,7 @@ contents, or expose persisted observations.
 | `internal/sync` | Reserved boundary for later synchronization work |
 | `fixtures` | Synthetic compatibility and regression data |
 | `server/postgres` | Hosted PostgreSQL connection and migration boundary |
+| `server/auth` and `server/httpapi` | GitHub device authorization and bounded JSON API |
 | `migrations` | Immutable, embedded hosted PostgreSQL schema history |
 | `docs` | Cross-cutting architecture and design decisions |
 

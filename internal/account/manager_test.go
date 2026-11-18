@@ -1,0 +1,97 @@
+package account
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"strings"
+	"testing"
+	"time"
+)
+
+func TestManagerLoginRefreshAndLogout(t *testing.T) {
+	session := Session{
+		Credential: "credential", UserID: "user", DeviceID: "device",
+		Login: "synthetic-user", ExpiresAt: time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC),
+	}
+	client := &fakeClient{
+		start:     DeviceStart{FlowToken: "flow", UserCode: "ABCD", VerificationURI: "https://github.com/login/device", ExpiresIn: time.Minute, Interval: time.Second},
+		polls:     []PollResult{{Pending: true, RetryAfter: 2 * time.Second}, {Session: session}},
+		refreshed: Session{Credential: "replacement", UserID: "user", DeviceID: "device", ExpiresAt: session.ExpiresAt.Add(time.Hour)},
+	}
+	store := &memoryStore{}
+	manager, err := NewManager(client, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var waits []time.Duration
+	manager.sleep = func(_ context.Context, duration time.Duration) error {
+		waits = append(waits, duration)
+		return nil
+	}
+	var output bytes.Buffer
+	if err := manager.Login(t.Context(), "test", &output); err != nil {
+		t.Fatal(err)
+	}
+	if store.session.Credential != "credential" || !strings.Contains(output.String(), "ABCD") || !strings.Contains(output.String(), "synthetic-user") {
+		t.Fatalf("login store/output = %#v/%q", store.session, output.String())
+	}
+	if len(waits) != 2 || waits[0] != time.Second || waits[1] != 2*time.Second {
+		t.Fatalf("login waits = %v", waits)
+	}
+	if err := manager.Refresh(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if store.session.Credential != "replacement" || store.session.Login != "synthetic-user" {
+		t.Fatalf("refreshed session = %#v", store.session)
+	}
+	if err := manager.Logout(t.Context()); err != nil || !store.deleted || client.logoutCredential != "replacement" {
+		t.Fatalf("Logout() = %v, deleted=%v credential=%q", err, store.deleted, client.logoutCredential)
+	}
+}
+
+func TestManagerKeepsCredentialWhenRevocationFails(t *testing.T) {
+	client := &fakeClient{logoutErr: errors.New("network unavailable")}
+	store := &memoryStore{session: Session{Credential: "still-live"}}
+	manager, err := NewManager(client, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.Logout(t.Context()); err == nil || store.deleted {
+		t.Fatalf("Logout() = %v, deleted=%v", err, store.deleted)
+	}
+}
+
+type fakeClient struct {
+	start            DeviceStart
+	polls            []PollResult
+	refreshed        Session
+	logoutErr        error
+	logoutCredential string
+}
+
+func (f *fakeClient) Start(context.Context, string) (DeviceStart, error) { return f.start, nil }
+func (f *fakeClient) Poll(context.Context, string) (PollResult, error) {
+	result := f.polls[0]
+	f.polls = f.polls[1:]
+	return result, nil
+}
+func (f *fakeClient) Refresh(context.Context, string) (Session, error) { return f.refreshed, nil }
+func (f *fakeClient) Logout(_ context.Context, credential string) error {
+	f.logoutCredential = credential
+	return f.logoutErr
+}
+
+type memoryStore struct {
+	session Session
+	deleted bool
+}
+
+func (s *memoryStore) Load() (Session, error) {
+	if s.session.Credential == "" {
+		return Session{}, ErrNoSession
+	}
+	return s.session, nil
+}
+func (s *memoryStore) Save(session Session) error { s.session = session; return nil }
+func (s *memoryStore) Delete() error              { s.deleted = true; s.session = Session{}; return nil }

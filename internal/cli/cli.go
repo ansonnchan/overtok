@@ -7,8 +7,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/ansonnchan/overtok/internal/account"
 	"github.com/ansonnchan/overtok/internal/adapters"
 	"github.com/ansonnchan/overtok/internal/doctor"
 	"github.com/ansonnchan/overtok/internal/store"
@@ -28,6 +30,12 @@ type dependencies struct {
 	input    io.Reader
 	launch   func(context.Context, string, string, io.Reader, io.Writer, bool) error
 	timeout  time.Duration
+	account  func(string) (accountManager, error)
+}
+
+type accountManager interface {
+	Login(context.Context, string, io.Writer) error
+	Logout(context.Context) error
 }
 
 func defaultDependencies() dependencies {
@@ -37,6 +45,13 @@ func defaultDependencies() dependencies {
 		input:   os.Stdin,
 		launch:  launchLocalTUI,
 		timeout: 5 * time.Second,
+		account: func(apiURL string) (accountManager, error) {
+			client, err := account.NewClient(apiURL, nil)
+			if err != nil {
+				return nil, err
+			}
+			return account.NewManager(client, account.NewKeyringStore(apiURL))
+		},
 		diagnose: func(ctx context.Context, home, codexHome string) doctor.Report {
 			discovery := adapters.Discoverer{Roots: adapters.DefaultMacRoots(home, codexHome)}
 			path, err := store.DefaultPath()
@@ -65,12 +80,63 @@ func run(args []string, stdout, stderr io.Writer, deps dependencies) int {
 	if flags.NArg() == 1 && flags.Arg(0) == "doctor" {
 		return runDoctor(stdout, stderr, deps)
 	}
+	if flags.NArg() == 1 && flags.Arg(0) == "login" {
+		return runLogin(stdout, stderr, deps)
+	}
+	if flags.NArg() == 1 && flags.Arg(0) == "logout" {
+		return runLogout(stdout, stderr, deps)
+	}
 	if flags.NArg() != 0 {
 		fmt.Fprintf(stderr, "unknown command %q\n", flags.Arg(0))
 		return 2
 	}
 
 	return runTUI(stdout, stderr, deps)
+}
+
+func runLogin(stdout, stderr io.Writer, deps dependencies) int {
+	manager, ok := configuredAccountManager(stderr, deps)
+	if !ok {
+		return 1
+	}
+	if err := manager.Login(context.Background(), version, stdout); err != nil {
+		fmt.Fprintln(stderr, "could not sign in; check the API configuration and try again")
+		return 1
+	}
+	return 0
+}
+
+func runLogout(stdout, stderr io.Writer, deps dependencies) int {
+	manager, ok := configuredAccountManager(stderr, deps)
+	if !ok {
+		return 1
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if err := manager.Logout(ctx); err != nil {
+		fmt.Fprintln(stderr, "could not sign out; the device remains authorized")
+		return 1
+	}
+	fmt.Fprintln(stdout, "Signed out and revoked this device.")
+	return 0
+}
+
+func configuredAccountManager(stderr io.Writer, deps dependencies) (accountManager, bool) {
+	apiURL := strings.TrimSpace(deps.getenv("OVERTOK_API_URL"))
+	if apiURL == "" {
+		fmt.Fprintln(stderr, "OVERTOK_API_URL is required for account commands")
+		return nil, false
+	}
+	if deps.account == nil {
+		fmt.Fprintln(stderr, "account support is unavailable")
+		return nil, false
+	}
+	manager, err := deps.account(apiURL)
+	if err != nil {
+		fmt.Fprintln(stderr, "OVERTOK_API_URL is invalid")
+		return nil, false
+	}
+	return manager, true
 }
 
 func runTUI(stdout, stderr io.Writer, deps dependencies) int {

@@ -40,6 +40,34 @@ go build -o ./bin/overtok ./cmd/overtok
 ./bin/overtok doctor
 ```
 
+## Local account API
+
+Running account commands locally requires PostgreSQL and a GitHub OAuth app
+with Device Flow enabled. The app needs only public identity; do not request
+repository or organization scopes.
+
+Configure the API process with:
+
+```sh
+export DATABASE_URL='postgres://overtok:password@localhost:5432/overtok?sslmode=disable'
+export GITHUB_CLIENT_ID='your-github-oauth-client-id'
+export OVERTOK_AUTH_STATE_KEY="$(openssl rand -base64 32)"
+export OVERTOK_LISTEN_ADDR='127.0.0.1:8080'
+go run ./server/cmd/api
+```
+
+Then point the native client at the loopback API:
+
+```sh
+OVERTOK_API_URL='http://127.0.0.1:8080' go run ./cmd/overtok login
+OVERTOK_API_URL='http://127.0.0.1:8080' go run ./cmd/overtok logout
+```
+
+Plain HTTP is accepted only for loopback development. Non-loopback API origins
+must use HTTPS. The state key encrypts short-lived GitHub device codes and must
+be provided through secret management in a deployed environment; it is not a
+client credential.
+
 The Makefile places `GOCACHE` and `GOPATH` under `/tmp` by default. Override those variables when a development environment needs different writable cache locations.
 
 ## Test boundaries
@@ -50,6 +78,7 @@ The Makefile places `GOCACHE` and `GOPATH` under `/tmp` by default. Override tho
 - Collection tests cover repeatability, overlap, cumulative counters, resets, partial writes, malformed records, and attribution quality.
 - Application and TUI tests inject storage, collection, terminal-size, and keyboard events; they never launch against real provider roots.
 - PostgreSQL integration tests use only synthetic identities and values in a disposable schema.
+- Authentication tests use synthetic GitHub responses and never contact a real account.
 
 Do not point automated tests at a real home directory or provider-owned storage. Real compatibility investigation requires explicit user approval and must produce a newly constructed sanitized regression fixture rather than a copied transcript.
 
