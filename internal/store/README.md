@@ -41,6 +41,10 @@ same evidence is a no-op. Source-root, session, and last-record identifiers are
 also fingerprinted before SQL execution; the schema has no path or raw
 source-identifier fields.
 
+`CommitScan` extends the same invariant across every source completed by one
+application scan: either all observation/checkpoint/health batches commit, or
+none do.
+
 Token categories use nullable decimal text. This preserves unavailable versus
 reported zero and supports the complete `uint64` range that SQLite's signed
 integer storage cannot represent. Model resolution, observed and canonical

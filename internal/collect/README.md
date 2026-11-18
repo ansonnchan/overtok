@@ -1,8 +1,13 @@
 # Collection semantics
 
-The `collect` package coordinates already-discovered candidates. It opens supported JSONL containers, delegates provider parsing to adapters, deduplicates raw observations, converts cumulative counters to increments, and can produce deterministic per-model summaries.
+The `collect` package owns the application scan boundary. Its orchestrator asks
+the discovery and storage interfaces for work, while the collector opens
+supported JSONL containers, delegates provider parsing to adapters, deduplicates
+raw observations, converts cumulative counters to increments, and produces
+deterministic normalized state.
 
-Collection does not discover roots, persist state, upload data, or present a UI.
+Collection coordinates discovery and persistence through consuming-boundary
+interfaces. It does not define provider roots, SQL behavior, uploads, or UI.
 
 ## Processing order
 
@@ -13,6 +18,7 @@ candidate files
     -> deduplicate source identities
     -> reduce cumulative snapshots per session
     -> deterministic observations and warnings
+    -> atomic observations + checkpoints + adapter health
 ```
 
 Deduplication must happen before cumulative reduction. Reducing two overlapping copies first would turn the same snapshot stream into separate deltas and inflate totals.
@@ -28,6 +34,16 @@ The source plus stable source-record identifier forms the duplicate key. Exact d
 5. a privacy-safe signature containing only normalized metadata.
 
 The final tie-breaker never includes raw record content or a source path.
+
+## Scan transactions and cancellation
+
+All source batches from one scan commit in a single store transaction. A
+partial parser failure degrades only the matching source health and does not
+discard valid observations from other sources. If cancellation arrives after
+discovery, already-normalized state is committed through a bounded detached
+context before `Scan` returns the cancellation; this prevents a retry from
+losing durable progress or inflating totals. The canceled state is recorded in
+adapter health and returned to the caller.
 
 ## Cumulative counters
 

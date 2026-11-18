@@ -106,12 +106,19 @@ type StoredAdapterHealth struct {
 // CommitObservations writes observations, the matching checkpoint, and health
 // in one transaction. A checkpoint never advances ahead of normalized state.
 func (db *DB) CommitObservations(ctx context.Context, batch ObservationBatch) (CommitResult, error) {
-	if err := validateBatch(batch); err != nil {
-		return CommitResult{}, err
+	return db.CommitScan(ctx, []ObservationBatch{batch})
+}
+
+// CommitScan atomically writes every source batch in one completed local scan.
+func (db *DB) CommitScan(ctx context.Context, batches []ObservationBatch) (CommitResult, error) {
+	for _, batch := range batches {
+		if err := validateBatch(batch); err != nil {
+			return CommitResult{}, err
+		}
 	}
 	tx, err := db.sql.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
-		return CommitResult{}, fmt.Errorf("begin observation commit: %w", err)
+		return CommitResult{}, fmt.Errorf("begin scan commit: %w", err)
 	}
 	committed := false
 	defer func() {
@@ -120,26 +127,28 @@ func (db *DB) CommitObservations(ctx context.Context, batch ObservationBatch) (C
 		}
 	}()
 
-	observations := append([]normalize.Observation(nil), batch.Observations...)
-	sort.Slice(observations, func(i, j int) bool {
-		return observationIdentity(observations[i]) < observationIdentity(observations[j])
-	})
 	var result CommitResult
-	for _, observation := range observations {
-		inserted, err := insertObservation(ctx, tx, observation)
-		if err != nil {
+	for _, batch := range batches {
+		observations := append([]normalize.Observation(nil), batch.Observations...)
+		sort.Slice(observations, func(i, j int) bool {
+			return observationIdentity(observations[i]) < observationIdentity(observations[j])
+		})
+		for _, observation := range observations {
+			inserted, err := insertObservation(ctx, tx, observation)
+			if err != nil {
+				return CommitResult{}, err
+			}
+			result.InsertedObservations += inserted
+		}
+		if err := upsertCheckpoint(ctx, tx, batch.Checkpoint); err != nil {
 			return CommitResult{}, err
 		}
-		result.InsertedObservations += inserted
-	}
-	if err := upsertCheckpoint(ctx, tx, batch.Checkpoint); err != nil {
-		return CommitResult{}, err
-	}
-	if err := upsertAdapterHealth(ctx, tx, batch.Health); err != nil {
-		return CommitResult{}, err
+		if err := upsertAdapterHealth(ctx, tx, batch.Health); err != nil {
+			return CommitResult{}, err
+		}
 	}
 	if err := tx.Commit(); err != nil {
-		return CommitResult{}, fmt.Errorf("commit observations and checkpoint: %w", err)
+		return CommitResult{}, fmt.Errorf("commit local scan: %w", err)
 	}
 	committed = true
 	return result, nil

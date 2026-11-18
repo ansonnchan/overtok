@@ -111,6 +111,29 @@ func TestCommitObservationsRollsBackWhenCheckpointFails(t *testing.T) {
 	assertStoredCounts(t, db, 0, 0, 0)
 }
 
+func TestCommitScanRollsBackAllSourcesTogether(t *testing.T) {
+	t.Parallel()
+	db := openStoreForTest(t)
+	first := sampleBatch()
+	second := sampleBatch()
+	second.Checkpoint.Source = NewSourceIdentity(normalize.SourceClaude, normalize.SurfaceDesktopCode, "second")
+	second.Health.Source = second.Checkpoint.Source
+	second.Health.Health.Surface = normalize.SurfaceDesktopCode
+	second.Observations[0].Surface = normalize.SurfaceDesktopCode
+	second.Observations[0].SourceRecordID = "second-record"
+	if _, err := db.sql.ExecContext(t.Context(), `
+		CREATE TRIGGER reject_second_checkpoint BEFORE INSERT ON source_checkpoints
+		WHEN NEW.surface = 'desktop_code'
+		BEGIN SELECT RAISE(ABORT, 'synthetic second-source interruption'); END
+	`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.CommitScan(t.Context(), []ObservationBatch{first, second}); err == nil {
+		t.Fatal("CommitScan() succeeded")
+	}
+	assertStoredCounts(t, db, 0, 0, 0)
+}
+
 func TestCommitObservationsHonorsCancellation(t *testing.T) {
 	t.Parallel()
 	db := openStoreForTest(t)

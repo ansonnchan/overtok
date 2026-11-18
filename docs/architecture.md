@@ -44,7 +44,7 @@ The root, `docs/`, and `internal/` READMEs provide navigation. Complex implement
 
 ## Local data flow
 
-The implemented in-memory collection path is:
+The implemented local collection path is:
 
 ```text
 Narrow read-only source discovery
@@ -52,11 +52,10 @@ Narrow read-only source discovery
     -> validated normalized observations
     -> raw source-identity deduplication
     -> per-session cumulative-counter reduction
-    -> deterministic per-model summaries
+    -> one SQLite transaction for observations, checkpoints, and adapter health
 ```
 
-The storage boundary now accepts normalized observations through this flow;
-application-level collection orchestration is the next integration step:
+Persistence follows this transaction flow:
 
 ```text
 Normalized observations
