@@ -85,7 +85,7 @@ func checkRaw(data []byte) error {
 		if _, found := prohibitedKeys[key]; found {
 			return fmt.Errorf("contains prohibited private key %q", match[1])
 		}
-		if _, found := allowedKeys[key]; !found {
+		if _, found := allowedKeys[key]; !found && !isSyntheticDynamicKey(string(match[1])) {
 			return fmt.Errorf("contains non-allowlisted fixture key %q", match[1])
 		}
 	}
@@ -139,6 +139,10 @@ func strictDecode(data []byte, value any) error {
 }
 
 func checkValue(value any) error {
+	return checkValueAt(value, "")
+}
+
+func checkValueAt(value any, parentKey string) error {
 	switch value := value.(type) {
 	case map[string]any:
 		for key, child := range value {
@@ -146,21 +150,30 @@ func checkValue(value any) error {
 			if _, found := prohibitedKeys[normalized]; found {
 				return fmt.Errorf("contains prohibited key %q", key)
 			}
-			if _, found := allowedKeys[normalized]; !found {
+			_, allowed := allowedKeys[normalized]
+			if normalizeKey(parentKey) == normalizeKey("models") {
+				allowed = isSyntheticDynamicKey(key)
+			}
+			if !allowed {
 				return fmt.Errorf("contains non-allowlisted key %q", key)
 			}
-			if err := checkValue(child); err != nil {
+			if err := checkValueAt(child, key); err != nil {
 				return err
 			}
 		}
 	case []any:
 		for _, child := range value {
-			if err := checkValue(child); err != nil {
+			if err := checkValueAt(child, parentKey); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+func isSyntheticDynamicKey(value string) bool {
+	normalized := strings.ToLower(value)
+	return strings.Contains(normalized, "synthetic") && !strings.ContainsAny(value, "/\\@")
 }
 
 func normalizeKey(value string) string {
