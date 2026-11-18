@@ -75,7 +75,13 @@ func TestServiceRejectsTamperedExpiredAndDeniedFlows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, token := range []string{"invalid", started.FlowToken[:len(started.FlowToken)-1] + "A"} {
+	tampered := []byte(started.FlowToken)
+	if tampered[len(tampered)/2] == 'A' {
+		tampered[len(tampered)/2] = 'B'
+	} else {
+		tampered[len(tampered)/2] = 'A'
+	}
+	for _, token := range []string{"invalid", string(tampered)} {
 		result, err := service.Poll(t.Context(), token)
 		if err != nil || result.Status != FlowExpired {
 			t.Fatalf("tampered Poll() = %#v, %v", result, err)
