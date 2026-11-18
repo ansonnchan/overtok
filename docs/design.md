@@ -50,8 +50,9 @@ The local native MVP has four TUI areas:
 3. **Models** — model usage, token categories, and attribution quality.
 4. **Settings** — keyboard help, local settings, privacy, and diagnostics.
 
-Authentication, groups, multiplayer leaderboards, and synchronization controls
-remain deferred until the local application is complete.
+Authentication is available through the explicit `login` and `logout` CLI
+commands. Groups, multiplayer leaderboards, and synchronization controls remain
+deferred in the TUI until their application boundaries are implemented.
 
 ## Responsive layout
 

@@ -1,6 +1,6 @@
 # Architecture
 
-Status: local native MVP and hosted persistence implemented; network API remains planned
+Status: local native MVP, hosted persistence, and device authentication implemented; synchronization planned
 Last updated: November 18, 2026
 
 ## System goals
@@ -23,6 +23,7 @@ The repository uses the following current and planned boundaries:
 cmd/
   overtok/                 Native CLI entry point
 internal/
+  account/                 Native login and OS credential-vault storage
   adapters/                Source-specific discovery and parsing
   application/             Local refresh and dashboard orchestration
   collect/                 Deduplication, counter reduction, and summaries
@@ -34,7 +35,9 @@ internal/
   sync/                    Buckets, outbox, and client protocol (planned)
   tui/                     Bubble Tea application shell and local views
 server/
-  cmd/api/                 Planned HTTP API entry point
+  auth/                    GitHub device flow and Overtok device credentials
+  cmd/api/                 Hosted HTTP API entry point
+  httpapi/                 Bounded JSON routing and protocol errors
   postgres/                Hosted connection and migration boundary
 migrations/                Embedded hosted PostgreSQL schema history
 fixtures/                  Sanitized compatibility fixtures
@@ -172,10 +175,11 @@ price coverage remains complete, partial, or unavailable through every query.
 
 ## Server data flow
 
-The hosted persistence foundation is implemented. PostgreSQL stores users,
+The hosted persistence and device-authentication foundations are implemented. PostgreSQL stores users,
 GitHub identities, independently revocable devices and credential hashes,
-pricing revisions, and privacy-limited absolute usage buckets. The HTTP API,
-authentication exchange, and synchronization protocol remain planned.
+pricing revisions, and privacy-limited absolute usage buckets. The HTTP API
+implements GitHub device login, credential rotation, and device revocation;
+the synchronization protocol remains planned.
 
 Server migrations are embedded in the Go binary, contiguous, checksummed, and
 applied once inside an advisory-locked transaction. Applied migration history
@@ -217,6 +221,18 @@ The leaderboard identity is the user account. Devices only collect and upload.
 - Each device has a separate revocable credential.
 - Memberships and invites reference users, not devices.
 - Revoking a device prevents future writes without deleting other device data.
+
+The CLI begins authorization through the Overtok API and displays GitHub's
+verification URL and user code. Short-lived GitHub device state is encrypted
+and authenticated inside an opaque flow token. After approval, the API uses the
+GitHub access token only in memory to read the stable numeric ID and login, then
+discards it. Neither PostgreSQL nor the native client stores that token.
+
+Overtok device credentials contain a public credential ID and 256-bit random
+secret. PostgreSQL stores only the SHA-256 secret hash. Rotation revokes the old
+credential atomically, logout revokes the entire device, and other devices on
+the same account remain independent. The native client stores its session in
+the operating-system credential vault with no plaintext-file fallback.
 
 ### Groups
 

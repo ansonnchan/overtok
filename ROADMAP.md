@@ -1,6 +1,6 @@
 # Overtok roadmap
 
-Status: local native MVP and server data model complete; authentication and synchronization planned
+Status: local native MVP, server data model, and device authentication complete; synchronization in progress
 Last updated: November 18, 2026
 
 ## Product definition
@@ -310,7 +310,7 @@ Goal: establish one account across multiple independently managed devices.
   - Users, GitHub identities, devices, device credentials, pricing revisions, and usage buckets.
   - Acceptance: database constraints enforce ownership and bucket idempotency.
 
-- [ ] **OVT-021: Implement GitHub device-flow login**
+- [x] **OVT-021: Implement GitHub device-flow login**
   - Complete CLI-friendly authorization without accepting a GitHub password.
   - Exchange GitHub identity for an Overtok account and device credential.
   - Acceptance: login, logout, credential refresh/failure, and device revocation are tested.

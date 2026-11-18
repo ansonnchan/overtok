@@ -1,0 +1,187 @@
+package httpapi
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"io"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	serverauth "github.com/ansonnchan/overtok/server/auth"
+)
+
+const maxRequestBytes = 16 << 10
+
+type authenticationService interface {
+	Start(context.Context, string) (serverauth.StartResponse, error)
+	Poll(context.Context, string) (serverauth.PollResponse, error)
+	Refresh(context.Context, string) (serverauth.Session, error)
+	Logout(context.Context, string) error
+}
+
+// Handler is the hosted Overtok HTTP API.
+type Handler struct {
+	auth authenticationService
+	mux  *http.ServeMux
+}
+
+// New constructs the API handler with exact method-aware routes.
+func New(authService authenticationService) (*Handler, error) {
+	if authService == nil {
+		return nil, errors.New("initialize HTTP API: authentication service is required")
+	}
+	handler := &Handler{auth: authService, mux: http.NewServeMux()}
+	handler.mux.HandleFunc("GET /healthz", handler.health)
+	handler.mux.HandleFunc("POST /v1/auth/device/start", handler.startDevice)
+	handler.mux.HandleFunc("POST /v1/auth/device/poll", handler.pollDevice)
+	handler.mux.HandleFunc("POST /v1/auth/refresh", handler.refresh)
+	handler.mux.HandleFunc("POST /v1/auth/logout", handler.logout)
+	return handler, nil
+}
+
+// ServeHTTP applies stable security headers before routing.
+func (h *Handler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
+	response.Header().Set("Cache-Control", "no-store")
+	response.Header().Set("Content-Type", "application/json")
+	response.Header().Set("X-Content-Type-Options", "nosniff")
+	h.mux.ServeHTTP(response, request)
+}
+
+func (h *Handler) health(response http.ResponseWriter, _ *http.Request) {
+	writeJSON(response, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (h *Handler) startDevice(response http.ResponseWriter, request *http.Request) {
+	var input struct {
+		ClientVersion string `json:"client_version"`
+	}
+	if err := decodeRequest(response, request, &input); err != nil {
+		writeError(response, http.StatusBadRequest, "invalid_request")
+		return
+	}
+	started, err := h.auth.Start(request.Context(), input.ClientVersion)
+	if err != nil {
+		writeError(response, http.StatusBadGateway, "authorization_unavailable")
+		return
+	}
+	writeJSON(response, http.StatusCreated, map[string]any{
+		"flow_token": started.FlowToken, "user_code": started.UserCode,
+		"verification_uri": started.VerificationURI,
+		"expires_in":       durationSeconds(started.ExpiresIn),
+		"interval":         durationSeconds(started.Interval),
+	})
+}
+
+func (h *Handler) pollDevice(response http.ResponseWriter, request *http.Request) {
+	var input struct {
+		FlowToken string `json:"flow_token"`
+	}
+	if err := decodeRequest(response, request, &input); err != nil || input.FlowToken == "" {
+		writeError(response, http.StatusBadRequest, "invalid_request")
+		return
+	}
+	result, err := h.auth.Poll(request.Context(), input.FlowToken)
+	if err != nil {
+		writeError(response, http.StatusBadGateway, "authorization_unavailable")
+		return
+	}
+	switch result.Status {
+	case serverauth.FlowPending, serverauth.FlowSlowDown:
+		retry := result.RetryAfter
+		if retry <= 0 {
+			retry = 5 * time.Second
+		}
+		response.Header().Set("Retry-After", strconv.FormatInt(durationSeconds(retry), 10))
+		writeJSON(response, http.StatusAccepted, map[string]any{
+			"status": result.Status, "retry_after": durationSeconds(retry),
+		})
+	case serverauth.FlowExpired:
+		writeError(response, http.StatusGone, "authorization_expired")
+	case serverauth.FlowDenied:
+		writeError(response, http.StatusForbidden, "authorization_denied")
+	case serverauth.FlowApproved:
+		if result.Session == nil {
+			writeError(response, http.StatusInternalServerError, "internal_error")
+			return
+		}
+		writeJSON(response, http.StatusOK, result.Session)
+	default:
+		writeError(response, http.StatusBadGateway, "authorization_unavailable")
+	}
+}
+
+func (h *Handler) refresh(response http.ResponseWriter, request *http.Request) {
+	credential, ok := bearerCredential(request)
+	if !ok {
+		writeError(response, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	session, err := h.auth.Refresh(request.Context(), credential)
+	if errors.Is(err, serverauth.ErrUnauthorized) {
+		writeError(response, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	if err != nil {
+		writeError(response, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	writeJSON(response, http.StatusOK, session)
+}
+
+func (h *Handler) logout(response http.ResponseWriter, request *http.Request) {
+	credential, ok := bearerCredential(request)
+	if !ok {
+		writeError(response, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	if err := h.auth.Logout(request.Context(), credential); errors.Is(err, serverauth.ErrUnauthorized) {
+		writeError(response, http.StatusUnauthorized, "unauthorized")
+		return
+	} else if err != nil {
+		writeError(response, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	response.WriteHeader(http.StatusNoContent)
+}
+
+func decodeRequest(response http.ResponseWriter, request *http.Request, target any) error {
+	request.Body = http.MaxBytesReader(response, request.Body, maxRequestBytes)
+	decoder := json.NewDecoder(request.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		return err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		return errors.New("request contains trailing JSON")
+	}
+	return nil
+}
+
+func bearerCredential(request *http.Request) (string, bool) {
+	scheme, value, found := strings.Cut(strings.TrimSpace(request.Header.Get("Authorization")), " ")
+	return value, found && strings.EqualFold(scheme, "Bearer") && value != ""
+}
+
+func durationSeconds(duration time.Duration) int64 {
+	seconds := int64(duration / time.Second)
+	if duration%time.Second != 0 {
+		seconds++
+	}
+	if seconds < 1 {
+		return 1
+	}
+	return seconds
+}
+
+func writeError(response http.ResponseWriter, status int, code string) {
+	writeJSON(response, status, map[string]string{"error": code})
+}
+
+func writeJSON(response http.ResponseWriter, status int, value any) {
+	response.WriteHeader(status)
+	_ = json.NewEncoder(response).Encode(value)
+}

@@ -157,3 +157,64 @@ func TestDoctorCommandHandlesHomeResolutionFailure(t *testing.T) {
 		t.Fatalf("doctor code/stderr = %d/%q", code, stderr.String())
 	}
 }
+
+func TestAccountCommandsUseConfiguredAPIAndRedactFailures(t *testing.T) {
+	t.Parallel()
+	manager := &fakeAccountManager{}
+	deps := dependencies{
+		getenv: func(name string) string {
+			if name == "OVERTOK_API_URL" {
+				return "https://api.example.test"
+			}
+			return ""
+		},
+		account: func(apiURL string) (accountManager, error) {
+			if apiURL != "https://api.example.test" {
+				t.Fatalf("api URL = %q", apiURL)
+			}
+			return manager, nil
+		},
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if code := run([]string{"login"}, &stdout, &stderr, deps); code != 0 || manager.loginVersion != version {
+		t.Fatalf("login = %d/%q/%q manager=%#v", code, stdout.String(), stderr.String(), manager)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := run([]string{"logout"}, &stdout, &stderr, deps); code != 0 || !manager.loggedOut || !strings.Contains(stdout.String(), "revoked") {
+		t.Fatalf("logout = %d/%q/%q manager=%#v", code, stdout.String(), stderr.String(), manager)
+	}
+	manager.loginErr = errors.New("secret provider token at /private/path")
+	stdout.Reset()
+	stderr.Reset()
+	if code := run([]string{"login"}, &stdout, &stderr, deps); code != 1 || strings.Contains(stderr.String(), "provider token") || strings.Contains(stderr.String(), "/private/path") {
+		t.Fatalf("failed login = %d/%q/%q", code, stdout.String(), stderr.String())
+	}
+}
+
+func TestAccountCommandRequiresAPIURL(t *testing.T) {
+	t.Parallel()
+	deps := dependencies{getenv: func(string) string { return "" }}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if code := run([]string{"login"}, &stdout, &stderr, deps); code != 1 || !strings.Contains(stderr.String(), "OVERTOK_API_URL") {
+		t.Fatalf("login = %d/%q/%q", code, stdout.String(), stderr.String())
+	}
+}
+
+type fakeAccountManager struct {
+	loginVersion string
+	loginErr     error
+	loggedOut    bool
+}
+
+func (f *fakeAccountManager) Login(_ context.Context, version string, _ io.Writer) error {
+	f.loginVersion = version
+	return f.loginErr
+}
+
+func (f *fakeAccountManager) Logout(context.Context) error {
+	f.loggedOut = true
+	return nil
+}

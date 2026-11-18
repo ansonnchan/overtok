@@ -13,12 +13,14 @@ local evidence
 
 doctor reads discovery, parser, and storage health without collecting records
 fixturecheck protects committed test data independently of runtime collection
+account owns hosted login and OS credential-vault storage beside the local flow
 ```
 
 ## Package ownership
 
 | Package | Owns | Does not own |
 | --- | --- | --- |
+| `account` | Overtok API login, credential rotation/revocation, and OS vault storage | GitHub tokens, source collection, or server persistence |
 | `adapters` | Source discovery, source formats, and external parser contracts | Cross-source totals, persistence, or UI |
 | `normalize` | Provider-neutral records, capability vocabulary, and validation | Filesystem discovery or provider parsing |
 | `collect` | Application scan orchestration, deduplication, cumulative reduction, and summaries | SQL implementation or uploads |
