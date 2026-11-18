@@ -29,7 +29,7 @@ internal/
   fixturecheck/            Fixture privacy enforcement
   modelcatalog/            Model resolution and pricing revisions (planned)
   normalize/               Canonical usage records
-  store/                   Local SQLite persistence (planned)
+  store/                   Local SQLite lifecycle and migrations
   sync/                    Buckets, outbox, and client protocol (planned)
   tui/                     Bubble Tea models and views (planned)
 server/
@@ -101,7 +101,7 @@ The canonical layer separates:
 
 It also converts source-specific token semantics into non-overlapping billable categories where possible. Unknown categories remain nullable. Reasoning tokens recorded as part of output remain subset metadata.
 
-### Local persistence (planned)
+### Local persistence
 
 SQLite runs in WAL mode and stores:
 
@@ -113,6 +113,13 @@ SQLite runs in WAL mode and stores:
 - adapter health and last-success state.
 
 Observation and checkpoint writes share a transaction. A source checkpoint cannot advance without the matching normalized state being durable.
+
+The local database uses the CGO-free `github.com/ncruces/go-sqlite3` driver and
+lives under the platform user-configuration directory by default. Embedded,
+checksummed migrations are contiguous and run as one immediate transaction.
+Owner-only directory and file permissions are established before SQLite opens
+the database. Connection-local foreign-key and busy-timeout settings are
+applied to every pooled connection.
 
 ### Upload buckets (planned)
 
