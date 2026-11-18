@@ -18,15 +18,20 @@ import (
 	"github.com/ansonnchan/overtok/internal/normalize"
 )
 
+// Result contains deterministic normalized observations and safe warning codes.
 type Result struct {
 	Observations []normalize.Observation
 	Warnings     []normalize.Warning
 }
 
+// Collector reads discovered local candidates using their provider adapters.
 type Collector struct {
 	SourceVersion string
 }
 
+// Collect parses candidates, deduplicates raw records, and reduces cumulative
+// snapshots. It returns warnings instead of aborting the entire scan when one
+// candidate is unreadable or malformed.
 func (c Collector) Collect(ctx context.Context, candidates []adapters.Candidate) Result {
 	version := c.SourceVersion
 	if version == "" {
@@ -68,6 +73,8 @@ func (c Collector) Collect(ctx context.Context, candidates []adapters.Candidate)
 		}
 		_ = file.Close()
 	}
+	// Overlapping roots must collapse before snapshots become deltas; reversing
+	// this order would count each copy as an independent cumulative stream.
 	rawObservations, result.Warnings = Deduplicate(rawObservations, result.Warnings)
 	result.Observations, result.Warnings = incrementalizeWithWarnings(rawObservations, result.Warnings)
 	sort.SliceStable(result.Warnings, func(i, j int) bool {
@@ -85,6 +92,8 @@ func incrementalizeWithWarnings(observations []normalize.Observation, warnings [
 }
 
 func logicalFileID(candidate adapters.Candidate) string {
+	// Relative identity is stable across equivalent roots. The absolute-path
+	// fallback is hashed immediately and remains local to cumulative-state isolation.
 	identity := candidate.RelativePath
 	if identity == "" {
 		identity = candidate.Path
@@ -93,6 +102,8 @@ func logicalFileID(candidate adapters.Candidate) string {
 	return "logical-file-" + hex.EncodeToString(sum[:16])
 }
 
+// Deduplicate collapses source identities and chooses a deterministic winner for
+// conflicting copies. The key and tie-breakers exclude raw content and paths.
 func Deduplicate(observations []normalize.Observation, warnings []normalize.Warning) ([]normalize.Observation, []normalize.Warning) {
 	byID := make(map[string]normalize.Observation, len(observations))
 	for _, observation := range observations {
@@ -133,6 +144,8 @@ func sameUsage(a, b normalize.Observation) bool {
 }
 
 func preferred(a, b normalize.Observation) normalize.Observation {
+	// Prefer completeness and magnitude before timestamps so a later partial copy
+	// cannot displace a more informative record of the same source identity.
 	aKnown, aTotal := usageQuality(a.Tokens)
 	bKnown, bTotal := usageQuality(b.Tokens)
 	if aKnown != bKnown {
@@ -184,6 +197,8 @@ func usageQuality(tokens normalize.TokenCounts) (int, uint64) {
 }
 
 func surfaceRank(surface normalize.Surface) int {
+	// Surface rank is only a deterministic duplicate tie-breaker. It does not
+	// claim that one product surface is more accurate than another.
 	switch surface {
 	case normalize.SurfaceDesktopCode:
 		return 0
@@ -203,6 +218,8 @@ func surfaceRank(surface normalize.Surface) int {
 }
 
 func safeSignature(observation normalize.Observation) string {
+	// This final tie-breaker contains only normalized usage metadata. Never add a
+	// path, session identifier, or raw-record fragment here.
 	return strings.Join([]string{
 		string(observation.Surface), observation.ObservedModelID, tokenValue(observation.Tokens.InputUncached),
 		tokenValue(observation.Tokens.InputCacheRead), tokenValue(observation.Tokens.InputCacheWrite),

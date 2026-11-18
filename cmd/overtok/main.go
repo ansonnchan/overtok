@@ -1,3 +1,4 @@
+// Command overtok is the native Overtok CLI entry point.
 package main
 
 import (

@@ -8,18 +8,23 @@ import (
 	"io"
 )
 
+// DefaultMaxRecordBytes bounds one record to avoid unbounded local allocations.
 const DefaultMaxRecordBytes = 1 << 20
 
+// Record is one complete non-empty JSONL line and its one-based line number.
 type Record struct {
 	Number int
 	Data   []byte
 }
 
+// Result contains complete records plus stable recovery warning codes.
 type Result struct {
 	Records  []Record
 	Warnings []string
 }
 
+// Read returns complete bounded records. An unterminated final record is treated
+// as a partial write and deferred until a later scan.
 func Read(reader io.Reader, maxRecordBytes int) (Result, error) {
 	if maxRecordBytes == 0 {
 		maxRecordBytes = DefaultMaxRecordBytes

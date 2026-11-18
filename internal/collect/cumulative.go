@@ -2,6 +2,8 @@ package collect
 
 import "github.com/ansonnchan/overtok/internal/normalize"
 
+// Incrementalize converts cumulative snapshots to per-record deltas while
+// keeping state isolated by source and local session identity.
 func Incrementalize(observations []normalize.Observation) ([]normalize.Observation, []normalize.Warning) {
 	result := make([]normalize.Observation, 0, len(observations))
 	warnings := []normalize.Warning(nil)
@@ -24,11 +26,15 @@ func Incrementalize(observations []normalize.Observation) ([]normalize.Observati
 		observation.Measurement = normalize.MeasurementDerived
 		observation.SourceRecordID += "-delta"
 		if reset {
+			// A decrease starts a new monotonic segment; treating it as subtraction
+			// would underflow and discard legitimate usage after a source reset.
 			warning := normalize.Warning{Code: "counter_reset"}
 			observation.Warnings = append(observation.Warnings, warning)
 			warnings = append(warnings, warning)
 			previousBySession[key] = cloneTokenCounts(snapshot)
 		} else {
+			// Missing categories remain absent from this delta but must not erase
+			// the last known snapshot used when that category reappears.
 			previousBySession[key] = mergeLastKnown(previous, snapshot)
 		}
 		if err := observation.Validate(); err != nil {

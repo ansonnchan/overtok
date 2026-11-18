@@ -1,6 +1,6 @@
 # Architecture
 
-Status: target architecture for the MVP
+Status: implemented local-collection boundaries plus target MVP architecture
 Last updated: November 17, 2026
 
 ## System goals
@@ -17,40 +17,48 @@ Overtok must:
 
 ## Repository shape
 
-The intended monorepo layout is:
+The repository uses the following current and planned boundaries:
 
 ```text
 cmd/
   overtok/                 Native CLI entry point
 internal/
   adapters/                Source-specific discovery and parsing
-  collect/                 Collection orchestration and checkpoints
-  modelcatalog/            Model resolution and pricing revisions
+  collect/                 Deduplication, counter reduction, and summaries
+  doctor/                  Privacy-safe source diagnostics
+  fixturecheck/            Fixture privacy enforcement
+  modelcatalog/            Model resolution and pricing revisions (planned)
   normalize/               Canonical usage records
-  store/                   Local SQLite persistence
-  sync/                    Buckets, outbox, and client protocol
-  tui/                     Bubble Tea models and views
+  store/                   Local SQLite persistence (planned)
+  sync/                    Buckets, outbox, and client protocol (planned)
+  tui/                     Bubble Tea models and views (planned)
 server/
-  cmd/api/                 HTTP API entry point
-  internal/auth/           GitHub identity and device credentials
-  internal/groups/         Groups, memberships, and invites
-  internal/ingest/         Idempotent usage ingestion
-  internal/leaderboard/    Period and metric queries
-migrations/                PostgreSQL migrations
+  cmd/api/                 Reserved HTTP API entry point
+migrations/                Reserved database migrations
 fixtures/                  Sanitized compatibility fixtures
-packages/                  pnpm npm-distribution workspace
+packages/                  npm-distribution workspace (planned)
 docs/                      Architecture and product design
 ```
 
-Package names may evolve during OVT-001, but the boundaries should remain.
+The root, `docs/`, and `internal/` READMEs provide navigation. Complex implemented subsystems also document their local contracts beside the code.
 
 ## Local data flow
 
+The implemented in-memory collection path is:
+
 ```text
-Source discovery
-    -> adapter parse
-    -> source-specific observations
-    -> canonical normalization
+Narrow read-only source discovery
+    -> provider JSONL parser or pinned ccusage contract
+    -> validated normalized observations
+    -> raw source-identity deduplication
+    -> per-session cumulative-counter reduction
+    -> deterministic per-model summaries
+```
+
+Persistence begins in M1. Its target flow remains:
+
+```text
+Normalized observations
     -> model resolution
     -> SQLite transaction
          - observation
@@ -59,7 +67,7 @@ Source discovery
          - outbox revision
 ```
 
-Collection never depends on the server. The TUI reads derived local state and does not parse source files directly.
+Collection never depends on the server. The future TUI reads derived local state and does not parse source files directly.
 
 ### Source adapters
 
@@ -75,7 +83,11 @@ An adapter owns:
 
 Adapters emit observations; they do not calculate leaderboard ranks or perform uploads.
 
-The initial integration may invoke a pinned ccusage native executable with JSON output. Overtok validates that output and converts it into its own contract. Claude Desktop local-agent discovery may wrap compatible roots or require a focused Go adapter.
+The implemented adapters parse supported Claude and Codex JSONL natively. They recover from malformed complete records, defer actively written final lines, preserve nullable categories, and emit stable local identities.
+
+The optional ccusage integration invokes version 20.0.51 with pinned offline daily JSON commands. Overtok rejects any other version, unknown or duplicate fields, invalid counter relationships, and inconsistent totals before normalization. It never downloads the binary at runtime.
+
+Claude Desktop discovery is limited to Code sessions and local Agent/Cowork evidence. Ordinary Claude Desktop chat storage is never scanned. Default Codex storage is classified as shared local evidence when CLI and Desktop attribution cannot be proven.
 
 ### Normalization
 
@@ -89,7 +101,7 @@ The canonical layer separates:
 
 It also converts source-specific token semantics into non-overlapping billable categories where possible. Unknown categories remain nullable. Reasoning tokens recorded as part of output remain subset metadata.
 
-### Local persistence
+### Local persistence (planned)
 
 SQLite runs in WAL mode and stores:
 
@@ -102,13 +114,13 @@ SQLite runs in WAL mode and stores:
 
 Observation and checkpoint writes share a transaction. A source checkpoint cannot advance without the matching normalized state being durable.
 
-### Upload buckets
+### Upload buckets (planned)
 
 The client uploads absolute bucket snapshots rather than additive deltas. A bucket key includes the account, device, time interval, source, surface, model identity, measurement quality, and schema version.
 
 Each local change increments the bucket revision. The server accepts a revision only when it is newer than the stored revision. Replaying a batch is therefore safe.
 
-The exact interval will be selected during the feasibility phase. It must balance timezone accuracy, privacy, and row count.
+The exact interval will be selected with synchronization work. It must balance timezone accuracy, privacy, and row count.
 
 ## Server data flow
 
@@ -192,12 +204,15 @@ Autosync points to a stable installed binary, not an ephemeral package-runner ca
 - Deletion and device revocation are first-class API operations.
 - Client data is self-reported and never presented as cheat-proof.
 
-## Open feasibility decisions
+## Feasibility decisions
 
-M0 must resolve:
+M0 established these local rules:
 
-- whether pinned ccusage output contains sufficient stable identity for local deduplication;
-- whether Claude Desktop roots can be parsed through explicit ccusage paths;
-- whether Codex Desktop duplicates CLI-visible rollouts;
-- which bucket interval preserves period semantics without excessive behavioral detail;
-- which fields are reliably available across supported source versions.
+- Pinned ccusage daily rows receive deterministic identities from schema, source, surface, UTC day, and observed model.
+- Claude Desktop coding roots are discovered narrowly and parsed through native compatible-record adapters.
+- Default Codex CLI and Desktop evidence is represented once as `shared_local`; a distinct `CODEX_HOME` permits separate CLI and Desktop roots.
+- Cross-root deduplication happens before cumulative snapshots become deltas.
+- Source capabilities distinguish reported, derived, inferred, and unsupported fields.
+- Missing model or token metadata remains unknown rather than becoming zero or a guessed alias.
+
+The synchronization bucket interval remains intentionally open until the persistence and protocol stages can evaluate timezone accuracy, privacy, and row volume together.

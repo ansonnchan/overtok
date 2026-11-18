@@ -20,31 +20,42 @@ import (
 )
 
 const (
-	PinnedVersion  = "20.0.51"
-	SchemaID       = "daily-agent-contract-v1"
+	// PinnedVersion is the only accepted external executable version.
+	PinnedVersion = "20.0.51"
+	// SchemaID versions Overtok's expectations for the pinned JSON shape.
+	SchemaID = "daily-agent-contract-v1"
+	// AdapterVersion identifies conversion from the external schema to observations.
 	AdapterVersion = "1"
 	defaultLimit   = 16 << 20
 )
 
+// ErrOutputTooLarge reports that bounded stdout or stderr was exceeded.
 var ErrOutputTooLarge = errors.New("ccusage output exceeds limit")
 
+// Agent selects one pinned ccusage command and report schema.
 type Agent string
 
 const (
+	// AgentClaude selects the root Claude daily command.
 	AgentClaude Agent = "claude"
-	AgentCodex  Agent = "codex"
+	// AgentCodex selects the namespaced Codex daily command.
+	AgentCodex Agent = "codex"
 )
 
+// Executor runs a bounded external command and is injected by tests.
 type Executor interface {
 	Run(context.Context, string, []string, int) ([]byte, []byte, error)
 }
 
+// Client validates and invokes one explicitly configured ccusage executable.
 type Client struct {
 	Binary   string
 	Executor Executor
 	Limit    int
 }
 
+// Collect checks the pinned version, runs an offline daily report, validates the
+// complete schema, and returns deterministic per-model observations.
 func (c Client) Collect(ctx context.Context, agent Agent, surface normalize.Surface) ([]normalize.Observation, error) {
 	if c.Binary == "" {
 		return nil, errors.New("ccusage binary path is required")
@@ -92,6 +103,7 @@ func (c Client) Collect(ctx context.Context, agent Agent, surface normalize.Surf
 	}
 }
 
+// ValidateVersion accepts only the pinned version with known CLI prefixes.
 func ValidateVersion(data []byte) error {
 	got := strings.TrimSpace(string(data))
 	if got != PinnedVersion && got != "ccusage "+PinnedVersion && got != "ccusage v"+PinnedVersion && got != "v"+PinnedVersion {
@@ -101,6 +113,8 @@ func ValidateVersion(data []byte) error {
 }
 
 func commandFor(agent Agent) ([]string, normalize.Source, error) {
+	// Offline prevents metadata fetches, no-cost keeps pricing outside collection,
+	// and UTC gives daily aggregates stable identities across local time zones.
 	flags := []string{"daily", "--json", "--no-cost", "--offline", "--timezone", "UTC"}
 	switch agent {
 	case AgentClaude:
@@ -117,8 +131,11 @@ func commandError(action string, err error) error {
 	return fmt.Errorf("ccusage %s: %w", action, err)
 }
 
+// OSExecutor invokes the configured local executable without a shell.
 type OSExecutor struct{}
 
+// Run captures bounded stdout and stderr. Callers must not expose stderr because
+// external diagnostics may contain identifying local paths.
 func (OSExecutor) Run(ctx context.Context, binary string, args []string, limit int) ([]byte, []byte, error) {
 	if limit <= 0 {
 		return nil, nil, errors.New("output limit must be positive")
@@ -156,6 +173,8 @@ func (b *cappedBuffer) Write(data []byte) (int, error) {
 
 func (b *cappedBuffer) Bytes() []byte { return b.buffer.Bytes() }
 
+// Report counters use pointers so strict validation can distinguish a reported
+// zero from a missing or null property in the external contract.
 type claudeReport struct {
 	Daily  []claudePeriod `json:"daily"`
 	Totals *claudeTotals  `json:"totals"`
@@ -249,6 +268,8 @@ func decodeCodexReport(data []byte) (codexReport, error) {
 }
 
 func strictDecode(data []byte, target any) error {
+	// encoding/json accepts duplicate keys by keeping the last value. Reject them
+	// first so malformed external output cannot silently change meaning.
 	if err := rejectDuplicateKeys(data); err != nil {
 		return err
 	}
@@ -395,6 +416,7 @@ func requiredCounts(input, output, cacheWrite, cacheRead, reasoning, total *uint
 		counts.total = calculated
 		return counts, nil
 	}
+	// Reasoning is a subset of output in this contract and must not be added twice.
 	calculated, err := sumValues(counts.input, counts.output, counts.cacheWrite, counts.cacheRead)
 	if err != nil {
 		return numericTotals{}, err
@@ -504,6 +526,8 @@ func (r codexReport) observations(surface normalize.Surface) ([]normalize.Observ
 				InputCacheWrite: cloneUint(model.CacheCreationTokens), Output: cloneUint(model.OutputTokens),
 				ReasoningOutput: cloneUint(model.ReasoningOutputTokens),
 			}
+			// ccusage has already associated snapshots with this map key outside
+			// Overtok's native record context, so preserve it as inferred.
 			warnings := append([]normalize.Warning{{Code: "model_inferred"}}, pricingWarnings(model.MissingPricing)...)
 			observation := baseObservation(normalize.SourceCodex, surface, day.Date, occurredAt, name, normalize.ModelInferred, tokens, warnings)
 			if err := observation.Validate(); err != nil {
@@ -516,6 +540,8 @@ func (r codexReport) observations(surface normalize.Surface) ([]normalize.Observ
 }
 
 func baseObservation(source normalize.Source, surface normalize.Surface, date string, occurredAt time.Time, model string, resolution normalize.ModelResolution, tokens normalize.TokenCounts, warnings []normalize.Warning) normalize.Observation {
+	// A daily report is an absolute aggregate for that period, not usage newly
+	// contributed by this invocation. Preserve cumulative semantics for safe replay.
 	return normalize.Observation{
 		Source: source, Surface: surface, SourceVersion: "ccusage/" + PinnedVersion,
 		SourceRecordID: stableID(source, surface, date, model), OccurredAt: occurredAt,
@@ -541,6 +567,8 @@ func cloneUint(value *uint64) *uint64 {
 }
 
 func stableID(source normalize.Source, surface normalize.Surface, period, model string) string {
+	// Contract version, source, surface, day, and model uniquely identify an
+	// absolute daily aggregate without retaining any provider record content.
 	sum := sha256.Sum256([]byte(strings.Join([]string{SchemaID, string(source), string(surface), period, model}, "\x00")))
 	return "ccusage-" + hex.EncodeToString(sum[:16])
 }

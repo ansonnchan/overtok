@@ -12,20 +12,26 @@ import (
 	"github.com/ansonnchan/overtok/internal/normalize"
 )
 
+// DiscoveryProbe supplies source health without requiring usage collection.
 type DiscoveryProbe interface {
 	Discover(context.Context) []adapters.Finding
 }
 
+// ParserProbe checks compatibility of an optional external parser.
 type ParserProbe interface {
 	Check(context.Context) ParserStatus
 }
 
+// ParserStatus distinguishes absence, incompatibility, execution failure, and timeout.
 type ParserStatus struct {
 	Found      bool
 	Compatible bool
-	Issue      string
+	// Issue is empty, "timeout", or "execution_failed"; incompatibility is
+	// represented by Found without Compatible so no external output is retained.
+	Issue string
 }
 
+// Report is a path-redacted snapshot of platform, parser, and source health.
 type Report struct {
 	GOOS     string
 	GOARCH   string
@@ -33,6 +39,7 @@ type Report struct {
 	Findings []adapters.Finding
 }
 
+// Diagnose gathers discovery and parser health under the caller's context.
 func Diagnose(ctx context.Context, discovery DiscoveryProbe, parser ParserProbe) Report {
 	report := Report{GOOS: runtime.GOOS, GOARCH: runtime.GOARCH, Findings: discovery.Discover(ctx)}
 	if parser != nil {
@@ -41,6 +48,8 @@ func Diagnose(ctx context.Context, discovery DiscoveryProbe, parser ParserProbe)
 	return report
 }
 
+// ExitCode returns non-zero for unsupported platforms or unhealthy present sources.
+// Missing optional sources do not make the diagnostic fail.
 func (r Report) ExitCode() int {
 	if r.GOOS != "darwin" {
 		return 1
@@ -57,6 +66,7 @@ func (r Report) ExitCode() int {
 	return 0
 }
 
+// Render formats a deterministic report using only redaction-safe finding fields.
 func (r Report) Render() string {
 	var output strings.Builder
 	fmt.Fprintln(&output, "Overtok doctor")
@@ -78,6 +88,8 @@ func (r Report) Render() string {
 	findings := append([]adapters.Finding(nil), r.Findings...)
 	sort.SliceStable(findings, func(i, j int) bool { return sourceOrder(findings[i].Kind) < sourceOrder(findings[j].Kind) })
 	for _, finding := range findings {
+		// Candidate paths are intentionally never consulted here. Finding metadata
+		// is sufficient to diagnose a source without exposing a user directory.
 		fmt.Fprintf(&output, "  %-29s %s", label(finding.Kind), statusText(finding))
 		if finding.SharedRoot {
 			fmt.Fprint(&output, "; shared records deduplicated")

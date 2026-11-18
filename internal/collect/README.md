@@ -1,0 +1,40 @@
+# Collection semantics
+
+The `collect` package coordinates already-discovered candidates. It opens supported JSONL containers, delegates provider parsing to adapters, deduplicates raw observations, converts cumulative counters to increments, and can produce deterministic per-model summaries.
+
+Collection does not discover roots, persist state, upload data, or present a UI.
+
+## Processing order
+
+```text
+candidate files
+    -> source parser
+    -> raw normalized observations
+    -> deduplicate source identities
+    -> reduce cumulative snapshots per session
+    -> deterministic observations and warnings
+```
+
+Deduplication must happen before cumulative reduction. Reducing two overlapping copies first would turn the same snapshot stream into separate deltas and inflate totals.
+
+## Duplicate conflicts
+
+The source plus stable source-record identifier forms the duplicate key. Exact duplicates collapse silently. Conflicting copies emit `duplicate_conflict` and use a deterministic winner selected by:
+
+1. number of known token categories;
+2. non-overlapping token magnitude;
+3. later source timestamp;
+4. stable surface precedence;
+5. a privacy-safe signature containing only normalized metadata.
+
+The final tie-breaker never includes raw record content or a source path.
+
+## Cumulative counters
+
+Cumulative state is isolated by source and local session identity. If a session identifier is unavailable, the adapter supplies a logical-file identity so unrelated files do not share state.
+
+A decreased known counter starts a new segment and emits `counter_reset`; the current snapshot becomes the first increment in that segment. A missing category remains unknown for that observation, but the reducer remembers the last known value so a later reappearance is compared with the correct snapshot.
+
+## Summaries
+
+Summaries group by source, observed model identifier, and resolution quality. Reported and inferred usage for the same model string must remain distinct. If either side of a category is unknown, the summarized category remains unknown instead of presenting a partial sum as complete.

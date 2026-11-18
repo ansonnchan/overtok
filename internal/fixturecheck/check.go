@@ -13,12 +13,16 @@ import (
 	"strings"
 )
 
+// Key checks are normalized across camelCase, snake_case, and kebab-case so a
+// fixture cannot bypass the privacy policy through source-specific spelling.
 var prohibitedKeys = normalizedSet(
 	"prompt", "response", "content", "text", "body", "messages", "transcript", "data",
 	"source_code", "diff", "tool_input", "tool_output", "command", "path", "project_path", "cwd", "project",
 	"repository", "repo", "branch", "api_key", "access_token", "authorization", "credential", "password", "secret",
 )
 
+// The allowlist is intentionally structural. Add a source field only after
+// confirming that it cannot contain transcript or identifying material.
 var allowedKeys = normalizedSet(
 	"type", "sessionId", "requestId", "timestamp", "message", "id", "model", "usage",
 	"input_tokens", "cached_input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens",
@@ -39,6 +43,8 @@ func normalizedSet(values ...string) map[string]struct{} {
 	return result
 }
 
+// Raw patterns protect malformed and non-JSON fixtures that structural decoding
+// cannot inspect reliably.
 var prohibitedPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)/Users/|/home/|/root/|~/|[A-Z]:\\`),
 	regexp.MustCompile(`(?i)[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}`),
@@ -48,6 +54,7 @@ var prohibitedPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`eyJ[a-zA-Z0-9_-]{8,}\.[a-zA-Z0-9_-]{8,}\.[a-zA-Z0-9_-]{8,}`),
 }
 
+// CheckDir validates every file under root before tests may consume fixtures.
 func CheckDir(root string) error {
 	return filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -60,6 +67,8 @@ func CheckDir(root string) error {
 		if err != nil {
 			return fmt.Errorf("read fixture %s: %w", filepath.Base(path), err)
 		}
+		// Raw validation always runs first, including for fixtures intentionally
+		// malformed to test parser recovery.
 		if err := checkRaw(data); err != nil {
 			return fmt.Errorf("fixture %s: %w", filepath.Base(path), err)
 		}
@@ -152,6 +161,8 @@ func checkValueAt(value any, parentKey string) error {
 			}
 			_, allowed := allowedKeys[normalized]
 			if normalizeKey(parentKey) == normalizeKey("models") {
+				// ccusage represents Codex model identifiers as dynamic object keys.
+				// Only explicitly synthetic keys are permitted in committed fixtures.
 				allowed = isSyntheticDynamicKey(key)
 			}
 			if !allowed {
@@ -187,6 +198,8 @@ func normalizeKey(value string) string {
 }
 
 func allowsMalformed(path string) bool {
+	// Malformed compatibility cases are opted in by name, but raw privacy scans
+	// have already run before syntax errors are tolerated.
 	name := strings.ToLower(filepath.Base(path))
 	return strings.Contains(name, "malformed") || strings.Contains(name, "partial")
 }

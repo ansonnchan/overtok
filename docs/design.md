@@ -1,6 +1,6 @@
 # TUI design direction
 
-Status: MVP visual and interaction guidance
+Status: approved MVP visual and interaction guidance; TUI not yet implemented
 Last updated: November 17, 2026
 
 ## Intent
@@ -8,6 +8,8 @@ Last updated: November 17, 2026
 The Overtok TUI should feel calm, compact, and deliberate. It is a metrics application, not a simulated hacker console.
 
 The supplied Tokenboard reference is useful for its hierarchy, warm accent, restrained dark surfaces, clear table rows, selected-user emphasis, and compact summary cards. Overtok should adapt those principles to terminal constraints without reproducing the web layout or branding.
+
+The presentation layer begins after local persistence and model resolution. Until then, `overtok doctor` is plain diagnostic output rather than a partial TUI, and presentation code must not absorb collection responsibilities.
 
 ## Visual principles
 

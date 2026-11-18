@@ -12,18 +12,27 @@ import (
 	"github.com/ansonnchan/overtok/internal/normalize"
 )
 
+// RootKind names one supported provider storage layout.
 type RootKind string
 
 const (
-	RootClaudeCLI           RootKind = "claude_cli"
-	RootClaudeDesktopCode   RootKind = "claude_desktop_code"
-	RootClaudeDesktopAgent  RootKind = "claude_desktop_agent"
+	// RootClaudeCLI is the Claude Code CLI project-session root.
+	RootClaudeCLI RootKind = "claude_cli"
+	// RootClaudeDesktopCode is the Claude Desktop Code-session root.
+	RootClaudeDesktopCode RootKind = "claude_desktop_code"
+	// RootClaudeDesktopAgent is the Claude Desktop local Agent subtree.
+	RootClaudeDesktopAgent RootKind = "claude_desktop_agent"
+	// RootClaudeDesktopCowork is the Claude Desktop Cowork audit subtree.
 	RootClaudeDesktopCowork RootKind = "claude_desktop_cowork"
-	RootCodexCLI            RootKind = "codex_cli"
-	RootCodexDesktop        RootKind = "codex_desktop"
-	RootCodexShared         RootKind = "codex_shared"
+	// RootCodexCLI is a Codex home distinct from default desktop storage.
+	RootCodexCLI RootKind = "codex_cli"
+	// RootCodexDesktop is the default Codex Desktop session root.
+	RootCodexDesktop RootKind = "codex_desktop"
+	// RootCodexShared is storage that cannot be attributed to CLI or Desktop.
+	RootCodexShared RootKind = "codex_shared"
 )
 
+// RootSpec defines a narrow read-only search without exposing its path publicly.
 type RootSpec struct {
 	Kind         RootKind
 	Source       normalize.Source
@@ -35,6 +44,8 @@ type RootSpec struct {
 	Capabilities normalize.Capabilities
 }
 
+// Candidate is a local file that matches one supported root contract.
+// Path and RelativePath must never be serialized into diagnostics or uploads.
 type Candidate struct {
 	Source       normalize.Source
 	Surface      normalize.Surface
@@ -43,6 +54,7 @@ type Candidate struct {
 	RelativePath string
 }
 
+// Finding records discovery health and private candidates for one root.
 type Finding struct {
 	Kind         RootKind
 	Source       normalize.Source
@@ -56,10 +68,12 @@ type Finding struct {
 	Capabilities normalize.Capabilities
 }
 
+// Discoverer scans an explicit set of source roots.
 type Discoverer struct {
 	Roots []RootSpec
 }
 
+// Discover returns one finding per configured root and marks cross-root overlap.
 func (d Discoverer) Discover(ctx context.Context) []Finding {
 	findings := make([]Finding, 0, len(d.Roots))
 	for _, root := range d.Roots {
@@ -83,6 +97,8 @@ func discoverRoot(ctx context.Context, root RootSpec) Finding {
 		return finding
 	}
 	if info.Mode()&os.ModeSymlink != 0 {
+		// Refusing a root symlink prevents discovery from escaping the explicitly
+		// supported provider directory into unrelated user data.
 		finding.Status = normalize.HealthUnsupported
 		finding.Warnings = []normalize.Warning{{Code: "source_root_symlink"}}
 		return finding
@@ -149,6 +165,8 @@ func discoverRoot(ctx context.Context, root RootSpec) Finding {
 }
 
 func markSharedCandidates(findings []Finding) {
+	// The same physical candidate under multiple roots cannot support a precise
+	// surface claim, even though its provider remains known.
 	owners := make(map[string][]int)
 	for index, finding := range findings {
 		for _, candidate := range finding.Candidates {
@@ -177,6 +195,8 @@ func hasWarningCode(warnings []normalize.Warning, code string) bool {
 	return false
 }
 
+// DefaultMacRoots returns only coding-agent evidence roots supported on macOS.
+// Ordinary desktop chat storage is intentionally absent.
 func DefaultMacRoots(home, codexHome string) []RootSpec {
 	if codexHome == "" {
 		codexHome = filepath.Join(home, ".codex")
@@ -209,6 +229,8 @@ func DefaultMacRoots(home, codexHome string) []RootSpec {
 		},
 	}
 	if filepath.Clean(codexHome) == filepath.Clean(defaultCodexHome) {
+		// The default Codex home is shared by CLI and Desktop in current installs;
+		// one ambiguous root avoids double discovery and false attribution.
 		return append(roots, RootSpec{
 			Kind: RootCodexShared, Source: normalize.SourceCodex, Surface: normalize.SurfaceSharedLocal,
 			Path: filepath.Join(defaultCodexHome, "sessions"), Format: "codex-rollout-jsonl", Extensions: []string{".jsonl"},

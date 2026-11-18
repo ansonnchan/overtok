@@ -2,55 +2,80 @@ package normalize
 
 import "time"
 
+// SchemaVersion identifies the normalized observation contract.
 const SchemaVersion = "1"
 
+// Source identifies the coding-agent provider that produced local evidence.
 type Source string
 
 const (
+	// SourceClaude identifies Claude coding-agent evidence.
 	SourceClaude Source = "claude"
-	SourceCodex  Source = "codex"
+	// SourceCodex identifies Codex coding-agent evidence.
+	SourceCodex Source = "codex"
 )
 
+// Surface identifies the product context in which evidence was recorded.
 type Surface string
 
 const (
-	SurfaceCLI           Surface = "cli"
-	SurfaceDesktopCode   Surface = "desktop_code"
-	SurfaceDesktopAgent  Surface = "desktop_agent"
+	// SurfaceCLI identifies a provider command-line client.
+	SurfaceCLI Surface = "cli"
+	// SurfaceDesktopCode identifies Claude Desktop Code sessions.
+	SurfaceDesktopCode Surface = "desktop_code"
+	// SurfaceDesktopAgent identifies Claude Desktop Agent sessions.
+	SurfaceDesktopAgent Surface = "desktop_agent"
+	// SurfaceDesktopCowork identifies Claude Desktop Cowork sessions.
 	SurfaceDesktopCowork Surface = "desktop_cowork"
-	SurfaceDesktop       Surface = "desktop"
-	SurfaceSharedLocal   Surface = "shared_local"
+	// SurfaceDesktop identifies evidence attributable to a desktop client.
+	SurfaceDesktop Surface = "desktop"
+	// SurfaceSharedLocal preserves ambiguity when CLI and desktop share storage.
+	SurfaceSharedLocal Surface = "shared_local"
 )
 
+// ModelResolution records the evidence quality behind model attribution.
 type ModelResolution string
 
 const (
+	// ModelReported means the source record directly names the observed model.
 	ModelReported ModelResolution = "reported"
+	// ModelResolved means canonical metadata was mapped from an observed model.
 	ModelResolved ModelResolution = "resolved"
+	// ModelInferred means surrounding source context supplies the observed model.
 	ModelInferred ModelResolution = "inferred"
-	ModelUnknown  ModelResolution = "unknown"
+	// ModelUnknown means available evidence cannot identify the model safely.
+	ModelUnknown ModelResolution = "unknown"
 )
 
+// CountSemantics distinguishes individual usage from running snapshots.
 type CountSemantics string
 
 const (
+	// CountIncremental means the record contributes its values once.
 	CountIncremental CountSemantics = "incremental"
-	CountCumulative  CountSemantics = "cumulative_snapshot"
+	// CountCumulative means the record is a running counter that requires reduction.
+	CountCumulative CountSemantics = "cumulative_snapshot"
 )
 
+// Measurement records how a normalized value was obtained.
 type Measurement string
 
 const (
-	MeasurementReported  Measurement = "reported"
-	MeasurementDerived   Measurement = "derived"
+	// MeasurementReported means the source provided the normalized value directly.
+	MeasurementReported Measurement = "reported"
+	// MeasurementDerived means Overtok computed the value deterministically.
+	MeasurementDerived Measurement = "derived"
+	// MeasurementEstimated means the value relies on an explicit approximation.
 	MeasurementEstimated Measurement = "estimated"
 )
 
+// Warning is a stable machine-readable condition with optional safe context.
 type Warning struct {
 	Code    string `json:"code"`
 	Message string `json:"message,omitempty"`
 }
 
+// TokenCounts stores independent token categories; nil means unavailable, not zero.
 type TokenCounts struct {
 	InputUncached   *uint64 `json:"input_uncached_tokens"`
 	InputCacheRead  *uint64 `json:"input_cache_read_tokens"`
@@ -59,6 +84,7 @@ type TokenCounts struct {
 	ReasoningOutput *uint64 `json:"reasoning_output_tokens"`
 }
 
+// Observation is one validated, source-neutral unit of local usage evidence.
 type Observation struct {
 	Source               Source          `json:"source"`
 	Surface              Surface         `json:"surface"`
