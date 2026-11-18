@@ -1,3 +1,4 @@
-// Package tui reserves the keyboard-first terminal presentation layer. It will
-// read committed application state and must not own collection or synchronization.
+// Package tui implements Overtok's keyboard-first terminal presentation.
+// It renders application snapshots and invokes application actions without
+// discovering sources or reading storage directly.
 package tui

@@ -1,7 +1,7 @@
 # TUI design direction
 
-Status: approved MVP visual and interaction guidance; TUI not yet implemented
-Last updated: November 17, 2026
+Status: application shell implemented; local views in progress
+Last updated: November 18, 2026
 
 ## Intent
 
@@ -9,7 +9,10 @@ The Overtok TUI should feel calm, compact, and deliberate. It is a metrics appli
 
 The supplied Tokenboard reference is useful for its hierarchy, warm accent, restrained dark surfaces, clear table rows, selected-user emphasis, and compact summary cards. Overtok should adapt those principles to terminal constraints without reproducing the web layout or branding.
 
-The presentation layer begins after local persistence and model resolution. Until then, `overtok doctor` is plain diagnostic output rather than a partial TUI, and presentation code must not absorb collection responsibilities.
+The presentation layer begins after local persistence and model resolution.
+`overtok doctor` remains plain diagnostic output. The TUI consumes
+presentation-ready application snapshots and must not absorb discovery,
+collection, persistence, or future synchronization responsibilities.
 
 ## Visual principles
 
@@ -40,46 +43,54 @@ Color is never the only carrier of meaning. Pair status colors with text, symbol
 
 ## Information architecture
 
-The MVP has four TUI areas:
+The local native MVP has four TUI areas:
 
-1. **Overview** — personal totals, source coverage, sync freshness, and current group standing.
-2. **Leaderboard** — rankings, period/metric controls, model/source mix, and the current user.
-3. **Models** — most-used models and token-category breakdown.
-4. **Settings/health** — account, devices, sources, autosync, privacy preview, and diagnostics.
+1. **Overview** — personal totals, recent periods, and collection freshness.
+2. **Sources** — local adapter coverage, source health, and availability.
+3. **Models** — model usage, token categories, and attribution quality.
+4. **Settings** — keyboard help, local settings, privacy, and diagnostics.
 
-Groups can be switched from the leaderboard header or a compact group selector. A separate full-screen group manager is unnecessary for the first version.
+Authentication, groups, multiplayer leaderboards, and synchronization controls
+remain deferred until the local application is complete.
 
 ## Responsive layout
 
 ### Wide terminals
 
-At approximately 120 columns or more:
+At 88 columns or more:
 
 ```text
-┌ Header: group · period · metric · freshness ─────────────────────┐
-│                                                                  │
-│  Leaderboard table                         Your standing          │
-│  rank · user · usage · trend               Group summary          │
-│                                             Source/model mix       │
-│                                                                  │
-├ Footer: shortcuts · sync state · warnings ────────────────────────┤
+Overtok · local usage
+[1 Overview]    2 Sources    3 Models    4 Settings
+
+Overview
+[ready] Local data loaded
+Today ...
+
+1–4 views · tab navigate · r refresh · ? help · q quit
 ```
 
-The main table receives most of the width. The side column contains no more than three compact cards.
+Whitespace and short rows provide hierarchy without surrounding the screen in
+borders. Data-heavy views may add a second column only when it leaves readable
+room for both columns.
 
 ### Narrow terminals
 
-Below the wide breakpoint:
+From 48 through 87 columns:
 
-- stack summary information above or below the table;
-- remove decorative columns before truncating identity or totals;
-- abbreviate large values consistently;
-- replace tab bars with a compact selector;
-- preserve all actions through keyboard shortcuts.
+- keep navigation on one compact row;
+- stack summary information;
+- remove decorative columns before truncating labels or totals;
+- abbreviate large values consistently; and
+- preserve every action through keyboard shortcuts.
 
-The initial minimum supported size should be documented after the first prototype is measured.
+The minimum supported width is 48 columns. Below it, the application presents
+a resize instruction while preserving help and quit controls.
 
-## Leaderboard behavior
+## Future leaderboard behavior
+
+The following guidance applies only after authentication and multiplayer work
+is explicitly started; it is not part of the local native MVP.
 
 Each row should prioritize:
 
@@ -111,16 +122,15 @@ The overview should answer these questions without navigation:
 
 - How much have I used in the selected period?
 - Which coding agents and models contributed?
-- When did this device last collect and sync?
+- When did this device last collect?
 - Is any source partial, unsupported, or unhealthy?
-- Where do I rank in the selected group?
 
 Warnings are concise and actionable:
 
 ```text
 Codex model unavailable for 2 legacy sessions
 Claude Desktop source changed; run `overtok doctor`
-3 buckets waiting to sync
+3 buckets pending locally
 ```
 
 Do not turn missing coverage into a zero-value chart.
@@ -134,10 +144,6 @@ Initial keyboard conventions:
 | `1`–`4` | Switch main area |
 | `tab` / `shift+tab` | Move between controls |
 | `j` / `k`, arrows | Move selection |
-| `[` / `]` | Change period |
-| `m` | Change metric |
-| `g` | Change group |
-| `s` | Synchronize |
 | `r` | Refresh current view |
 | `?` | Help |
 | `q` | Quit |
@@ -146,11 +152,11 @@ Avoid modal dialogs when a focused inline confirmation is sufficient. Destructiv
 
 ## Motion and feedback
 
-- Use a small spinner only for active collection, login, sync, or refresh.
+- Use a small spinner only for active collection or refresh.
 - Avoid continuous animations while idle.
 - Preserve the last stable data while refreshing.
 - Show success briefly, then return to freshness/status text.
-- Never block navigation on a background leaderboard refresh.
+- Never block navigation on a background refresh.
 
 ## Content style
 
