@@ -13,8 +13,10 @@ import (
 	"github.com/ansonnchan/overtok/internal/normalize"
 )
 
+// AdapterVersion identifies the Claude-to-normalized mapping contract.
 const AdapterVersion = "1"
 
+// Result contains valid observations and safe warning codes from one stream.
 type Result struct {
 	Observations []normalize.Observation
 	Warnings     []normalize.Warning
@@ -37,6 +39,7 @@ type record struct {
 	} `json:"message"`
 }
 
+// Parse reads Claude assistant usage records and skips all non-usage content.
 func Parse(reader io.Reader, surface normalize.Surface, sourceVersion string) (Result, error) {
 	lines, err := jsonl.Read(reader, 0)
 	if err != nil {
@@ -87,6 +90,8 @@ func Parse(reader io.Reader, surface normalize.Surface, sourceVersion string) (R
 }
 
 func recordID(parsed record, ordinal int) string {
+	// Provider identifiers are stable enough for deduplication but are hashed so
+	// normalized state never retains a raw source identifier.
 	switch {
 	case parsed.RequestID != "":
 		return "claude-request-" + safeIdentifier(parsed.RequestID)

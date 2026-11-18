@@ -13,8 +13,10 @@ import (
 	"github.com/ansonnchan/overtok/internal/normalize"
 )
 
+// AdapterVersion identifies the Codex-to-normalized mapping contract.
 const AdapterVersion = "1"
 
+// Result contains valid observations and safe warning codes from one rollout.
 type Result struct {
 	Observations []normalize.Observation
 	Warnings     []normalize.Warning
@@ -40,6 +42,8 @@ type tokenUsage struct {
 	ReasoningOutputTokens *uint64 `json:"reasoning_output_tokens"`
 }
 
+// Parse follows turn context and token events in source order. logicalFileID
+// isolates cumulative state when the rollout does not expose a session ID.
 func Parse(reader io.Reader, surface normalize.Surface, sourceVersion, logicalFileID string) (Result, error) {
 	lines, err := jsonl.Read(reader, 0)
 	if err != nil {
@@ -59,6 +63,8 @@ func Parse(reader io.Reader, surface normalize.Surface, sourceVersion, logicalFi
 		}
 		switch parsed.Type {
 		case "turn_context":
+			// Token events omit the model, so the active turn context makes later
+			// attribution inferred rather than directly reported.
 			activeModel = parsed.Payload.Model
 			if parsed.Payload.SessionID != "" {
 				sessionID = parsed.Payload.SessionID
@@ -116,6 +122,8 @@ func usageObservation(parsed record, model, session string, surface normalize.Su
 }
 
 func uncachedInput(total, cached *uint64) (*uint64, bool) {
+	// Codex input includes cached input. Normalize to non-overlapping categories
+	// before any total is calculated.
 	if total == nil {
 		return nil, true
 	}
