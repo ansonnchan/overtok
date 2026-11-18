@@ -86,6 +86,12 @@ type OutboxRecord struct {
 	Payload   json.RawMessage
 }
 
+// OutboxAcknowledgement marks one exact bucket revision as durable remotely.
+type OutboxAcknowledgement struct {
+	BucketKey string
+	Revision  uint64
+}
+
 // Period names one local calendar query window.
 type Period string
 
@@ -267,6 +273,44 @@ func (db *DB) PendingOutbox(ctx context.Context) ([]OutboxRecord, error) {
 		return nil, fmt.Errorf("iterate local outbox: %w", err)
 	}
 	return records, nil
+}
+
+// AcknowledgeOutbox marks only the exact revisions confirmed by the server.
+// A newer local replacement remains pending if an older request completes late.
+func (db *DB) AcknowledgeOutbox(ctx context.Context, acknowledgements []OutboxAcknowledgement) (int64, error) {
+	tx, err := db.sql.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
+	if err != nil {
+		return 0, fmt.Errorf("begin outbox acknowledgement: %w", err)
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+	var acknowledged int64
+	for _, acknowledgement := range acknowledgements {
+		if len(acknowledgement.BucketKey) != 64 || acknowledgement.Revision == 0 {
+			return 0, errors.New("outbox acknowledgement has invalid identity")
+		}
+		result, err := tx.ExecContext(ctx, `
+			UPDATE outbox_records SET state = 'acknowledged'
+			WHERE bucket_key = ? AND revision = ? AND state = 'pending'
+		`, acknowledgement.BucketKey, strconv.FormatUint(acknowledgement.Revision, 10))
+		if err != nil {
+			return 0, fmt.Errorf("acknowledge outbox revision: %w", err)
+		}
+		changed, err := result.RowsAffected()
+		if err != nil {
+			return 0, fmt.Errorf("count acknowledged outbox revision: %w", err)
+		}
+		acknowledged += changed
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("commit outbox acknowledgement: %w", err)
+	}
+	committed = true
+	return acknowledged, nil
 }
 
 // PendingOutboxCount returns the number of newest revisions awaiting future sync.

@@ -17,11 +17,7 @@ import (
 const localCloseTimeout = 5 * time.Second
 
 func launchLocalTUI(ctx context.Context, home, codexHome string, input io.Reader, output io.Writer, noColor bool) (err error) {
-	path, err := store.DefaultPath()
-	if err != nil {
-		return err
-	}
-	database, err := store.Open(ctx, path)
+	database, service, err := openLocalApplication(ctx, home, codexHome)
 	if err != nil {
 		return err
 	}
@@ -32,14 +28,27 @@ func launchLocalTUI(ctx context.Context, home, codexHome string, input io.Reader
 			err = closeErr
 		}
 	}()
+	return tui.Run(ctx, service, input, output, tui.Config{NoColor: noColor})
+}
 
+func openLocalApplication(ctx context.Context, home, codexHome string) (*store.DB, *application.Service, error) {
+	path, err := store.DefaultPath()
+	if err != nil {
+		return nil, nil, err
+	}
+	database, err := store.Open(ctx, path)
+	if err != nil {
+		return nil, nil, err
+	}
 	resolver, err := modelcatalog.NewResolver(modelcatalog.DefaultCatalog())
 	if err != nil {
-		return fmt.Errorf("initialize model catalog: %w", err)
+		_ = database.Close(context.Background())
+		return nil, nil, fmt.Errorf("initialize model catalog: %w", err)
 	}
 	pricing, err := modelcatalog.DefaultPricingRegistry()
 	if err != nil {
-		return fmt.Errorf("initialize pricing catalog: %w", err)
+		_ = database.Close(context.Background())
+		return nil, nil, fmt.Errorf("initialize pricing catalog: %w", err)
 	}
 	orchestrator := collect.Orchestrator{
 		Discovery: adapters.Discoverer{Roots: adapters.DefaultMacRoots(home, codexHome)},
@@ -48,7 +57,8 @@ func launchLocalTUI(ctx context.Context, home, codexHome string, input io.Reader
 	}
 	service, err := application.NewService(database, orchestrator, pricing, time.Local, time.Now)
 	if err != nil {
-		return err
+		_ = database.Close(context.Background())
+		return nil, nil, err
 	}
-	return tui.Run(ctx, service, input, output, tui.Config{NoColor: noColor})
+	return database, service, nil
 }

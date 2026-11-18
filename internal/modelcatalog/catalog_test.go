@@ -112,6 +112,22 @@ func TestPricingRegistryEstimatesAndReportsUnavailablePrices(t *testing.T) {
 	}
 }
 
+func TestPricingRegistryChecksumAndEffectiveDateAreStable(t *testing.T) {
+	t.Parallel()
+	registry := syntheticPricing(t)
+	first, err := registry.Checksum()
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := registry.Checksum()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second || first == [32]byte{} || registry.EffectiveAt().IsZero() {
+		t.Fatalf("pricing checksum/effective date = %x/%x/%v", first, second, registry.EffectiveAt())
+	}
+}
+
 func syntheticResolver(t *testing.T, revision string) *Resolver {
 	t.Helper()
 	resolver, err := NewResolver(Catalog{

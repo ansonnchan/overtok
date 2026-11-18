@@ -203,6 +203,41 @@ func TestAccountCommandRequiresAPIURL(t *testing.T) {
 	}
 }
 
+func TestSyncCommandParsesDryRunAndRedactsFailure(t *testing.T) {
+	t.Parallel()
+	var gotDryRun bool
+	deps := dependencies{
+		homeDir: func() (string, error) { return "/synthetic/home", nil },
+		getenv: func(name string) string {
+			if name == "OVERTOK_API_URL" {
+				return "https://api.example.test"
+			}
+			return ""
+		},
+		sync: func(_ context.Context, home, codexHome, apiURL string, dryRun bool, output io.Writer) error {
+			if home != "/synthetic/home" || codexHome != "" || apiURL != "https://api.example.test" {
+				t.Fatalf("sync inputs = %q/%q/%q", home, codexHome, apiURL)
+			}
+			gotDryRun = dryRun
+			_, _ = io.WriteString(output, "{\"schema_version\":1}\n")
+			return nil
+		},
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if code := run([]string{"sync", "--dry-run"}, &stdout, &stderr, deps); code != 0 || !gotDryRun || !strings.Contains(stdout.String(), "schema_version") {
+		t.Fatalf("sync dry run = %d/%q/%q dry=%v", code, stdout.String(), stderr.String(), gotDryRun)
+	}
+	deps.sync = func(context.Context, string, string, string, bool, io.Writer) error {
+		return errors.New("private/path and credential")
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := run([]string{"sync"}, &stdout, &stderr, deps); code != 1 || strings.Contains(stderr.String(), "private/path") || strings.Contains(stderr.String(), "credential") {
+		t.Fatalf("failed sync = %d/%q/%q", code, stdout.String(), stderr.String())
+	}
+}
+
 type fakeAccountManager struct {
 	loginVersion string
 	loginErr     error

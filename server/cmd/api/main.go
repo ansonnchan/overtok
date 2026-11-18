@@ -12,9 +12,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ansonnchan/overtok/internal/modelcatalog"
 	serverauth "github.com/ansonnchan/overtok/server/auth"
 	"github.com/ansonnchan/overtok/server/httpapi"
 	"github.com/ansonnchan/overtok/server/postgres"
+	serversync "github.com/ansonnchan/overtok/server/sync"
 )
 
 func main() {
@@ -44,6 +46,13 @@ func run() error {
 	if err := postgres.Migrate(ctx, pool); err != nil {
 		return err
 	}
+	pricing, err := modelcatalog.DefaultPricingRegistry()
+	if err != nil {
+		return err
+	}
+	if err := postgres.EnsurePricingRevision(ctx, pool, pricing); err != nil {
+		return err
+	}
 	repository, err := postgres.NewAuthRepository(pool)
 	if err != nil {
 		return err
@@ -56,7 +65,15 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	handler, err := httpapi.New(authentication)
+	usageRepository, err := postgres.NewUsageRepository(pool)
+	if err != nil {
+		return err
+	}
+	synchronization, err := serversync.NewService(authentication, usageRepository)
+	if err != nil {
+		return err
+	}
+	handler, err := httpapi.New(authentication, synchronization)
 	if err != nil {
 		return err
 	}

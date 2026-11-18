@@ -1,4 +1,3 @@
-// Package sync reserves privacy-limited upload contracts. It will serialize only
-// allowlisted aggregate fields and use absolute versioned buckets rather than
-// additive commands.
+// Package sync defines the privacy-allowlisted absolute-bucket protocol and
+// native outbox client.
 package sync

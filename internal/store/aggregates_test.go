@@ -84,6 +84,15 @@ func TestBucketReplayReplacementAndOutOfOrderRevision(t *testing.T) {
 	if len(outbox) != 1 || outbox[0].Revision != 3 || strings.Contains(string(outbox[0].Payload), "source_record") {
 		t.Fatalf("outbox = %#v", outbox)
 	}
+	if count, err := db.AcknowledgeOutbox(t.Context(), []OutboxAcknowledgement{{BucketKey: outbox[0].BucketKey, Revision: 2}}); err != nil || count != 0 {
+		t.Fatalf("stale acknowledgement = %d, %v", count, err)
+	}
+	if count, err := db.AcknowledgeOutbox(t.Context(), []OutboxAcknowledgement{{BucketKey: outbox[0].BucketKey, Revision: 3}}); err != nil || count != 1 {
+		t.Fatalf("current acknowledgement = %d, %v", count, err)
+	}
+	if count, err := db.PendingOutboxCount(t.Context()); err != nil || count != 0 {
+		t.Fatalf("pending after acknowledgement = %d, %v", count, err)
+	}
 	conflict := newer
 	setAggregate(&conflict.Tokens.Output, 31, AvailabilityComplete)
 	if _, err := db.ApplyBucketRevisions(t.Context(), []UsageBucket{conflict}); !errors.Is(err, ErrBucketRevisionConflict) {
