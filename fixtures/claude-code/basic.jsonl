@@ -1,0 +1,2 @@
+{"type":"assistant","sessionId":"synthetic-claude-cli","requestId":"synthetic-request-cli-1","timestamp":"2026-01-02T03:04:05Z","message":{"id":"synthetic-message-cli-1","model":"claude-sonnet-synthetic","usage":{"input_tokens":100,"cache_read_input_tokens":20,"cache_creation_input_tokens":10,"output_tokens":30}}}
+{"type":"assistant","sessionId":"synthetic-claude-cli","requestId":"synthetic-request-cli-2","timestamp":"2026-01-02T03:05:05Z","message":{"id":"synthetic-message-cli-2","model":"claude-opus-synthetic","usage":{"input_tokens":50,"output_tokens":15}}}

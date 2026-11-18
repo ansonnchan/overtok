@@ -1,0 +1,1 @@
+{"type":"assistant","sessionId":"synthetic-desktop-code","requestId":"synthetic-request-desktop-code","timestamp":"2026-01-03T03:04:05Z","message":{"id":"synthetic-message-desktop-code","model":"claude-sonnet-synthetic","usage":{"input_tokens":40,"cache_read_input_tokens":4,"cache_creation_input_tokens":2,"output_tokens":12}}}
