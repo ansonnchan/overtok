@@ -7,7 +7,7 @@ local evidence
     -> adapters
     -> normalize
     -> collect
-    -> future store
+    -> store
     -> future sync and TUI
 
 doctor reads discovery health and parser compatibility without collecting records
@@ -24,7 +24,7 @@ fixturecheck protects committed test data independently of runtime collection
 | `doctor` | Redacted source and parser diagnostics | Usage collection or repair |
 | `fixturecheck` | Privacy validation for committed fixtures | Runtime validation of user data |
 | `modelcatalog` | Future canonical model and pricing resolution | Source parsing |
-| `store` | Future local persistence | Source-specific behavior |
+| `store` | SQLite lifecycle, migrations, and local persistence | Source-specific behavior |
 | `sync` | Future privacy-limited synchronization | Raw local records |
 | `tui` | Future presentation of committed local state | Collection or synchronization logic |
 
