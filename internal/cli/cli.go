@@ -11,6 +11,7 @@ import (
 
 	"github.com/ansonnchan/overtok/internal/adapters"
 	"github.com/ansonnchan/overtok/internal/doctor"
+	"github.com/ansonnchan/overtok/internal/store"
 )
 
 const version = "dev"
@@ -34,7 +35,13 @@ func defaultDependencies() dependencies {
 		timeout: 5 * time.Second,
 		diagnose: func(ctx context.Context, home, codexHome string) doctor.Report {
 			discovery := adapters.Discoverer{Roots: adapters.DefaultMacRoots(home, codexHome)}
-			return doctor.Diagnose(ctx, discovery, doctor.CCUsageProbe{})
+			path, err := store.DefaultPath()
+			if err != nil {
+				report := doctor.Diagnose(ctx, discovery, doctor.CCUsageProbe{}, nil)
+				report.Database = doctor.DatabaseStatus{Location: "default application data", State: doctor.DatabaseError, SupportedVersion: store.SupportedSchemaVersion()}
+				return report
+			}
+			return doctor.Diagnose(ctx, discovery, doctor.CCUsageProbe{}, doctor.LocalDatabaseProbe{Path: path, Default: true})
 		},
 	}
 }
