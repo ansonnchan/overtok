@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+// Validate checks the normalized contract without filling unavailable metadata.
 func (o Observation) Validate() error {
 	if !validSource(o.Source) {
 		return fmt.Errorf("source %q is unsupported", o.Source)
@@ -70,6 +71,8 @@ func (o Observation) validateModel() error {
 	return nil
 }
 
+// KnownTotal sums non-overlapping known categories and excludes reasoning output,
+// which is subset metadata already represented by Output.
 func (t TokenCounts) KnownTotal() (*uint64, error) {
 	var total uint64
 	known := false
@@ -93,6 +96,7 @@ func (t TokenCounts) anyKnown() bool {
 	return t.InputUncached != nil || t.InputCacheRead != nil || t.InputCacheWrite != nil || t.Output != nil || t.ReasoningOutput != nil
 }
 
+// Validate rejects empty or unrecognized capability classifications.
 func (c Capabilities) Validate() error {
 	fields := []CapabilitySupport{c.Model, c.InputUncached, c.InputCacheRead, c.InputCacheWrite, c.Output, c.ReasoningOutput}
 	for _, field := range fields {

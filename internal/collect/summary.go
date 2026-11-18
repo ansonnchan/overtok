@@ -9,6 +9,7 @@ import (
 	"github.com/ansonnchan/overtok/internal/normalize"
 )
 
+// ModelSummary aggregates one source, observed model, and resolution quality.
 type ModelSummary struct {
 	Source          normalize.Source
 	ObservedModelID string
@@ -16,6 +17,8 @@ type ModelSummary struct {
 	Tokens          normalize.TokenCounts
 }
 
+// Summarize returns deterministic per-model totals without combining different
+// attribution qualities for the same observed identifier.
 func Summarize(observations []normalize.Observation) ([]ModelSummary, error) {
 	byModel := make(map[string]ModelSummary)
 	for _, observation := range observations {
@@ -76,6 +79,7 @@ func addTokens(a, b normalize.TokenCounts) (normalize.TokenCounts, error) {
 }
 
 func addKnown(a, b *uint64) (*uint64, error) {
+	// A sum is complete only when both contributions report the category.
 	if a == nil || b == nil {
 		return nil, nil
 	}
