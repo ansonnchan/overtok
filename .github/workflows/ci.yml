@@ -18,3 +18,29 @@ jobs:
           go-version-file: go.mod
           cache: true
       - run: make check
+
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.7-alpine
+        env:
+          POSTGRES_DB: overtok_test
+          POSTGRES_PASSWORD: overtok_test
+          POSTGRES_USER: overtok
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U overtok -d overtok_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      OVERTOK_TEST_DATABASE_URL: postgres://overtok:overtok_test@localhost:5432/overtok_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: make test-postgres

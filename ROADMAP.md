@@ -1,6 +1,6 @@
 # Overtok roadmap
 
-Status: local native MVP complete; accounts and synchronization planned
+Status: local native MVP and server data model complete; authentication and synchronization planned
 Last updated: November 18, 2026
 
 ## Product definition
@@ -306,7 +306,7 @@ M1 exit criteria:
 
 Goal: establish one account across multiple independently managed devices.
 
-- [ ] **OVT-020: Define and migrate the server data model**
+- [x] **OVT-020: Define and migrate the server data model**
   - Users, GitHub identities, devices, device credentials, pricing revisions, and usage buckets.
   - Acceptance: database constraints enforce ownership and bucket idempotency.
 

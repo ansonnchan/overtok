@@ -1,10 +1,18 @@
 # Migrations
 
-Local SQLite migrations are embedded beside `internal/store` so the native
-binary can apply them without runtime files. Their lifecycle and immutability
-rules are documented in [local storage](../internal/store/README.md).
+This package embeds the immutable PostgreSQL schema history for the hosted API.
+It remains separate from the local SQLite migrations beside `internal/store`.
 
-This directory remains reserved for future server PostgreSQL migrations, which
-must stay separate from the local schema history.
+PostgreSQL files use `NNNN_short_name.sql`, begin at version 1, and remain
+contiguous. The server records each name and SHA-256 checksum. Never edit an
+applied migration; add the next version instead. A changed checksum, changed
+name, gap, or database version newer than the binary is an incompatibility.
 
-Do not add tables for authentication, synchronization, groups, or backend infrastructure before their roadmap stage. Schema comments should explain invariants and ownership instead of duplicating column names.
+All pending migrations run in one transaction under a PostgreSQL advisory
+lock. Validate changes with `make test-postgres` and a disposable database URL.
+Schema comments should explain privacy, ownership, and unusual invariants
+instead of duplicating column names.
+
+Do not add authentication, synchronization, group, or deployment state before
+its roadmap stage. Server migrations must never introduce columns for raw local
+records or prohibited source material.
