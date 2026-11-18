@@ -14,6 +14,7 @@ import (
 	"time"
 
 	protocol "github.com/ansonnchan/overtok/internal/sync"
+	serveraccount "github.com/ansonnchan/overtok/server/account"
 	serverauth "github.com/ansonnchan/overtok/server/auth"
 )
 
@@ -26,7 +27,7 @@ func TestAuthenticationRoutesAndStableErrors(t *testing.T) {
 		poll:    serverauth.PollResponse{Status: serverauth.FlowPending, RetryAfter: 7 * time.Second},
 		refresh: serverauth.Session{Credential: "replacement", DeviceID: "device", UserID: "user"},
 	}
-	handler, err := New(service, &fakeUsageSyncService{})
+	handler, err := New(service, &fakeUsageSyncService{}, &fakeAccountUsageService{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +66,7 @@ func TestAuthenticationRoutesAndStableErrors(t *testing.T) {
 
 func TestHandlerRedactsServiceFailures(t *testing.T) {
 	service := &fakeAuthService{startErr: errors.New("provider token and private/path")}
-	handler, err := New(service, &fakeUsageSyncService{})
+	handler, err := New(service, &fakeUsageSyncService{}, &fakeAccountUsageService{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +81,7 @@ func TestHandlerRedactsServiceFailures(t *testing.T) {
 func TestSyncRouteAuthenticatesAndReturnsExactAcknowledgement(t *testing.T) {
 	service := &fakeAuthService{}
 	syncService := &fakeUsageSyncService{}
-	handler, err := New(service, syncService)
+	handler, err := New(service, syncService, &fakeAccountUsageService{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,6 +96,29 @@ func TestSyncRouteAuthenticatesAndReturnsExactAcknowledgement(t *testing.T) {
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusOK || syncService.credential != "device-credential" || !strings.Contains(response.Body.String(), batch.Buckets[0].BucketKey) {
 		t.Fatalf("sync response/service = %d %q/%#v", response.Code, response.Body.String(), syncService)
+	}
+}
+
+func TestAccountUsageRouteRequiresCredential(t *testing.T) {
+	accountService := &fakeAccountUsageService{usage: serveraccount.Usage{
+		UserID: "user", DisplayName: "synthetic-user", GeneratedAt: time.Now().UTC(),
+	}}
+	handler, err := New(&fakeAuthService{}, &fakeUsageSyncService{}, accountService)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "/v1/account/usage", nil)
+	request.Header.Set("Authorization", "Bearer device-credential")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || accountService.credential != "device-credential" || !strings.Contains(response.Body.String(), "synthetic-user") {
+		t.Fatalf("account response = %d %q/%#v", response.Code, response.Body.String(), accountService)
+	}
+	request = httptest.NewRequest(http.MethodGet, "/v1/account/usage", nil)
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthorized account response = %d %q", response.Code, response.Body.String())
 	}
 }
 
@@ -145,6 +169,16 @@ func (f *fakeAuthService) Logout(context.Context, string) error { return f.logou
 
 type fakeUsageSyncService struct {
 	credential string
+}
+
+type fakeAccountUsageService struct {
+	credential string
+	usage      serveraccount.Usage
+}
+
+func (f *fakeAccountUsageService) Usage(_ context.Context, credential string) (serveraccount.Usage, error) {
+	f.credential = credential
+	return f.usage, nil
 }
 
 func (f *fakeUsageSyncService) Apply(_ context.Context, credential string, batch protocol.Batch) (protocol.BatchResponse, error) {

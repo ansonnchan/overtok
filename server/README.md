@@ -7,6 +7,12 @@ authorization, Overtok credential rotation/revocation, and bounded JSON routes.
 `sync` authenticates privacy-limited uploads and `postgres` applies absolute
 revisions transactionally.
 
+`account` exposes one authenticated usage row across active devices. Its
+PostgreSQL query runs in a repeatable-read snapshot, preserves unavailable and
+partial coverage, and reports device freshness and revocation without local
+machine identity. Revoked-device history remains stored but no longer
+contributes to active account totals.
+
 The schema contains users, stable GitHub identities, independently revocable
 devices and hashed credentials, pricing revisions, and privacy-limited absolute
 usage buckets. Bucket identity is unique per device. Network code will later

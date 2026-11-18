@@ -6,10 +6,10 @@ normalizes token and model metadata, persists privacy-safe aggregates, reports
 installation health, and provides a keyboard-first application shell without
 reading ordinary chat data.
 
-The hosted PostgreSQL data model, HTTP API, GitHub device login, and idempotent
-absolute-bucket synchronization now provide account and independently revocable
-device identity plus privacy-limited upload. Groups and multiplayer
-leaderboards remain later roadmap stages and are not required by local mode.
+The hosted PostgreSQL data model, HTTP API, GitHub device login, idempotent
+absolute-bucket synchronization, and account-level multi-device aggregation
+complete the accounts/devices milestone. Groups and multiplayer leaderboards
+remain later roadmap stages and are not required by local mode.
 
 ## Privacy boundary
 
@@ -32,6 +32,7 @@ The native Go command currently provides:
 - a keyboard-first Overview, Sources, Models, and Settings TUI with manual collection;
 - GitHub device-flow `login` and revoking `logout` commands backed by the OS credential vault;
 - bounded `sync` and exact-payload `sync --dry-run` commands with durable acknowledgements;
+- one authenticated account usage row across active devices with independent revocation and freshness; and
 - privacy-safe source and storage diagnostics through `overtok doctor`.
 
 Model names are not allowlisted. A previously unseen, non-empty observed identifier can retain its token counts while canonical resolution and pricing remain unavailable. Reported, resolved, inferred, and unknown attribution are separate states.
@@ -109,7 +110,7 @@ contents, or expose persisted observations.
 | `internal/sync` | Privacy-allowlisted protocol, bounded batching, retry, and dry-run serialization |
 | `fixtures` | Synthetic compatibility and regression data |
 | `server/postgres` | Hosted PostgreSQL connection and migration boundary |
-| `server/auth`, `server/sync`, and `server/httpapi` | Device authorization, idempotent upload, and bounded JSON API |
+| `server/account`, `server/auth`, `server/sync`, and `server/httpapi` | Account aggregation, device authorization, idempotent upload, and bounded JSON API |
 | `migrations` | Immutable, embedded hosted PostgreSQL schema history |
 | `docs` | Cross-cutting architecture and design decisions |
 

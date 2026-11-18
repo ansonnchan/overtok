@@ -11,6 +11,7 @@ import (
 	"time"
 
 	protocol "github.com/ansonnchan/overtok/internal/sync"
+	serveraccount "github.com/ansonnchan/overtok/server/account"
 	serverauth "github.com/ansonnchan/overtok/server/auth"
 	serversync "github.com/ansonnchan/overtok/server/sync"
 )
@@ -31,26 +32,50 @@ type usageSyncService interface {
 	Apply(context.Context, string, protocol.Batch) (protocol.BatchResponse, error)
 }
 
+type accountUsageService interface {
+	Usage(context.Context, string) (serveraccount.Usage, error)
+}
+
 // Handler is the hosted Overtok HTTP API.
 type Handler struct {
-	auth authenticationService
-	sync usageSyncService
-	mux  *http.ServeMux
+	auth    authenticationService
+	sync    usageSyncService
+	account accountUsageService
+	mux     *http.ServeMux
 }
 
 // New constructs the API handler with exact method-aware routes.
-func New(authService authenticationService, syncService usageSyncService) (*Handler, error) {
-	if authService == nil || syncService == nil {
-		return nil, errors.New("initialize HTTP API: authentication and synchronization services are required")
+func New(authService authenticationService, syncService usageSyncService, accountService accountUsageService) (*Handler, error) {
+	if authService == nil || syncService == nil || accountService == nil {
+		return nil, errors.New("initialize HTTP API: authentication, synchronization, and account services are required")
 	}
-	handler := &Handler{auth: authService, sync: syncService, mux: http.NewServeMux()}
+	handler := &Handler{auth: authService, sync: syncService, account: accountService, mux: http.NewServeMux()}
 	handler.mux.HandleFunc("GET /healthz", handler.health)
 	handler.mux.HandleFunc("POST /v1/auth/device/start", handler.startDevice)
 	handler.mux.HandleFunc("POST /v1/auth/device/poll", handler.pollDevice)
 	handler.mux.HandleFunc("POST /v1/auth/refresh", handler.refresh)
 	handler.mux.HandleFunc("POST /v1/auth/logout", handler.logout)
 	handler.mux.HandleFunc("POST /v1/sync/buckets", handler.syncBuckets)
+	handler.mux.HandleFunc("GET /v1/account/usage", handler.accountUsage)
 	return handler, nil
+}
+
+func (h *Handler) accountUsage(response http.ResponseWriter, request *http.Request) {
+	credential, ok := bearerCredential(request)
+	if !ok {
+		writeError(response, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	usage, err := h.account.Usage(request.Context(), credential)
+	if errors.Is(err, serverauth.ErrUnauthorized) {
+		writeError(response, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	if err != nil {
+		writeError(response, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	writeJSON(response, http.StatusOK, usage)
 }
 
 func (h *Handler) syncBuckets(response http.ResponseWriter, request *http.Request) {
