@@ -8,11 +8,13 @@ import (
 	"github.com/ansonnchan/overtok/internal/adapters/ccusage"
 )
 
+// CCUsageProbe checks whether the pinned optional parser can execute locally.
 type CCUsageProbe struct {
 	LookPath func(string) (string, error)
 	Run      func(context.Context, string, ...string) ([]byte, error)
 }
 
+// Check runs only the version command and reduces failures to safe issue codes.
 func (p CCUsageProbe) Check(ctx context.Context) ParserStatus {
 	lookPath := p.LookPath
 	if lookPath == nil {

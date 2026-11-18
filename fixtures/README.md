@@ -1,5 +1,35 @@
 # Compatibility fixtures
 
-Only synthetic or explicitly approved sanitized source records belong here. Fixtures must not contain prompts, responses, source code, credentials, identifying paths, repository metadata, or raw transcripts.
+This directory contains synthetic examples of supported local source behavior. Fixtures make parser, counter, deduplication, recovery, and external-contract changes reproducible without reading a contributor's real agent logs.
 
-The committed records use synthetic identifiers and timestamps. `internal/fixturecheck` validates every JSON and JSONL fixture during `go test ./...`, including intentionally malformed compatibility cases.
+Only synthetic or explicitly approved sanitized source records belong here. Fixtures must not contain prompts, responses, source code, tool payloads, command text, credentials, identifying paths, project names, repository metadata, branch names, or raw transcripts.
+
+## Layout
+
+| Directory | Contract exercised |
+| --- | --- |
+| `claude-code` | Claude Code incremental assistant usage, duplicates, and malformed-line recovery |
+| `claude-desktop/code` | Claude Desktop Code records and overlap with CLI-compatible evidence |
+| `claude-desktop/agent` | Claude Desktop local Agent records |
+| `claude-desktop/cowork` | Claude Desktop Cowork audit records |
+| `codex-cli` | Codex context attribution, cumulative snapshots, resets, and malformed-line recovery |
+| `codex-desktop` | Codex Desktop/shared records and full or midstream overlap |
+| `ccusage` | Pinned Claude and Codex daily JSON schemas |
+
+Model names, session IDs, dates, and token counts are synthetic test values. They are examples of record shape and semantics, not a list of models supported by Overtok.
+
+## Privacy validation
+
+`internal/fixturecheck` validates every file during `go test ./...`. It performs a raw scan before JSON decoding so intentionally malformed files cannot hide prohibited keys or secret/path patterns. Valid JSON fields must also pass a structural allowlist; dynamic Codex model-map keys must explicitly contain `synthetic`.
+
+Do not weaken the validator to admit a copied production record. If a new source field is necessary, reduce the example to the smallest synthetic structure, add the field deliberately to the allowlist, and add a test proving that nearby private fields are still rejected.
+
+## Adding a regression fixture
+
+1. Construct the record manually with synthetic identifiers and timestamps.
+2. Retain only fields required to reproduce the source behavior.
+3. Name malformed or partial-write cases accordingly so syntax failure is intentional.
+4. Add the parser or collection assertion that consumes the fixture.
+5. Run `go test ./internal/fixturecheck` and then `make check`.
+
+Never generate fixtures by copying a real home-directory record and redacting it afterward. Unknown embedded fields are too easy to miss.
