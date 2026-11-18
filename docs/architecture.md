@@ -126,13 +126,23 @@ Owner-only directory and file permissions are established before SQLite opens
 the database. Connection-local foreign-key and busy-timeout settings are
 applied to every pooled connection.
 
-### Upload buckets (planned)
+### Local usage buckets
 
-The client uploads absolute bucket snapshots rather than additive deltas. A bucket key includes the account, device, time interval, source, surface, model identity, measurement quality, and schema version.
+Local bucket keys include the UTC interval, source, surface, observed and
+canonical model identity, resolution quality, measurement quality, and
+normalization version. A later upload envelope will add account and device
+identity without changing the local absolute value.
 
-Each local change increments the bucket revision. The server accepts a revision only when it is newer than the stored revision. Replaying a batch is therefore safe.
+Each local change increments the bucket revision. A newer local revision
+replaces its earlier absolute value and the outbox retains only that newest
+pending payload. Replaying a revision is therefore safe. No network client is
+implemented at this stage.
 
-The exact interval will be selected with synchronization work. It must balance timezone accuracy, privacy, and row count.
+Local buckets use one-minute UTC intervals. This preserves exact modern IANA
+timezone day and week boundaries while grouping events that occur in the same
+minute. Today starts at local midnight, weeks start Monday, and the 30-day view
+uses 30 local calendar dates rather than a rolling 720-hour duration. Token and
+price coverage remains complete, partial, or unavailable through every query.
 
 ## Server data flow
 
@@ -235,4 +245,6 @@ M0 established these local rules:
 - Source capabilities distinguish reported, derived, inferred, and unsupported fields.
 - Missing model or token metadata remains unknown rather than becoming zero or a guessed alias.
 
-The synchronization bucket interval remains intentionally open until the persistence and protocol stages can evaluate timezone accuracy, privacy, and row volume together.
+The local interval is fixed at one minute. A later network protocol may define
+a coarser upload projection, but it must retain absolute replacement revisions
+and the same privacy allowlist.
