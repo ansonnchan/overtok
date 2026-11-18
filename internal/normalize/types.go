@@ -19,6 +19,7 @@ const (
 	SurfaceDesktopAgent  Surface = "desktop_agent"
 	SurfaceDesktopCowork Surface = "desktop_cowork"
 	SurfaceDesktop       Surface = "desktop"
+	SurfaceSharedLocal   Surface = "shared_local"
 )
 
 type ModelResolution string

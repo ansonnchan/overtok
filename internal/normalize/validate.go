@@ -112,7 +112,7 @@ func validSurface(source Source, surface Surface) bool {
 	case SourceClaude:
 		return surface == SurfaceCLI || surface == SurfaceDesktopCode || surface == SurfaceDesktopAgent || surface == SurfaceDesktopCowork
 	case SourceCodex:
-		return surface == SurfaceCLI || surface == SurfaceDesktop
+		return surface == SurfaceCLI || surface == SurfaceDesktop || surface == SurfaceSharedLocal
 	default:
 		return false
 	}
