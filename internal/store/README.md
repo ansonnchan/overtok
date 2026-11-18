@@ -50,3 +50,26 @@ reported zero and supports the complete `uint64` range that SQLite's signed
 integer storage cannot represent. Model resolution, observed and canonical
 identifiers, pricing keys, measurement quality, counter semantics, versions,
 capabilities, and safe warnings remain separate fields.
+
+## Absolute usage buckets
+
+Committed observations reduce into absolute one-minute UTC buckets keyed by
+source, surface, observed and canonical model identity, resolution quality,
+measurement quality, and normalization version. A higher revision replaces the
+entire earlier value. Replaying the same revision is a no-op; an older revision
+is ignored; the same revision with different content is rejected.
+
+Only the newest pending revision for each bucket remains in the local outbox.
+Its JSON is built from an explicit aggregate payload and has no source record,
+session, or path fields. This package does not implement a network client.
+
+Each token category and API-equivalent estimate carries `complete`, `partial`,
+or `unavailable` coverage. Period queries add `empty` when no bucket exists.
+Aggregation returns an error on unsigned overflow rather than saturating or
+wrapping.
+
+Today and the current week begin at midnight in the requested IANA timezone;
+weeks begin Monday. The last-30-days window includes the current local calendar
+date plus the preceding 29 dates. Boundaries convert to UTC before querying,
+and the end includes the current UTC minute. One-minute buckets make modern
+IANA offset and daylight-saving boundaries exact.
