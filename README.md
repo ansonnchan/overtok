@@ -19,6 +19,12 @@ go build -o ./bin/overtok ./cmd/overtok
 ./bin/overtok
 ```
 
+Inspect local coding-agent source availability without printing source paths:
+
+```sh
+./bin/overtok doctor
+```
+
 Project documentation:
 
 - [Roadmap](./ROADMAP.md)

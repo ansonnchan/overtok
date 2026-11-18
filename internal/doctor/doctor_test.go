@@ -1,0 +1,147 @@
+package doctor
+
+import (
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/ansonnchan/overtok/internal/adapters"
+	"github.com/ansonnchan/overtok/internal/adapters/ccusage"
+	"github.com/ansonnchan/overtok/internal/normalize"
+)
+
+type fakeDiscovery struct{ findings []adapters.Finding }
+
+func (f fakeDiscovery) Discover(context.Context) []adapters.Finding { return f.findings }
+
+type fakeParser struct{ status ParserStatus }
+
+func (f fakeParser) Check(context.Context) ParserStatus { return f.status }
+
+func TestReportRendersAllSurfacesWithoutPaths(t *testing.T) {
+	t.Parallel()
+
+	privateRoot := filepath.Join(t.TempDir(), "private-root")
+	kinds := []adapters.RootKind{
+		adapters.RootClaudeCLI, adapters.RootClaudeDesktopCode, adapters.RootClaudeDesktopAgent,
+		adapters.RootClaudeDesktopCowork, adapters.RootCodexCLI, adapters.RootCodexDesktop, adapters.RootCodexShared,
+	}
+	findings := make([]adapters.Finding, 0, len(kinds))
+	for _, kind := range kinds {
+		findings = append(findings, adapters.Finding{
+			Kind: kind, Status: normalize.HealthDetected, RecordCount: 1, Format: "synthetic-jsonl",
+			Candidates: []adapters.Candidate{{Path: privateRoot}}, Capabilities: normalize.Capabilities{
+				Model: normalize.CapabilityReported, InputCacheWrite: normalize.CapabilityUnsupported,
+			},
+		})
+	}
+	findings[len(findings)-1].SharedRoot = true
+	report := Report{GOOS: "darwin", GOARCH: "arm64", Parser: ParserStatus{Found: true, Compatible: true}, Findings: findings}
+	output := report.Render()
+	for _, expected := range []string{"Claude Code CLI", "Claude Desktop Code", "Claude Desktop Agent", "Claude Desktop Cowork", "Codex CLI", "Codex Desktop", "Codex CLI/Desktop shared"} {
+		if !strings.Contains(output, expected) {
+			t.Errorf("output missing %q:\n%s", expected, output)
+		}
+	}
+	if strings.Contains(output, privateRoot) {
+		t.Fatalf("output leaked source path: %s", output)
+	}
+	if !strings.Contains(output, "candidate files") {
+		t.Fatalf("output overstates unparsed candidates: %s", output)
+	}
+	if report.ExitCode() != 0 {
+		t.Fatalf("ExitCode() = %d", report.ExitCode())
+	}
+}
+
+func TestDiagnoseDiscoversSyntheticHome(t *testing.T) {
+	t.Parallel()
+
+	home := t.TempDir()
+	paths := []string{
+		filepath.Join(home, ".claude", "projects", "synthetic", "record.jsonl"),
+		filepath.Join(home, "Library", "Application Support", "Claude", "claude-code-sessions", "synthetic", "record.jsonl"),
+		filepath.Join(home, "Library", "Application Support", "Claude", "local-agent-mode-sessions", "synthetic", "rpm", "agent.jsonl"),
+		filepath.Join(home, "Library", "Application Support", "Claude", "local-agent-mode-sessions", "synthetic", "local_synthetic", "audit.jsonl"),
+		filepath.Join(home, ".codex", "sessions", "2026", "01", "02", "rollout-synthetic.jsonl"),
+	}
+	for _, path := range paths {
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("{}\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	discovery := adapters.Discoverer{Roots: adapters.DefaultMacRoots(home, "")}
+	report := Diagnose(context.Background(), discovery, fakeParser{status: ParserStatus{Found: true, Compatible: true}})
+	if len(report.Findings) != 5 {
+		t.Fatalf("findings = %d, want 5", len(report.Findings))
+	}
+	for _, finding := range report.Findings {
+		if finding.Status != normalize.HealthDetected || finding.RecordCount != 1 {
+			t.Errorf("finding = %#v", finding)
+		}
+	}
+	if strings.Contains(report.Render(), home) {
+		t.Fatal("doctor output leaked the synthetic home path")
+	}
+}
+
+func TestReportMakesPermissionIssueActionable(t *testing.T) {
+	t.Parallel()
+
+	report := Report{GOOS: "darwin", GOARCH: "arm64", Findings: []adapters.Finding{{
+		Kind: adapters.RootCodexCLI, Status: normalize.HealthPermissionDenied,
+		Warnings: []normalize.Warning{{Code: "source_root_unreadable"}},
+	}}}
+	output := report.Render()
+	if report.ExitCode() != 1 || !strings.Contains(output, "check macOS file permissions") {
+		t.Fatalf("report = %q, code = %d", output, report.ExitCode())
+	}
+}
+
+func TestCCUsageProbeValidatesPinnedVersion(t *testing.T) {
+	t.Parallel()
+
+	probe := CCUsageProbe{
+		LookPath: func(string) (string, error) { return "synthetic-ccusage", nil },
+		Run: func(context.Context, string, ...string) ([]byte, error) {
+			return []byte("ccusage " + ccusage.PinnedVersion), nil
+		},
+	}
+	if status := probe.Check(context.Background()); !status.Found || !status.Compatible {
+		t.Fatalf("Check() = %#v", status)
+	}
+	probe.Run = func(context.Context, string, ...string) ([]byte, error) { return nil, errors.New("synthetic failure") }
+	if status := probe.Check(context.Background()); !status.Found || status.Compatible || status.Issue != "execution_failed" {
+		t.Fatalf("failed Check() = %#v", status)
+	}
+}
+
+func TestCCUsageProbeReportsTimeout(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	probe := CCUsageProbe{
+		LookPath: func(string) (string, error) { return "synthetic-ccusage", nil },
+		Run:      func(context.Context, string, ...string) ([]byte, error) { return nil, context.DeadlineExceeded },
+	}
+	status := probe.Check(ctx)
+	if status.Issue != "timeout" {
+		t.Fatalf("Check() = %#v", status)
+	}
+}
+
+func TestUnsupportedParserVersionIsAnIssue(t *testing.T) {
+	t.Parallel()
+
+	report := Report{GOOS: "darwin", GOARCH: "arm64", Parser: ParserStatus{Found: true}}
+	if report.ExitCode() != 1 {
+		t.Fatalf("ExitCode() = %d, want 1", report.ExitCode())
+	}
+}
