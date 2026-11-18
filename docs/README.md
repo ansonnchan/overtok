@@ -1,0 +1,16 @@
+# Documentation
+
+This directory owns decisions that cross package boundaries. Package-specific implementation details belong beside the relevant code, using a package `doc.go`, a focused subsystem README, or short comments at the invariant they explain.
+
+## Documents
+
+- [Architecture](./architecture.md) defines system boundaries, data flow, persistence and synchronization direction, deployment constraints, and privacy invariants.
+- [TUI design direction](./design.md) defines interaction, responsive layout, visual restraint, accessibility, and content language for the future terminal interface.
+- [Roadmap](../ROADMAP.md) defines scope, delivery order, dependencies, and acceptance criteria.
+- [Contributor guidance](../AGENTS.md) defines implementation, documentation, review, privacy, and Git workflow rules.
+
+## Where new documentation belongs
+
+Use this directory for decisions shared by several packages or product areas. Use a subsystem README when a directory has multiple packages, important operational instructions, or a contract that developers need before reading implementation details. Use Go documentation comments for package APIs and comments next to non-obvious invariants.
+
+Avoid creating a README in every leaf directory. A small package with a clear `doc.go` is easier to navigate than a second document that repeats its source. When a decision changes, update the closest authoritative document rather than adding a competing explanation elsewhere.

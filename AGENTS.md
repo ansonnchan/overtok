@@ -42,7 +42,11 @@ Unknown and unavailable values are not zero. Preserve the distinction between re
 
 - Keep code comments short.
 - Explain architectural intent, privacy boundaries, unusual source semantics, and non-obvious invariants.
+- Give every Go package an accurate package comment and document exported declarations with Go-style comments.
+- Audit every changed source and configuration file for documentation impact; add focused comments where behavior, constraints, or failure modes would otherwise be ambiguous.
+- Add README files at meaningful subsystem boundaries, not mechanically in every leaf directory. Prefer `doc.go` for a small Go package whose boundary is already clear.
 - Do not restate what a function or line already says.
+- Keep cross-package decisions in `docs/`, subsystem operating guidance near the code, and link to the authoritative source instead of duplicating it.
 - Update architecture or design documentation when a change alters their decisions.
 - Do not copy prompts, transcript text, paths, or credentials into tests, documentation, commits, or PRs.
 
