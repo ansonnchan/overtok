@@ -4,9 +4,10 @@ This guide covers the current native Go workspace. The pnpm workspace is reserve
 
 ## Prerequisites
 
-- Go 1.24 or newer.
+- Go 1.25 or newer.
 - macOS to exercise the implemented default discovery roots.
 - Git for the repository hygiene check.
+- Docker or another PostgreSQL 18 installation only for hosted schema tests.
 
 ccusage is optional. Tests inject a fake executor and read synthetic fixtures, so the verification suite does not require an installed binary or inspect real local agent data.
 
@@ -18,6 +19,17 @@ make test        # standard Go tests
 make test-race   # race-enabled Go tests
 make build       # build every Go package
 ```
+
+Run the hosted schema integration test against an isolated PostgreSQL database:
+
+```sh
+OVERTOK_TEST_DATABASE_URL='postgres://overtok:password@localhost:5432/overtok_test?sslmode=disable' make test-postgres
+```
+
+The test creates a random schema, applies the embedded migrations twice, checks
+ownership and bucket constraints, and removes that schema afterward. Never use
+a production database URL. Regular `make check` does not require PostgreSQL;
+CI runs the integration target separately against PostgreSQL 18.
 
 Build and run the command directly:
 
@@ -37,6 +49,7 @@ The Makefile places `GOCACHE` and `GOPATH` under `/tmp` by default. Override tho
 - Fixture privacy tests scan every file under `fixtures`, including malformed and non-JSON cases.
 - Collection tests cover repeatability, overlap, cumulative counters, resets, partial writes, malformed records, and attribution quality.
 - Application and TUI tests inject storage, collection, terminal-size, and keyboard events; they never launch against real provider roots.
+- PostgreSQL integration tests use only synthetic identities and values in a disposable schema.
 
 Do not point automated tests at a real home directory or provider-owned storage. Real compatibility investigation requires explicit user approval and must produce a newly constructed sanitized regression fixture rather than a copied transcript.
 
@@ -53,4 +66,7 @@ For stacked work, open and report each parent PR before starting its child branc
 
 ## CI
 
-GitHub Actions runs `make check` on pull requests and pushes to `main` using the Go version declared in `go.mod`. A local clean checkout should pass the same command before a PR is marked ready.
+GitHub Actions runs `make check` on macOS and the hosted schema integration test
+against PostgreSQL 18 on Linux. Both jobs use the Go version declared in
+`go.mod`. A local clean checkout should pass the same applicable commands before
+a PR is marked ready.

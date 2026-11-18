@@ -6,8 +6,10 @@ normalizes token and model metadata, persists privacy-safe aggregates, reports
 installation health, and provides a keyboard-first application shell without
 reading ordinary chat data.
 
-Network synchronization, authentication, groups, and multiplayer leaderboards
-remain future roadmap stages and are not required by the local application.
+The hosted PostgreSQL data model and migration runner now provide the server
+persistence foundation. Network synchronization, authentication, groups, and
+multiplayer leaderboards remain future roadmap stages and are not required by
+the local application.
 
 ## Privacy boundary
 
@@ -34,8 +36,9 @@ Model names are not allowlisted. A previously unseen, non-empty observed identif
 
 ## Requirements
 
-- Go 1.24 or newer.
+- Go 1.25 or newer.
 - macOS for the currently implemented discovery paths.
+- PostgreSQL 18 only when exercising the hosted schema integration tests.
 - ccusage 20.0.51 only when exercising the optional ccusage integration. Overtok does not download it at runtime.
 
 The pnpm workspace is reserved for later npm release tooling; it is not needed to build the native command today.
@@ -89,7 +92,8 @@ contents, or expose persisted observations.
 | `internal/tui` | Bubble Tea application shell and local presentation boundary |
 | `internal/sync` | Reserved boundary for later synchronization work |
 | `fixtures` | Synthetic compatibility and regression data |
-| `server` and `migrations` | Reserved server and database boundaries |
+| `server/postgres` | Hosted PostgreSQL connection and migration boundary |
+| `migrations` | Immutable, embedded hosted PostgreSQL schema history |
 | `docs` | Cross-cutting architecture and design decisions |
 
 Package-level navigation and ownership are documented in [internal/README.md](./internal/README.md). Cross-cutting documents are indexed in [docs/README.md](./docs/README.md).

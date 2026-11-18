@@ -1,6 +1,6 @@
 # Architecture
 
-Status: local native MVP implemented; network architecture remains planned
+Status: local native MVP and hosted persistence implemented; network API remains planned
 Last updated: November 18, 2026
 
 ## System goals
@@ -34,8 +34,9 @@ internal/
   sync/                    Buckets, outbox, and client protocol (planned)
   tui/                     Bubble Tea application shell and local views
 server/
-  cmd/api/                 Reserved HTTP API entry point
-migrations/                Reserved database migrations
+  cmd/api/                 Planned HTTP API entry point
+  postgres/                Hosted connection and migration boundary
+migrations/                Embedded hosted PostgreSQL schema history
 fixtures/                  Sanitized compatibility fixtures
 packages/                  npm-distribution workspace (planned)
 docs/                      Architecture and product design
@@ -170,6 +171,25 @@ uses 30 local calendar dates rather than a rolling 720-hour duration. Token and
 price coverage remains complete, partial, or unavailable through every query.
 
 ## Server data flow
+
+The hosted persistence foundation is implemented. PostgreSQL stores users,
+GitHub identities, independently revocable devices and credential hashes,
+pricing revisions, and privacy-limited absolute usage buckets. The HTTP API,
+authentication exchange, and synchronization protocol remain planned.
+
+Server migrations are embedded in the Go binary, contiguous, checksummed, and
+applied once inside an advisory-locked transaction. Applied migration history
+must match the binary exactly; changed or newer history is rejected instead of
+being silently repaired. The current implementation targets PostgreSQL 18 and
+uses pgx for connection pooling and migration execution.
+
+The schema owns bucket identity with `(device_id, bucket_key)`. That constraint
+prevents duplicate rows, while the later synchronization protocol will define
+the no-op and replacement behavior for equal and newer absolute revisions.
+Foreign keys make user ownership explicit and cascade user deletion through
+devices, credential hashes, and usage buckets. The schema has no columns for
+raw source records, local identities, paths, prompts, responses, code, project
+metadata, commands, or provider credentials.
 
 ```text
 GitHub device authorization

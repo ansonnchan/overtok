@@ -1,4 +1,4 @@
-.PHONY: build check fmt test test-race vet
+.PHONY: build check fmt test test-postgres test-race vet
 
 # Keep build artifacts out of user-global caches so clean-checkout verification
 # behaves consistently in local sandboxes and CI.
@@ -18,6 +18,10 @@ vet:
 
 test:
 	go test ./...
+
+test-postgres:
+	test -n "$$OVERTOK_TEST_DATABASE_URL"
+	go test ./server/postgres -run Postgres -count=1
 
 test-race:
 	go test -race ./...
