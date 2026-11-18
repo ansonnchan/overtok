@@ -28,6 +28,7 @@ var applicationMigrations = mustLoadMigrations([]struct {
 	file    string
 }{
 	{version: 1, name: "initialize_store", file: "migrations/0001_initialize_store.sql"},
+	{version: 2, name: "store_observations", file: "migrations/0002_store_observations.sql"},
 })
 
 func mustLoadMigrations(definitions []struct {
