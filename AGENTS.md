@@ -69,6 +69,8 @@ Unknown and unavailable values are not zero. Preserve the distinction between re
 - Agents may push, open, and monitor PRs, but must not merge them without an explicit user request for that PR.
 - Leave completed PRs open and report their URLs, check status, dependencies, and review notes to the user.
 - When sequential work must continue before review, use stacked PRs: branch from the preceding unmerged branch and set that branch as the PR base.
+- Complete, validate, commit, and push each stacked branch, then open its PR before starting work on the next child branch.
+- Opening a stacked PR does not authorize merging it; leave every PR open for review unless the user explicitly requests that PR's merge.
 - Keep each stacked PR limited to its incremental diff and state its parent PR dependency clearly.
 - After the user merges a parent PR, rebase or retarget its child PR as needed and wait for the user to merge it.
 - When merging is explicitly requested, prefer rebase merge to retain meaningful commits in a linear history and delete the remote branch afterward.
