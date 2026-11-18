@@ -1,7 +1,7 @@
 # Overtok roadmap
 
-Status: working implementation plan
-Last updated: November 17, 2026
+Status: local native MVP complete; accounts and synchronization planned
+Last updated: November 18, 2026
 
 ## Product definition
 
@@ -267,30 +267,30 @@ M0 exit criteria:
 
 Goal: deliver a useful local application before authentication or multiplayer work.
 
-- [ ] **OVT-010: Implement local SQLite storage and migrations**
+- [x] **OVT-010: Implement local SQLite storage and migrations**
   - Add checkpoints, observations, buckets, outbox, and adapter-health tables.
   - Use transactions and WAL mode.
   - Acceptance: interruption and restart tests preserve committed observations and checkpoints.
   - Depends on: M0.
 
-- [ ] **OVT-011: Implement source collection orchestration**
+- [x] **OVT-011: Implement source collection orchestration**
   - Detect sources, collect incrementally, normalize, persist, and report adapter warnings.
   - Acceptance: one scan combines CLI and desktop sources without duplicates.
   - Depends on: OVT-010.
 
-- [ ] **OVT-012: Implement model resolution and pricing registry**
+- [x] **OVT-012: Implement model resolution and pricing registry**
   - Store observed, canonical, provider, pricing key, quality, source, and revision separately.
   - Unknown models retain tokens while cost remains unavailable.
   - Acceptance: reported, aliased, routed, and unknown fixtures display correctly.
   - Depends on: OVT-002, OVT-010.
 
-- [ ] **OVT-013: Build the initial Bubble Tea TUI**
+- [x] **OVT-013: Build the initial Bubble Tea TUI**
   - Overview, sources/health, models, recent periods, and settings/help views.
   - Support narrow terminals and graceful no-color output.
   - Acceptance: a new user can identify detected sources, totals, model mix, and collection warnings without reading documentation.
   - Depends on: OVT-011, OVT-012.
 
-- [ ] **OVT-014: Implement `overtok doctor`**
+- [x] **OVT-014: Implement `overtok doctor`**
   - Report platform, source paths without sensitive details, parser version, database health, and collection errors.
   - Acceptance: missing sources, permissions, unsupported formats, and corrupt local state have actionable diagnostics.
   - Depends on: OVT-011.

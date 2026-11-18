@@ -25,7 +25,10 @@ The native Go command currently provides:
 - native parsing of supported Claude and Codex JSONL evidence;
 - strict validation of pinned ccusage Claude and Codex daily JSON;
 - deterministic per-model normalization, cumulative-counter reduction, recovery from partial records, and deduplication;
-- privacy-safe source diagnostics through `overtok doctor`.
+- transactional local SQLite observations, checkpoints, health, and absolute usage buckets;
+- timezone-aware local totals with explicit complete, partial, unavailable, and empty states;
+- a keyboard-first Overview, Sources, Models, and Settings TUI with manual collection; and
+- privacy-safe source and storage diagnostics through `overtok doctor`.
 
 Model names are not allowlisted. A previously unseen, non-empty observed identifier can retain its token counts while canonical resolution and pricing remain unavailable. Reported, resolved, inferred, and unknown attribution are separate states.
 
@@ -54,6 +57,11 @@ go build -o ./bin/overtok ./cmd/overtok
 ./bin/overtok
 ```
 
+The TUI starts in local mode. Press `r` to collect supported evidence and
+refresh committed totals, `1`–`4` to switch views, `?` for help, and `q` to
+quit. Set `NO_COLOR` to any non-empty value to disable styled output. The
+minimum supported width is 48 columns.
+
 Run the source diagnostic:
 
 ```sh
@@ -73,9 +81,10 @@ contents, or expose persisted observations.
 | `internal/adapters` | Source discovery, ccusage validation, and source-specific parsers |
 | `internal/normalize` | Provider-neutral observations, capabilities, and invariants |
 | `internal/collect` | Parsing orchestration, deduplication, cumulative reduction, and summaries |
+| `internal/application` | Local refresh sequencing and committed dashboard queries |
 | `internal/doctor` | Privacy-safe source and storage diagnostic reporting |
 | `internal/fixturecheck` | Automated fixture privacy validation |
-| `internal/modelcatalog` | Reserved boundary for model aliases and pricing resolution |
+| `internal/modelcatalog` | Versioned model aliases and API-equivalent pricing resolution |
 | `internal/store` | Local SQLite lifecycle, observations, aggregates, and diagnostics |
 | `internal/tui` | Bubble Tea application shell and local presentation boundary |
 | `internal/sync` | Reserved boundary for later synchronization work |

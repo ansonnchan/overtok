@@ -24,6 +24,7 @@ Build and run the command directly:
 ```sh
 go build -o ./bin/overtok ./cmd/overtok
 ./bin/overtok --version
+./bin/overtok             # interactive local TUI
 ./bin/overtok doctor
 ```
 
@@ -35,6 +36,7 @@ The Makefile places `GOCACHE` and `GOPATH` under `/tmp` by default. Override tho
 - Discovery and doctor tests construct temporary home-directory layouts.
 - Fixture privacy tests scan every file under `fixtures`, including malformed and non-JSON cases.
 - Collection tests cover repeatability, overlap, cumulative counters, resets, partial writes, malformed records, and attribution quality.
+- Application and TUI tests inject storage, collection, terminal-size, and keyboard events; they never launch against real provider roots.
 
 Do not point automated tests at a real home directory or provider-owned storage. Real compatibility investigation requires explicit user approval and must produce a newly constructed sanitized regression fixture rather than a copied transcript.
 

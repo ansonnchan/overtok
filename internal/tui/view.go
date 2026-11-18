@@ -71,15 +71,21 @@ func (m Model) renderContent(output *strings.Builder, width int) {
 		fmt.Fprintln(output, m.styles.muted.Render("[empty] No local data to show yet."))
 		fmt.Fprintln(output, "Press r to collect and refresh.")
 	case StateWarning:
-		fmt.Fprintln(output, m.styles.warning.Render("[warning] "+clip(cleanLine(m.page.Warning), width-10)))
+		for _, line := range wrap("[warning] "+cleanLine(m.page.Warning), width) {
+			fmt.Fprintln(output, m.styles.warning.Render(line))
+		}
 		m.renderLines(output, width)
 	case StateError:
 		message := m.errMessage
 		if message == "" {
 			message = "Could not load local data"
 		}
-		fmt.Fprintln(output, m.styles.failure.Render("[error] "+message+"."))
-		fmt.Fprintln(output, "Press r to retry or run `overtok doctor` for details.")
+		for _, line := range wrap("[error] "+message+".", width) {
+			fmt.Fprintln(output, m.styles.failure.Render(line))
+		}
+		for _, line := range wrap("Press r to retry or run `overtok doctor` for details.", width) {
+			fmt.Fprintln(output, line)
+		}
 	default:
 		fmt.Fprintln(output, m.styles.success.Render("[ready] Local data loaded"))
 		m.renderLines(output, width)
@@ -88,7 +94,9 @@ func (m Model) renderContent(output *strings.Builder, width int) {
 
 func (m Model) renderLines(output *strings.Builder, width int) {
 	for _, line := range m.page.Lines {
-		fmt.Fprintln(output, clip(cleanLine(line), width))
+		for _, wrapped := range wrap(cleanLine(line), width) {
+			fmt.Fprintln(output, wrapped)
+		}
 	}
 }
 
@@ -117,4 +125,35 @@ func clip(value string, width int) string {
 	}
 	runes := []rune(value)
 	return string(runes[:width-1]) + "…"
+}
+
+func wrap(value string, width int) []string {
+	if value == "" || width <= 0 {
+		return []string{value}
+	}
+	var words []string
+	for _, word := range strings.Fields(value) {
+		for utf8.RuneCountInString(word) > width {
+			runes := []rune(word)
+			words = append(words, string(runes[:width]))
+			word = string(runes[width:])
+		}
+		if word != "" {
+			words = append(words, word)
+		}
+	}
+	if len(words) == 0 {
+		return []string{""}
+	}
+	lines := []string{words[0]}
+	for _, word := range words[1:] {
+		last := len(lines) - 1
+		candidate := lines[last] + " " + word
+		if utf8.RuneCountInString(candidate) <= width {
+			lines[last] = candidate
+			continue
+		}
+		lines = append(lines, word)
+	}
+	return lines
 }

@@ -40,7 +40,8 @@ type AggregateValue struct {
 	State Availability `json:"state"`
 }
 
-// TokenBreakdown holds independent, non-overlapping token categories.
+// TokenBreakdown holds billing categories plus reasoning subset metadata.
+// ReasoningOutput must not be added to Output when calculating total tokens.
 type TokenBreakdown struct {
 	InputUncached   AggregateValue `json:"input_uncached"`
 	InputCacheRead  AggregateValue `json:"input_cache_read"`
@@ -207,6 +208,37 @@ func (db *DB) RebuildUsageBuckets(ctx context.Context, revision uint64, estimato
 		return BucketApplyResult{}, err
 	}
 	return db.ApplyBucketRevisions(ctx, buckets)
+}
+
+// NextUsageBucketRevision returns a monotonic revision after every stored
+// bucket, including values outside SQLite's signed integer range.
+func (db *DB) NextUsageBucketRevision(ctx context.Context) (uint64, error) {
+	rows, err := db.sql.QueryContext(ctx, `SELECT revision FROM usage_buckets`)
+	if err != nil {
+		return 0, fmt.Errorf("query usage bucket revisions: %w", err)
+	}
+	defer rows.Close()
+	var maximum uint64
+	for rows.Next() {
+		var encoded string
+		if err := rows.Scan(&encoded); err != nil {
+			return 0, fmt.Errorf("decode usage bucket revision row: %w", err)
+		}
+		revision, err := strconv.ParseUint(encoded, 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("decode usage bucket revision: %w", err)
+		}
+		if revision > maximum {
+			maximum = revision
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return 0, fmt.Errorf("iterate usage bucket revisions: %w", err)
+	}
+	if maximum == math.MaxUint64 {
+		return 0, errors.New("usage bucket revision is exhausted")
+	}
+	return maximum + 1, nil
 }
 
 // PendingOutbox returns current pending absolute revisions without network behavior.

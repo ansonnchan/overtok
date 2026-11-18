@@ -1,8 +1,16 @@
 # Terminal application
 
-This package is Overtok's presentation boundary. It renders privacy-safe pages
-returned by an application interface and requests a refresh through that same
-interface. It must not import provider adapters or query SQLite directly.
+This package is Overtok's presentation boundary. It converts privacy-safe
+dashboard snapshots from the application interface into Overview, Sources,
+Models, and Settings pages, and requests refresh through that same interface.
+It must not import provider adapters or query SQLite directly.
+
+The Overview uses Today as its current period and shows Today, This week,
+30 days, and All time together. Sources renders persisted adapter health;
+Models retains reported, resolved, inferred, and unknown attribution; Settings
+explains the local-only privacy boundary. API-equivalent values always include
+the word `estimate`, and missing coverage renders as `no data`, `partial`, or
+`unavailable` rather than zero.
 
 ## Dependency pin
 

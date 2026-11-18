@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/ansonnchan/overtok/internal/application"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -57,7 +58,7 @@ type Page struct {
 // Application supplies committed local state and owns refresh behavior.
 // Implementations keep collection and persistence outside the TUI package.
 type Application interface {
-	Load(context.Context, Section) (Page, error)
+	Load(context.Context) (application.Dashboard, error)
 	Refresh(context.Context) error
 }
 
@@ -79,12 +80,14 @@ type Model struct {
 	height     int
 	help       bool
 	refreshing bool
+	requestID  uint64
 }
 
 type loadResult struct {
-	section Section
-	page    Page
-	err     error
+	section   Section
+	requestID uint64
+	dashboard application.Dashboard
+	err       error
 }
 
 type refreshResult struct {
@@ -101,17 +104,18 @@ func NewModel(ctx context.Context, app Application, config Config) Model {
 		state = StateEmpty
 	}
 	return Model{
-		ctx:     ctx,
-		app:     app,
-		styles:  newStyles(config.NoColor),
-		section: OverviewSection,
-		state:   state,
+		ctx:       ctx,
+		app:       app,
+		styles:    newStyles(config.NoColor),
+		section:   OverviewSection,
+		state:     state,
+		requestID: 1,
 	}
 }
 
 // Init loads the initial application snapshot.
 func (m Model) Init() tea.Cmd {
-	return m.load(m.section)
+	return m.load(m.section, m.requestID)
 }
 
 // Update applies terminal, navigation, help, refresh, and load messages.
@@ -124,21 +128,21 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		return m.updateKey(message)
 	case loadResult:
-		// A slow request for a previous tab must not replace the newly selected
-		// tab. The section token makes that transition deterministic.
-		if message.section != m.section {
+		// A slow request must not replace a newer selection, including when the
+		// user leaves and returns to the same tab before the first load finishes.
+		if message.section != m.section || message.requestID != m.requestID {
 			return m, nil
 		}
 		m.refreshing = false
 		m.errMessage = ""
-		m.page = message.page
+		m.page = buildPage(message.section, message.dashboard)
 		switch {
 		case message.err != nil:
 			m.state = StateError
 			m.errMessage = "Could not load local data"
-		case message.page.Warning != "":
+		case m.page.Warning != "":
 			m.state = StateWarning
-		case len(message.page.Lines) == 0:
+		case len(m.page.Lines) == 0:
 			m.state = StateEmpty
 		default:
 			m.state = StateReady
@@ -151,7 +155,8 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.errMessage = "Could not refresh local data"
 			return m, nil
 		}
-		return m, m.load(m.section)
+		m.requestID++
+		return m, m.load(m.section, m.requestID)
 	default:
 		return m, nil
 	}
@@ -196,16 +201,17 @@ func (m Model) activate(section Section) (tea.Model, tea.Cmd) {
 	m.state = StateLoading
 	m.page = Page{}
 	m.errMessage = ""
-	return m, m.load(section)
+	m.requestID++
+	return m, m.load(section, m.requestID)
 }
 
-func (m Model) load(section Section) tea.Cmd {
+func (m Model) load(section Section, requestID uint64) tea.Cmd {
 	if m.app == nil {
 		return nil
 	}
 	return func() tea.Msg {
-		page, err := m.app.Load(m.ctx, section)
-		return loadResult{section: section, page: page, err: err}
+		dashboard, err := m.app.Load(m.ctx)
+		return loadResult{section: section, requestID: requestID, dashboard: dashboard, err: err}
 	}
 }
 
