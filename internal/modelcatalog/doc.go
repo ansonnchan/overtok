@@ -1,4 +1,3 @@
-// Package modelcatalog reserves canonical model and pricing resolution. Source
-// adapters keep observed identifiers usable until this package is implemented;
-// they must not embed provider alias tables themselves.
+// Package modelcatalog resolves observed model identifiers against versioned,
+// reviewed canonical metadata and API-equivalent pricing revisions.
 package modelcatalog
