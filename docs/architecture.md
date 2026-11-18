@@ -31,7 +31,7 @@ internal/
   normalize/               Canonical usage records
   store/                   Local SQLite lifecycle and migrations
   sync/                    Buckets, outbox, and client protocol (planned)
-  tui/                     Bubble Tea models and views (planned)
+  tui/                     Bubble Tea application shell and local views
 server/
   cmd/api/                 Reserved HTTP API entry point
 migrations/                Reserved database migrations
@@ -67,7 +67,9 @@ Normalized observations
          - outbox revision
 ```
 
-Collection never depends on the server. The future TUI reads derived local state and does not parse source files directly.
+Collection never depends on the server. The TUI reads derived local state
+through an application interface and does not parse source files or query
+SQLite directly.
 
 ### Source adapters
 

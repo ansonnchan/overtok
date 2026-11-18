@@ -1,8 +1,13 @@
 # Overtok
 
-Overtok is a terminal-first application for comparing coding-agent usage in private groups. The current implementation collects supported local Claude and Codex evidence, normalizes token and model metadata, and reports source health without reading ordinary chat data.
+Overtok is a terminal-first application for understanding coding-agent usage.
+The current local implementation collects supported Claude and Codex evidence,
+normalizes token and model metadata, persists privacy-safe aggregates, reports
+installation health, and provides a keyboard-first application shell without
+reading ordinary chat data.
 
-The repository is still before persistence, synchronization, authentication, and the interactive TUI. The [roadmap](./ROADMAP.md) describes those later stages without making them part of the current executable.
+Network synchronization, authentication, groups, and multiplayer leaderboards
+remain future roadmap stages and are not required by the local application.
 
 ## Privacy boundary
 
@@ -72,7 +77,8 @@ contents, or expose persisted observations.
 | `internal/fixturecheck` | Automated fixture privacy validation |
 | `internal/modelcatalog` | Reserved boundary for model aliases and pricing resolution |
 | `internal/store` | Local SQLite lifecycle, observations, aggregates, and diagnostics |
-| `internal/sync`, `internal/tui` | Reserved boundaries for later roadmap stages |
+| `internal/tui` | Bubble Tea application shell and local presentation boundary |
+| `internal/sync` | Reserved boundary for later synchronization work |
 | `fixtures` | Synthetic compatibility and regression data |
 | `server` and `migrations` | Reserved server and database boundaries |
 | `docs` | Cross-cutting architecture and design decisions |
