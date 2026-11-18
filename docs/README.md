@@ -17,6 +17,7 @@ This directory owns decisions that cross package boundaries. Package-specific im
 - [Pinned ccusage contract](../internal/adapters/ccusage/README.md)
 - [Normalized usage contract](../internal/normalize/README.md)
 - [Collection semantics](../internal/collect/README.md)
+- [Model catalog and pricing](../internal/modelcatalog/README.md)
 - [Source diagnostics](../internal/doctor/README.md)
 - [Compatibility fixtures](../fixtures/README.md)
 - [Server boundary](../server/README.md)

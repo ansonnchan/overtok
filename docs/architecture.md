@@ -27,7 +27,7 @@ internal/
   collect/                 Deduplication, counter reduction, and summaries
   doctor/                  Privacy-safe source diagnostics
   fixturecheck/            Fixture privacy enforcement
-  modelcatalog/            Model resolution and pricing revisions (planned)
+  modelcatalog/            Model resolution and pricing revisions
   normalize/               Canonical usage records
   store/                   Local SQLite lifecycle and migrations
   sync/                    Buckets, outbox, and client protocol (planned)
@@ -171,7 +171,15 @@ Leaderboard authorization checks membership on every request. A member of one gr
 
 ### Pricing
 
-Pricing is a versioned registry derived from public model catalogs plus small reviewed overrides. The server prices leaderboard data consistently and records the applied revision.
+Pricing is a versioned registry derived from official provider model catalogs
+plus small reviewed overrides. The local registry records source URLs,
+effective or retrieval dates, and its applied revision. It provides standard
+API-equivalent estimates only; it does not claim subscription usage was billed.
+
+Resolution uses exact identifiers and reviewed mappings. Ambiguous routing
+aliases remain unknown instead of selecting a backend model. Models with
+context-dependent prices remain resolved but unpriced when local evidence does
+not prove the applicable tier.
 
 Unknown models retain token totals and display unavailable cost. Historical values do not change silently when the upstream catalog changes.
 

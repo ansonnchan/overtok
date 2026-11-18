@@ -26,11 +26,17 @@ type ScanStore interface {
 	CommitScan(context.Context, []store.ObservationBatch) (store.CommitResult, error)
 }
 
+// ModelResolver enriches observed identifiers without changing usage values.
+type ModelResolver interface {
+	ResolveObservation(normalize.Observation) normalize.Observation
+}
+
 // Orchestrator owns the application boundary from discovery through durable
 // normalized state. Provider-specific parsing remains in adapters.
 type Orchestrator struct {
 	Discovery      Discovery
 	Collector      Collector
+	Models         ModelResolver
 	Store          ScanStore
 	AdapterVersion string
 	Now            func() time.Time
@@ -59,6 +65,11 @@ func (o Orchestrator) Scan(ctx context.Context) (ScanResult, error) {
 		candidates = append(candidates, finding.Candidates...)
 	}
 	collected := o.Collector.Collect(ctx, candidates)
+	if o.Models != nil {
+		for index, observation := range collected.Observations {
+			collected.Observations[index] = o.Models.ResolveObservation(observation)
+		}
+	}
 	now := time.Now().UTC()
 	if o.Now != nil {
 		now = o.Now().UTC()

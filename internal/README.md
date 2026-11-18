@@ -23,7 +23,7 @@ fixturecheck protects committed test data independently of runtime collection
 | `collect` | Application scan orchestration, deduplication, cumulative reduction, and summaries | SQL implementation or uploads |
 | `doctor` | Redacted source and parser diagnostics | Usage collection or repair |
 | `fixturecheck` | Privacy validation for committed fixtures | Runtime validation of user data |
-| `modelcatalog` | Future canonical model and pricing resolution | Source parsing |
+| `modelcatalog` | Versioned canonical model and API-equivalent pricing resolution | Source parsing |
 | `store` | SQLite lifecycle, migrations, and local persistence | Source-specific behavior |
 | `sync` | Future privacy-limited synchronization | Raw local records |
 | `tui` | Future presentation of committed local state | Collection or synchronization logic |

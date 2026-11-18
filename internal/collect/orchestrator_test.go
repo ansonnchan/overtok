@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ansonnchan/overtok/internal/adapters"
+	"github.com/ansonnchan/overtok/internal/modelcatalog"
 	"github.com/ansonnchan/overtok/internal/normalize"
 	"github.com/ansonnchan/overtok/internal/store"
 )
@@ -80,8 +81,18 @@ func TestOrchestratorPersistsValidSourcesWhenAnotherIsPartial(t *testing.T) {
 		testRoot(adapters.RootCodexShared, normalize.SourceCodex, normalize.SurfaceSharedLocal, codexRoot),
 	}}
 	db := openCollectionStore(t)
+	resolver, err := modelcatalog.NewResolver(modelcatalog.Catalog{
+		Revision: "synthetic-r1",
+		Models: []modelcatalog.Model{
+			{CanonicalID: "claude-sonnet-synthetic", Provider: "synthetic-provider"},
+			{CanonicalID: "gpt-6-synthetic", Provider: "synthetic-provider"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	result, err := (Orchestrator{
-		Discovery: discovery, Collector: Collector{SourceVersion: "synthetic-v1"}, Store: db,
+		Discovery: discovery, Collector: Collector{SourceVersion: "synthetic-v1"}, Models: resolver, Store: db,
 		Now: func() time.Time { return time.Date(2026, 11, 17, 20, 0, 0, 0, time.UTC) },
 	}).Scan(t.Context())
 	if err != nil {
@@ -97,6 +108,9 @@ func TestOrchestratorPersistsValidSourcesWhenAnotherIsPartial(t *testing.T) {
 	sources := map[normalize.Source]int{}
 	for _, observation := range observations {
 		sources[observation.Source]++
+		if observation.CanonicalModelID == nil || observation.ModelProvider == nil {
+			t.Fatalf("observation was not model-resolved: %#v", observation)
+		}
 	}
 	if sources[normalize.SourceClaude] != 2 || sources[normalize.SourceCodex] != 1 {
 		t.Fatalf("stored source counts = %#v", sources)
