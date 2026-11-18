@@ -1,6 +1,6 @@
 # Architecture
 
-Status: local native MVP, hosted persistence, and device authentication implemented; synchronization planned
+Status: local native MVP, hosted authentication, and absolute-bucket synchronization implemented
 Last updated: November 18, 2026
 
 ## System goals
@@ -32,13 +32,14 @@ internal/
   modelcatalog/            Model resolution and pricing revisions
   normalize/               Canonical usage records
   store/                   Local SQLite lifecycle and migrations
-  sync/                    Buckets, outbox, and client protocol (planned)
+  sync/                    Allowlisted batches, retry, dry run, and acknowledgements
   tui/                     Bubble Tea application shell and local views
 server/
   auth/                    GitHub device flow and Overtok device credentials
   cmd/api/                 Hosted HTTP API entry point
   httpapi/                 Bounded JSON routing and protocol errors
   postgres/                Hosted connection and migration boundary
+  sync/                    Authenticated absolute-revision application
 migrations/                Embedded hosted PostgreSQL schema history
 fixtures/                  Sanitized compatibility fixtures
 packages/                  npm-distribution workspace (planned)
@@ -164,8 +165,16 @@ identity without changing the local absolute value.
 
 Each local change increments the bucket revision. A newer local revision
 replaces its earlier absolute value and the outbox retains only that newest
-pending payload. Replaying a revision is therefore safe. No network client is
-implemented at this stage.
+pending payload. Replaying a revision is therefore safe. The sync client reads
+only this committed outbox, sends at most 100 allowlisted buckets per request,
+and marks only the exact acknowledged revision as durable remotely. A late
+acknowledgement cannot clear a newer local replacement.
+
+Both real sync and dry run collect, normalize, and commit locally before reading
+the outbox. Dry run writes the exact request JSON produced by the real serializer
+and performs no network or acknowledgement mutation. Transient network, rate
+limit, and server failures receive one exponential-backoff retry with jitter;
+an interrupted or rejected batch remains pending.
 
 Local buckets use one-minute UTC intervals. This preserves exact modern IANA
 timezone day and week boundaries while grouping events that occur in the same
@@ -175,11 +184,11 @@ price coverage remains complete, partial, or unavailable through every query.
 
 ## Server data flow
 
-The hosted persistence and device-authentication foundations are implemented. PostgreSQL stores users,
+The hosted persistence, device authentication, and synchronization foundations are implemented. PostgreSQL stores users,
 GitHub identities, independently revocable devices and credential hashes,
 pricing revisions, and privacy-limited absolute usage buckets. The HTTP API
-implements GitHub device login, credential rotation, and device revocation;
-the synchronization protocol remains planned.
+implements GitHub device login, credential rotation, device revocation, and
+bounded authenticated bucket upload.
 
 Server migrations are embedded in the Go binary, contiguous, checksummed, and
 applied once inside an advisory-locked transaction. Applied migration history
@@ -187,13 +196,18 @@ must match the binary exactly; changed or newer history is rejected instead of
 being silently repaired. The current implementation targets PostgreSQL 18 and
 uses pgx for connection pooling and migration execution.
 
-The schema owns bucket identity with `(device_id, bucket_key)`. That constraint
-prevents duplicate rows, while the later synchronization protocol will define
-the no-op and replacement behavior for equal and newer absolute revisions.
+The schema owns bucket identity with `(device_id, bucket_key)`. Equal revisions
+with the same canonical payload are no-ops, older revisions are acknowledged as
+stale, and newer absolute revisions replace earlier values. Equal revisions
+with different payload hashes reject the entire transaction.
 Foreign keys make user ownership explicit and cascade user deletion through
 devices, credential hashes, and usage buckets. The schema has no columns for
 raw source records, local identities, paths, prompts, responses, code, project
 metadata, commands, or provider credentials.
+
+The server registers only trusted bundled pricing-revision checksums. Upload
+serialization is an explicit field allowlist and stores normalized columns plus
+a canonical payload hash, never the client JSON body or local observation IDs.
 
 ```text
 GitHub device authorization

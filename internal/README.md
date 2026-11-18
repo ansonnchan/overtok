@@ -29,7 +29,7 @@ account owns hosted login and OS credential-vault storage beside the local flow
 | `fixturecheck` | Privacy validation for committed fixtures | Runtime validation of user data |
 | `modelcatalog` | Versioned canonical model and API-equivalent pricing resolution | Source parsing |
 | `store` | SQLite lifecycle, migrations, and local persistence | Source-specific behavior |
-| `sync` | Future privacy-limited synchronization | Raw local records |
+| `sync` | Allowlisted absolute-bucket batches, retry, dry run, and acknowledgements | Raw local records or provider credentials |
 | `tui` | Keyboard-first presentation of committed local state | Collection, SQL, or synchronization logic |
 
 Interfaces should be declared at the package that consumes them. Provider-specific identifiers may pass through normalized contracts as observed values, but provider-specific filesystem and schema rules stay in adapters.

@@ -1,6 +1,8 @@
 package modelcatalog
 
 import (
+	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -18,6 +20,29 @@ type Rate struct {
 	InputCacheRead  *uint64
 	InputCacheWrite *uint64
 	Output          *uint64
+}
+
+// Checksum returns a stable digest of the reviewed revision and sorted prices.
+func (r *PricingRegistry) Checksum() ([32]byte, error) {
+	encoded, err := json.Marshal(struct {
+		Revision string  `json:"revision"`
+		Prices   []Price `json:"prices"`
+	}{Revision: r.Revision, Prices: r.Prices})
+	if err != nil {
+		return [32]byte{}, fmt.Errorf("encode pricing registry checksum: %w", err)
+	}
+	return sha256.Sum256(encoded), nil
+}
+
+// EffectiveAt returns when the complete revision became effective.
+func (r *PricingRegistry) EffectiveAt() time.Time {
+	var effective time.Time
+	for _, price := range r.Prices {
+		if price.EffectiveDate.After(effective) {
+			effective = price.EffectiveDate
+		}
+	}
+	return effective
 }
 
 // Price ties a pricing key to one provider source revision.

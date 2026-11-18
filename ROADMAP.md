@@ -1,6 +1,6 @@
 # Overtok roadmap
 
-Status: local native MVP, server data model, and device authentication complete; synchronization in progress
+Status: local native MVP, device authentication, and synchronization complete; account aggregation in progress
 Last updated: November 18, 2026
 
 ## Product definition
@@ -316,7 +316,7 @@ Goal: establish one account across multiple independently managed devices.
   - Acceptance: login, logout, credential refresh/failure, and device revocation are tested.
   - Depends on: OVT-020.
 
-- [ ] **OVT-022: Implement local outbox and sync protocol**
+- [x] **OVT-022: Implement local outbox and sync protocol**
   - Build absolute versioned buckets, bounded batches, retry behavior, acknowledgements, and dry-run serialization.
   - Acceptance: retries, duplicate submissions, out-of-order revisions, and network interruption do not inflate totals.
   - Depends on: OVT-010, OVT-020, OVT-021.

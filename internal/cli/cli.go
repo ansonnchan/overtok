@@ -31,6 +31,7 @@ type dependencies struct {
 	launch   func(context.Context, string, string, io.Reader, io.Writer, bool) error
 	timeout  time.Duration
 	account  func(string) (accountManager, error)
+	sync     func(context.Context, string, string, string, bool, io.Writer) error
 }
 
 type accountManager interface {
@@ -52,6 +53,7 @@ func defaultDependencies() dependencies {
 			}
 			return account.NewManager(client, account.NewKeyringStore(apiURL))
 		},
+		sync: synchronizeLocal,
 		diagnose: func(ctx context.Context, home, codexHome string) doctor.Report {
 			discovery := adapters.Discoverer{Roots: adapters.DefaultMacRoots(home, codexHome)}
 			path, err := store.DefaultPath()
@@ -66,6 +68,9 @@ func defaultDependencies() dependencies {
 }
 
 func run(args []string, stdout, stderr io.Writer, deps dependencies) int {
+	if len(args) > 0 && args[0] == "sync" {
+		return runSyncCommand(args[1:], stdout, stderr, deps)
+	}
 	flags := flag.NewFlagSet("overtok", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	showVersion := flags.Bool("version", false, "print the version")
@@ -92,6 +97,45 @@ func run(args []string, stdout, stderr io.Writer, deps dependencies) int {
 	}
 
 	return runTUI(stdout, stderr, deps)
+}
+
+func runSyncCommand(args []string, stdout, stderr io.Writer, deps dependencies) int {
+	flags := flag.NewFlagSet("overtok sync", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	dryRun := flags.Bool("dry-run", false, "show the exact upload requests without sending them")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if flags.NArg() != 0 {
+		fmt.Fprintln(stderr, "sync accepts only --dry-run")
+		return 2
+	}
+	home, err := deps.homeDir()
+	if err != nil {
+		fmt.Fprintln(stderr, "could not resolve the local home directory")
+		return 1
+	}
+	codexHome := deps.getenv("CODEX_HOME")
+	if codexHome != "" && !filepath.IsAbs(codexHome) {
+		fmt.Fprintln(stderr, "CODEX_HOME must be an absolute directory")
+		return 1
+	}
+	apiURL := strings.TrimSpace(deps.getenv("OVERTOK_API_URL"))
+	if apiURL == "" {
+		fmt.Fprintln(stderr, "OVERTOK_API_URL is required for synchronization")
+		return 1
+	}
+	if deps.sync == nil {
+		fmt.Fprintln(stderr, "synchronization support is unavailable")
+		return 1
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	if err := deps.sync(ctx, home, codexHome, apiURL, *dryRun, stdout); err != nil {
+		fmt.Fprintln(stderr, "could not synchronize usage; local pending data was preserved")
+		return 1
+	}
+	return 0
 }
 
 func runLogin(stdout, stderr io.Writer, deps dependencies) int {

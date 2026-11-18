@@ -61,12 +61,19 @@ Then point the native client at the loopback API:
 ```sh
 OVERTOK_API_URL='http://127.0.0.1:8080' go run ./cmd/overtok login
 OVERTOK_API_URL='http://127.0.0.1:8080' go run ./cmd/overtok logout
+OVERTOK_API_URL='http://127.0.0.1:8080' go run ./cmd/overtok sync --dry-run
+OVERTOK_API_URL='http://127.0.0.1:8080' go run ./cmd/overtok sync
 ```
 
 Plain HTTP is accepted only for loopback development. Non-loopback API origins
 must use HTTPS. The state key encrypts short-lived GitHub device codes and must
 be provided through secret management in a deployed environment; it is not a
 client credential.
+
+`sync` first runs the normal local collection transaction and absolute-bucket
+rebuild. It then uploads committed outbox records in batches of at most 100.
+`sync --dry-run` follows the same path through serialization, but prints one
+exact request body per line without contacting the API or changing outbox state.
 
 The Makefile places `GOCACHE` and `GOPATH` under `/tmp` by default. Override those variables when a development environment needs different writable cache locations.
 
@@ -79,6 +86,7 @@ The Makefile places `GOCACHE` and `GOPATH` under `/tmp` by default. Override tho
 - Application and TUI tests inject storage, collection, terminal-size, and keyboard events; they never launch against real provider roots.
 - PostgreSQL integration tests use only synthetic identities and values in a disposable schema.
 - Authentication tests use synthetic GitHub responses and never contact a real account.
+- Synchronization tests use allowlisted synthetic buckets and verify retry, replay, replacement, conflict, and acknowledgement behavior.
 
 Do not point automated tests at a real home directory or provider-owned storage. Real compatibility investigation requires explicit user approval and must produce a newly constructed sanitized regression fixture rather than a copied transcript.
 

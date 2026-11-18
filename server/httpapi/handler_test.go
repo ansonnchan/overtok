@@ -3,6 +3,9 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	protocol "github.com/ansonnchan/overtok/internal/sync"
 	serverauth "github.com/ansonnchan/overtok/server/auth"
 )
 
@@ -22,7 +26,7 @@ func TestAuthenticationRoutesAndStableErrors(t *testing.T) {
 		poll:    serverauth.PollResponse{Status: serverauth.FlowPending, RetryAfter: 7 * time.Second},
 		refresh: serverauth.Session{Credential: "replacement", DeviceID: "device", UserID: "user"},
 	}
-	handler, err := New(service)
+	handler, err := New(service, &fakeUsageSyncService{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +65,7 @@ func TestAuthenticationRoutesAndStableErrors(t *testing.T) {
 
 func TestHandlerRedactsServiceFailures(t *testing.T) {
 	service := &fakeAuthService{startErr: errors.New("provider token and private/path")}
-	handler, err := New(service)
+	handler, err := New(service, &fakeUsageSyncService{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,6 +75,53 @@ func TestHandlerRedactsServiceFailures(t *testing.T) {
 	if response.Code != http.StatusBadGateway || strings.Contains(response.Body.String(), "provider token") || strings.Contains(response.Body.String(), "private/path") {
 		t.Fatalf("response = %d %q", response.Code, response.Body.String())
 	}
+}
+
+func TestSyncRouteAuthenticatesAndReturnsExactAcknowledgement(t *testing.T) {
+	service := &fakeAuthService{}
+	syncService := &fakeUsageSyncService{}
+	handler, err := New(service, syncService)
+	if err != nil {
+		t.Fatal(err)
+	}
+	batch := validSyncBatch()
+	body, err := json.Marshal(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/v1/sync/buckets", bytes.NewReader(body))
+	request.Header.Set("Authorization", "Bearer device-credential")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || syncService.credential != "device-credential" || !strings.Contains(response.Body.String(), batch.Buckets[0].BucketKey) {
+		t.Fatalf("sync response/service = %d %q/%#v", response.Code, response.Body.String(), syncService)
+	}
+}
+
+func validSyncBatch() protocol.Batch {
+	zero, output := uint64(0), uint64(7)
+	bucket := protocol.Bucket{
+		Start:  time.Date(2026, 11, 18, 12, 0, 0, 0, time.UTC),
+		Source: "codex", Surface: "cli", ObservedModelID: "unknown-model",
+		ModelResolution: "unknown", Measurement: "reported", NormalizationVersion: "1",
+		Tokens: protocol.Tokens{
+			InputUncached:   protocol.Value{Value: &zero, State: "complete"},
+			InputCacheRead:  protocol.Value{State: "unavailable"},
+			InputCacheWrite: protocol.Value{State: "unavailable"},
+			Output:          protocol.Value{Value: &output, State: "complete"},
+			ReasoningOutput: protocol.Value{State: "unavailable"},
+		},
+		APIEstimate: protocol.Value{State: "unavailable"}, Revision: 1,
+	}
+	parts := []string{
+		bucket.Start.Format(time.RFC3339Nano), bucket.Source, bucket.Surface,
+		bucket.ObservedModelID, "<null>", "<null>", "<null>",
+		bucket.ModelResolution, bucket.Measurement, bucket.NormalizationVersion,
+	}
+	digest := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
+	return protocol.Batch{SchemaVersion: protocol.SchemaVersion, Buckets: []protocol.Envelope{{
+		BucketKey: hex.EncodeToString(digest[:]), Bucket: bucket,
+	}}}
 }
 
 type fakeAuthService struct {
@@ -91,3 +142,18 @@ func (f *fakeAuthService) Refresh(context.Context, string) (serverauth.Session, 
 	return f.refresh, nil
 }
 func (f *fakeAuthService) Logout(context.Context, string) error { return f.logoutErr }
+
+type fakeUsageSyncService struct {
+	credential string
+}
+
+func (f *fakeUsageSyncService) Apply(_ context.Context, credential string, batch protocol.Batch) (protocol.BatchResponse, error) {
+	f.credential = credential
+	acknowledgements := make([]protocol.Acknowledgement, 0, len(batch.Buckets))
+	for _, bucket := range batch.Buckets {
+		acknowledgements = append(acknowledgements, protocol.Acknowledgement{
+			BucketKey: bucket.BucketKey, Revision: bucket.Bucket.Revision, Status: protocol.AckApplied,
+		})
+	}
+	return protocol.BatchResponse{Acknowledgements: acknowledgements}, nil
+}
