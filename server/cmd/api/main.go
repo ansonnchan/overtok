@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ansonnchan/overtok/internal/modelcatalog"
+	serveraccount "github.com/ansonnchan/overtok/server/account"
 	serverauth "github.com/ansonnchan/overtok/server/auth"
 	"github.com/ansonnchan/overtok/server/httpapi"
 	"github.com/ansonnchan/overtok/server/postgres"
@@ -73,7 +74,15 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	handler, err := httpapi.New(authentication, synchronization)
+	accountRepository, err := postgres.NewAccountRepository(pool)
+	if err != nil {
+		return err
+	}
+	accountUsage, err := serveraccount.NewService(authentication, accountRepository)
+	if err != nil {
+		return err
+	}
+	handler, err := httpapi.New(authentication, synchronization, accountUsage)
 	if err != nil {
 		return err
 	}

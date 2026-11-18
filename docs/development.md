@@ -75,6 +75,17 @@ rebuild. It then uploads committed outbox records in batches of at most 100.
 `sync --dry-run` follows the same path through serialization, but prints one
 exact request body per line without contacting the API or changing outbox state.
 
+An authenticated client can inspect the account-level aggregation endpoint:
+
+```sh
+curl -H 'Authorization: Bearer OVERTOK-DEVICE-CREDENTIAL' \
+  http://127.0.0.1:8080/v1/account/usage
+```
+
+The response aggregates active devices and reports every device's revocation
+and freshness state. Never paste a real device credential into documentation,
+shell history, bug reports, or test fixtures.
+
 The Makefile places `GOCACHE` and `GOPATH` under `/tmp` by default. Override those variables when a development environment needs different writable cache locations.
 
 ## Test boundaries
@@ -87,6 +98,7 @@ The Makefile places `GOCACHE` and `GOPATH` under `/tmp` by default. Override tho
 - PostgreSQL integration tests use only synthetic identities and values in a disposable schema.
 - Authentication tests use synthetic GitHub responses and never contact a real account.
 - Synchronization tests use allowlisted synthetic buckets and verify retry, replay, replacement, conflict, and acknowledgement behavior.
+- Account integration tests combine two synthetic devices, revoke one, retain its stored history, and keep the sibling writable.
 
 Do not point automated tests at a real home directory or provider-owned storage. Real compatibility investigation requires explicit user approval and must produce a newly constructed sanitized regression fixture rather than a copied transcript.
 

@@ -1,6 +1,6 @@
 # Overtok roadmap
 
-Status: local native MVP, device authentication, and synchronization complete; account aggregation in progress
+Status: accounts, devices, and synchronization milestone complete; private groups next
 Last updated: November 18, 2026
 
 ## Product definition
@@ -302,7 +302,7 @@ M1 exit criteria:
 - Closing or interrupting the app does not corrupt local state.
 - Repeated scans do not inflate totals.
 
-### M2 — Accounts, devices, and synchronization
+### M2 — Accounts, devices, and synchronization (complete)
 
 Goal: establish one account across multiple independently managed devices.
 
@@ -321,7 +321,7 @@ Goal: establish one account across multiple independently managed devices.
   - Acceptance: retries, duplicate submissions, out-of-order revisions, and network interruption do not inflate totals.
   - Depends on: OVT-010, OVT-020, OVT-021.
 
-- [ ] **OVT-023: Implement account-level multi-device aggregation**
+- [x] **OVT-023: Implement account-level multi-device aggregation**
   - Aggregate devices under one user while retaining device revocation and freshness.
   - Acceptance: two devices contribute to one account row; revoking one prevents future writes without deleting the other.
   - Depends on: OVT-022.

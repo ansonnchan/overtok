@@ -53,7 +53,8 @@ The local native MVP has four TUI areas:
 Authentication and synchronization are available through the explicit
 `login`, `logout`, `sync`, and `sync --dry-run` CLI commands. Groups,
 multiplayer leaderboards, and sync controls remain deferred in the TUI until
-their presentation boundary is implemented.
+their presentation boundary is implemented. The hosted account summary is an
+application/API boundary and does not make the TUI own multi-device queries.
 
 ## Responsive layout
 

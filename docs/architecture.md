@@ -1,6 +1,6 @@
 # Architecture
 
-Status: local native MVP, hosted authentication, and absolute-bucket synchronization implemented
+Status: accounts, devices, and synchronization implemented; private groups planned
 Last updated: November 18, 2026
 
 ## System goals
@@ -35,6 +35,7 @@ internal/
   sync/                    Allowlisted batches, retry, dry run, and acknowledgements
   tui/                     Bubble Tea application shell and local views
 server/
+  account/                 Authorized multi-device account aggregation
   auth/                    GitHub device flow and Overtok device credentials
   cmd/api/                 Hosted HTTP API entry point
   httpapi/                 Bounded JSON routing and protocol errors
@@ -208,6 +209,17 @@ metadata, commands, or provider credentials.
 The server registers only trusted bundled pricing-revision checksums. Upload
 serialization is an explicit field allowlist and stores normalized columns plus
 a canonical payload hash, never the client JSON body or local observation IDs.
+
+Account usage is read as one repeatable PostgreSQL snapshot. Normalized token
+categories, non-overlapping total tokens, and API-equivalent estimates preserve
+complete, partial, unavailable, and empty coverage. Numeric sums remain decimal
+strings so multiple devices cannot overflow a native unsigned integer.
+
+Only active devices contribute to the account total. The response includes all
+account devices with revocation, last-authenticated, and last-synchronized
+state. Revocation blocks subsequent writes and removes that device from active
+totals without deleting its synchronized history or affecting sibling devices.
+Explicit uploaded-data deletion remains a later account operation.
 
 ```text
 GitHub device authorization

@@ -1,0 +1,89 @@
+package account
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	serverauth "github.com/ansonnchan/overtok/server/auth"
+)
+
+// Availability preserves complete, partial, unavailable, and empty coverage.
+type Availability string
+
+const (
+	AvailabilityEmpty       Availability = "empty"
+	AvailabilityComplete    Availability = "complete"
+	AvailabilityPartial     Availability = "partial"
+	AvailabilityUnavailable Availability = "unavailable"
+)
+
+// Value is an arbitrary-precision decimal aggregate plus coverage.
+type Value struct {
+	Value *string      `json:"value"`
+	State Availability `json:"state"`
+}
+
+// Tokens is the account-level normalized token breakdown.
+type Tokens struct {
+	InputUncached   Value `json:"input_uncached"`
+	InputCacheRead  Value `json:"input_cache_read"`
+	InputCacheWrite Value `json:"input_cache_write"`
+	Output          Value `json:"output"`
+	ReasoningOutput Value `json:"reasoning_output"`
+}
+
+// Device reports independent revocation and freshness without exposing local
+// machine or project identity.
+type Device struct {
+	DeviceID     string     `json:"device_id"`
+	Revoked      bool       `json:"revoked"`
+	LastSeenAt   *time.Time `json:"last_seen_at"`
+	LastSyncedAt *time.Time `json:"last_synced_at"`
+}
+
+// Usage is one account row aggregated from active devices.
+type Usage struct {
+	UserID        string     `json:"user_id"`
+	DisplayName   string     `json:"display_name"`
+	GeneratedAt   time.Time  `json:"generated_at"`
+	ActiveDevices int        `json:"active_devices"`
+	LastSyncedAt  *time.Time `json:"last_synced_at"`
+	TotalTokens   Value      `json:"total_tokens"`
+	Tokens        Tokens     `json:"tokens"`
+	APIEstimate   Value      `json:"api_equivalent_estimate_microusd"`
+	Devices       []Device   `json:"devices"`
+}
+
+// Authenticator resolves an Overtok device credential.
+type Authenticator interface {
+	Authenticate(context.Context, string) (serverauth.Principal, error)
+}
+
+// Repository aggregates the authenticated user's active devices.
+type Repository interface {
+	AccountUsage(context.Context, serverauth.Principal) (Usage, error)
+}
+
+// Service owns account usage authorization.
+type Service struct {
+	auth       Authenticator
+	repository Repository
+}
+
+// NewService constructs the account aggregation service.
+func NewService(auth Authenticator, repository Repository) (*Service, error) {
+	if auth == nil || repository == nil {
+		return nil, errors.New("initialize account usage: authenticator and repository are required")
+	}
+	return &Service{auth: auth, repository: repository}, nil
+}
+
+// Usage authenticates one device and aggregates its user account.
+func (s *Service) Usage(ctx context.Context, credential string) (Usage, error) {
+	principal, err := s.auth.Authenticate(ctx, credential)
+	if err != nil {
+		return Usage{}, err
+	}
+	return s.repository.AccountUsage(ctx, principal)
+}
