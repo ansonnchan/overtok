@@ -198,17 +198,24 @@ being silently repaired. The current implementation targets PostgreSQL 18 and
 uses pgx for connection pooling and migration execution.
 
 The schema owns bucket identity with `(device_id, bucket_key)`. Equal revisions
-with the same canonical payload are no-ops, older revisions are acknowledged as
-stale, and newer absolute revisions replace earlier values. Equal revisions
-with different payload hashes reject the entire transaction.
+with the same canonical client-evidence payload are no-ops, older revisions are
+acknowledged as stale, and newer absolute revisions replace earlier values.
+Server-derived price and pricing-revision fields are excluded from conflict
+identity so a trusted catalog update cannot turn an otherwise identical retry
+into a conflict. Other equal-revision differences reject the transaction.
 Foreign keys make user ownership explicit and cascade user deletion through
 devices, credential hashes, and usage buckets. The schema has no columns for
 raw source records, local identities, paths, prompts, responses, code, project
 metadata, commands, or provider credentials.
 
-The server registers only trusted bundled pricing-revision checksums. Upload
+The server registers only trusted bundled model and pricing revisions. Upload
 serialization is an explicit field allowlist and stores normalized columns plus
 a canonical payload hash, never the client JSON body or local observation IDs.
+Clients report locally observed token counts and evidence quality, but the API
+rejects model metadata that disagrees with its catalog and replaces every
+client-provided API-equivalent estimate and pricing revision with a value
+derived from its trusted registry. Missing token categories or prices remain
+unavailable; partial token coverage produces a partial lower bound.
 
 Account usage is read as one repeatable PostgreSQL snapshot. Normalized token
 categories, non-overlapping total tokens, and API-equivalent estimates preserve
@@ -233,7 +240,8 @@ GitHub device authorization
 
 Signed-in client
     -> bounded HTTPS batch
-    -> authentication and schema validation
+    -> authentication, schema, and model-catalog validation
+    -> server-derived API-equivalent estimate
     -> idempotent bucket upsert
     -> acknowledgement
 

@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 const defaultCredentialLifetime = 90 * 24 * time.Hour
@@ -40,8 +42,9 @@ func NewService(github GitHub, repository Repository, stateKey []byte) (*Service
 
 // Start begins a GitHub device authorization without accepting a password.
 func (s *Service) Start(ctx context.Context, clientVersion string) (StartResponse, error) {
-	if len(clientVersion) > 64 {
-		return StartResponse{}, errors.New("client version is too long")
+	clientVersion = strings.TrimSpace(clientVersion)
+	if clientVersion == "" || len(clientVersion) > 64 || !utf8.ValidString(clientVersion) || strings.IndexFunc(clientVersion, unicode.IsControl) >= 0 {
+		return StartResponse{}, fmt.Errorf("%w: client version", ErrInvalidInput)
 	}
 	authorization, err := s.github.Start(ctx)
 	if err != nil {
