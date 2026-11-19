@@ -9,8 +9,9 @@ reading ordinary chat data.
 The hosted PostgreSQL data model, HTTP API, GitHub device login, idempotent
 absolute-bucket synchronization, and account-level multi-device aggregation
 complete the accounts/devices milestone. Private groups and authenticated
-multiplayer leaderboard queries are implemented; their TUI views remain the
-next roadmap stage and local mode still works without a server.
+multiplayer leaderboards are implemented in the API and TUI. Local mode still
+works without a server; account and uploaded-data deletion is the remaining
+social-loop milestone.
 
 ## Privacy boundary
 
@@ -30,7 +31,7 @@ The native Go command currently provides:
 - deterministic per-model normalization, cumulative-counter reduction, recovery from partial records, and deduplication;
 - transactional local SQLite observations, checkpoints, health, and absolute usage buckets;
 - timezone-aware local totals with explicit complete, partial, unavailable, and empty states;
-- a keyboard-first Overview, Sources, Models, and Settings TUI with manual collection;
+- a keyboard-first Overview, Sources, Models, Settings, and private Groups TUI with manual collection;
 - GitHub device-flow `login` and revoking `logout` commands backed by the OS credential vault;
 - bounded `sync` and exact-payload `sync --dry-run` commands with durable acknowledgements;
 - one authenticated account usage row across active devices with independent revocation and freshness;
@@ -56,6 +57,11 @@ OVERTOK_API_URL=https://api.example.test overtok login
 OVERTOK_API_URL=https://api.example.test overtok logout
 OVERTOK_API_URL=https://api.example.test overtok sync --dry-run
 OVERTOK_API_URL=https://api.example.test overtok sync
+OVERTOK_API_URL=https://api.example.test overtok group list
+OVERTOK_API_URL=https://api.example.test overtok group create "Quiet team"
+OVERTOK_API_URL=https://api.example.test overtok group invite --expires 24h --uses 10 "Quiet team"
+OVERTOK_API_URL=https://api.example.test overtok group join "$OVERTOK_INVITE_CODE"
+OVERTOK_API_URL=https://api.example.test overtok group leave "Quiet team"
 ```
 
 Login requests public GitHub identity only. The CLI never receives a GitHub

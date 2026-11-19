@@ -13,6 +13,7 @@ import (
 	"github.com/ansonnchan/overtok/internal/account"
 	"github.com/ansonnchan/overtok/internal/adapters"
 	"github.com/ansonnchan/overtok/internal/doctor"
+	"github.com/ansonnchan/overtok/internal/multiplayer"
 	"github.com/ansonnchan/overtok/internal/store"
 )
 
@@ -28,15 +29,24 @@ type dependencies struct {
 	getenv   func(string) string
 	diagnose func(context.Context, string, string) doctor.Report
 	input    io.Reader
-	launch   func(context.Context, string, string, io.Reader, io.Writer, bool) error
+	launch   func(context.Context, string, string, string, io.Reader, io.Writer, bool) error
 	timeout  time.Duration
 	account  func(string) (accountManager, error)
+	groups   func(string) (groupManager, error)
 	sync     func(context.Context, string, string, string, bool, io.Writer) error
 }
 
 type accountManager interface {
 	Login(context.Context, string, io.Writer) error
 	Logout(context.Context) error
+}
+
+type groupManager interface {
+	List(context.Context) ([]multiplayer.Group, error)
+	Create(context.Context, string) (multiplayer.Group, error)
+	Join(context.Context, string) (multiplayer.Group, error)
+	Invite(context.Context, string, time.Duration, int) (multiplayer.Invite, error)
+	Leave(context.Context, string) error
 }
 
 func defaultDependencies() dependencies {
@@ -52,6 +62,13 @@ func defaultDependencies() dependencies {
 				return nil, err
 			}
 			return account.NewManager(client, account.NewKeyringStore(apiURL))
+		},
+		groups: func(apiURL string) (groupManager, error) {
+			client, err := multiplayer.NewClient(apiURL, nil)
+			if err != nil {
+				return nil, err
+			}
+			return multiplayer.NewService(client, account.NewKeyringStore(apiURL), localTimezone())
 		},
 		sync: synchronizeLocal,
 		diagnose: func(ctx context.Context, home, codexHome string) doctor.Report {
@@ -70,6 +87,9 @@ func defaultDependencies() dependencies {
 func run(args []string, stdout, stderr io.Writer, deps dependencies) int {
 	if len(args) > 0 && args[0] == "sync" {
 		return runSyncCommand(args[1:], stdout, stderr, deps)
+	}
+	if len(args) > 0 && args[0] == "group" {
+		return runGroupCommand(args[1:], stdout, stderr, deps)
 	}
 	flags := flag.NewFlagSet("overtok", flag.ContinueOnError)
 	flags.SetOutput(stderr)
@@ -198,7 +218,7 @@ func runTUI(stdout, stderr io.Writer, deps dependencies) int {
 		fmt.Fprintln(stderr, "could not start the local application")
 		return 1
 	}
-	if err := deps.launch(context.Background(), home, codexHome, deps.input, stdout, deps.getenv("NO_COLOR") != ""); err != nil {
+	if err := deps.launch(context.Background(), home, codexHome, strings.TrimSpace(deps.getenv("OVERTOK_API_URL")), deps.input, stdout, deps.getenv("NO_COLOR") != ""); err != nil {
 		// Runtime errors can wrap private local paths. Keep CLI output stable and
 		// direct detailed investigation through the redacted doctor report.
 		fmt.Fprintln(stderr, "could not start the local application; run `overtok doctor`")

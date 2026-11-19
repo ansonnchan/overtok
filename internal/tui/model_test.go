@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ansonnchan/overtok/internal/application"
+	"github.com/ansonnchan/overtok/internal/multiplayer"
 	"github.com/ansonnchan/overtok/internal/normalize"
 	"github.com/ansonnchan/overtok/internal/store"
 	tea "github.com/charmbracelet/bubbletea"
@@ -19,6 +20,49 @@ type fakeApplication struct {
 	refreshErr error
 	loads      int
 	refreshes  int
+}
+
+type fakeMultiplayer struct {
+	snapshot   multiplayer.Snapshot
+	selectedID string
+	period     multiplayer.Period
+	metric     multiplayer.Metric
+	created    string
+	joined     string
+}
+
+func (f *fakeMultiplayer) Load(_ context.Context, selectedID string, period multiplayer.Period, metric multiplayer.Metric) (multiplayer.Snapshot, error) {
+	f.selectedID, f.period, f.metric = selectedID, period, metric
+	snapshot := f.snapshot
+	if selectedID != "" {
+		for _, group := range snapshot.Groups {
+			if group.ID == selectedID {
+				snapshot.Selected = group
+				break
+			}
+		}
+	}
+	if snapshot.Board != nil {
+		board := *snapshot.Board
+		board.GroupID, board.GroupName = snapshot.Selected.ID, snapshot.Selected.Name
+		board.Period, board.Metric = period, metric
+		snapshot.Board = &board
+	}
+	return snapshot, nil
+}
+
+func (f *fakeMultiplayer) Create(_ context.Context, name string) (multiplayer.Group, error) {
+	f.created = name
+	group := multiplayer.Group{ID: "group-created", Name: name, Timezone: "UTC", Role: "owner"}
+	f.snapshot.Groups = append(f.snapshot.Groups, group)
+	return group, nil
+}
+
+func (f *fakeMultiplayer) Join(_ context.Context, code string) (multiplayer.Group, error) {
+	f.joined = code
+	group := multiplayer.Group{ID: "group-joined", Name: "Joined", Timezone: "UTC", Role: "member"}
+	f.snapshot.Groups = append(f.snapshot.Groups, group)
+	return group, nil
 }
 
 func (a *fakeApplication) Load(context.Context) (application.Dashboard, error) {
@@ -123,7 +167,7 @@ func TestNarrowLayoutAndHelp(t *testing.T) {
 		t.Fatalf("too-narrow View() = %q", view)
 	}
 	updated, _ = updated.(Model).Update(key('?'))
-	if view = updated.(Model).View(); !strings.Contains(view, "1–4 views") {
+	if view = updated.(Model).View(); !strings.Contains(view, "1–5 views") {
 		t.Fatalf("too-narrow help View() = %q", view)
 	}
 
@@ -169,6 +213,89 @@ func TestNarrowSettingsContentWrapsWithoutLosingPrivacyMeaning(t *testing.T) {
 		if len([]rune(line)) > MinimumWidth {
 			t.Fatalf("settings line is %d columns: %q", len([]rune(line)), line)
 		}
+	}
+}
+
+func TestGroupsViewLoadsSwitchesPeriodMetricAndSelection(t *testing.T) {
+	t.Parallel()
+	value := "20"
+	now := time.Date(2026, 11, 18, 12, 0, 0, 0, time.UTC)
+	remote := &fakeMultiplayer{snapshot: multiplayer.Snapshot{
+		Groups: []multiplayer.Group{
+			{ID: "group-one", Name: "One", Timezone: "UTC", Role: "owner"},
+			{ID: "group-two", Name: "Two", Timezone: "UTC", Role: "member"},
+		},
+		Selected: multiplayer.Group{ID: "group-one", Name: "One", Timezone: "UTC", Role: "owner"},
+		Board: &multiplayer.Board{
+			GroupID: "group-one", GroupName: "One", Timezone: "UTC",
+			Period: multiplayer.PeriodToday, Metric: multiplayer.MetricTotalTokens,
+			GeneratedAt: now, Rows: []multiplayer.Row{{
+				Rank: new(int), DisplayName: "Alpha", CurrentUser: true,
+				Value:       multiplayer.Value{Value: &value, State: multiplayer.AvailabilityComplete},
+				Limitations: multiplayer.Limitations{UnknownModelBuckets: 1},
+			}},
+		},
+	}}
+	*remote.snapshot.Board.Rows[0].Rank = 1
+	model := NewModel(t.Context(), &fakeApplication{}, Config{NoColor: true, Multiplayer: remote})
+	updated, command := model.Update(key('5'))
+	if command == nil {
+		t.Fatal("groups navigation did not load")
+	}
+	updated, _ = updated.(Model).Update(command())
+	model = updated.(Model)
+	view := model.View()
+	for _, want := range []string{"Group 1/2 · One", "Your standing: #1 of 1", "Alpha (you)", "unknown model 1"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("group View() = %q, want %q", view, want)
+		}
+	}
+	updated, command = model.Update(key('p'))
+	updated, _ = updated.(Model).Update(command())
+	if remote.period != multiplayer.PeriodWeek {
+		t.Fatalf("period = %s", remote.period)
+	}
+	updated, command = updated.(Model).Update(key('m'))
+	updated, _ = updated.(Model).Update(command())
+	if remote.metric != multiplayer.MetricOutput {
+		t.Fatalf("metric = %s", remote.metric)
+	}
+	updated, command = updated.(Model).Update(key('j'))
+	updated, _ = updated.(Model).Update(command())
+	if remote.selectedID != "group-two" || !strings.Contains(updated.(Model).View(), "Group 2/2 · Two") {
+		t.Fatalf("selected group/view = %q/%q", remote.selectedID, updated.(Model).View())
+	}
+}
+
+func TestGroupsViewCreatesAndMasksInviteInput(t *testing.T) {
+	t.Parallel()
+	remote := &fakeMultiplayer{snapshot: multiplayer.Snapshot{Groups: []multiplayer.Group{
+		{ID: "group-one", Name: "One", Timezone: "UTC", Role: "owner"},
+	}, Selected: multiplayer.Group{ID: "group-one", Name: "One", Timezone: "UTC", Role: "owner"}}}
+	model := NewModel(t.Context(), &fakeApplication{}, Config{NoColor: true, Multiplayer: remote})
+	updated, command := model.Update(key('5'))
+	updated, _ = updated.(Model).Update(command())
+	updated, _ = updated.(Model).Update(key('c'))
+	updated, _ = updated.(Model).Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("New group")})
+	if !strings.Contains(updated.(Model).View(), "New group_") {
+		t.Fatalf("create input View() = %q", updated.(Model).View())
+	}
+	updated, command = updated.(Model).Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, command = updated.(Model).Update(command())
+	updated, _ = updated.(Model).Update(command())
+	if remote.created != "New group" {
+		t.Fatalf("created = %q", remote.created)
+	}
+	updated, _ = updated.(Model).Update(key('i'))
+	updated, _ = updated.(Model).Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("ovt_secret")})
+	view := updated.(Model).View()
+	if strings.Contains(view, "ovt_secret") || !strings.Contains(view, "**********_") {
+		t.Fatalf("invite input was not masked: %q", view)
+	}
+	updated, command = updated.(Model).Update(tea.KeyMsg{Type: tea.KeyEnter})
+	_, _ = updated.(Model).Update(command())
+	if remote.joined != "ovt_secret" {
+		t.Fatalf("joined with %q", remote.joined)
 	}
 }
 

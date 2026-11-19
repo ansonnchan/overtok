@@ -14,6 +14,7 @@ local evidence
 doctor reads discovery, parser, and storage health without collecting records
 fixturecheck protects committed test data independently of runtime collection
 account owns hosted login and OS credential-vault storage beside the local flow
+multiplayer owns authenticated group and leaderboard HTTP calls
 ```
 
 ## Package ownership
@@ -28,6 +29,7 @@ account owns hosted login and OS credential-vault storage beside the local flow
 | `doctor` | Redacted source, parser, and storage diagnostics | Usage collection or repair |
 | `fixturecheck` | Privacy validation for committed fixtures | Runtime validation of user data |
 | `modelcatalog` | Versioned canonical model and API-equivalent pricing resolution | Source parsing |
+| `multiplayer` | Native private-group commands, leaderboard DTOs, and authenticated API calls | Credentials, server policy, aggregation, or terminal rendering |
 | `store` | SQLite lifecycle, migrations, and local persistence | Source-specific behavior |
 | `sync` | Allowlisted absolute-bucket batches, retry, dry run, and acknowledgements | Raw local records or provider credentials |
 | `tui` | Keyboard-first presentation of committed local state | Collection, SQL, or synchronization logic |

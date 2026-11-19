@@ -11,6 +11,7 @@ import (
 
 	"github.com/ansonnchan/overtok/internal/adapters"
 	"github.com/ansonnchan/overtok/internal/doctor"
+	"github.com/ansonnchan/overtok/internal/multiplayer"
 	"github.com/ansonnchan/overtok/internal/normalize"
 )
 
@@ -64,9 +65,9 @@ func TestRootCommandLaunchesLocalTUIWithEnvironment(t *testing.T) {
 			}
 		},
 		input: input,
-		launch: func(ctx context.Context, home, codexHome string, gotInput io.Reader, _ io.Writer, noColor bool) error {
-			if ctx == nil || home != "/synthetic/home" || codexHome != "/synthetic/codex" || gotInput != input || !noColor {
-				t.Fatalf("launch inputs = %v %q %q %v %v", ctx, home, codexHome, gotInput, noColor)
+		launch: func(ctx context.Context, home, codexHome, apiURL string, gotInput io.Reader, _ io.Writer, noColor bool) error {
+			if ctx == nil || home != "/synthetic/home" || codexHome != "/synthetic/codex" || apiURL != "" || gotInput != input || !noColor {
+				t.Fatalf("launch inputs = %v %q %q %q %v %v", ctx, home, codexHome, apiURL, gotInput, noColor)
 			}
 			return nil
 		},
@@ -84,7 +85,7 @@ func TestRootCommandRedactsStartupFailure(t *testing.T) {
 		homeDir: func() (string, error) { return "/synthetic/home", nil },
 		getenv:  func(string) string { return "" },
 		input:   strings.NewReader("q"),
-		launch: func(context.Context, string, string, io.Reader, io.Writer, bool) error {
+		launch: func(context.Context, string, string, string, io.Reader, io.Writer, bool) error {
 			return errors.New("private/path/state.db")
 		},
 	}
@@ -92,6 +93,16 @@ func TestRootCommandRedactsStartupFailure(t *testing.T) {
 	var stderr bytes.Buffer
 	if code := run(nil, &stdout, &stderr, deps); code != 1 || !strings.Contains(stderr.String(), "overtok doctor") || strings.Contains(stderr.String(), "private/path") {
 		t.Fatalf("root code/stderr = %d/%q", code, stderr.String())
+	}
+}
+
+func TestLocalTimezoneResolvesLoadableLocation(t *testing.T) {
+	zone := localTimezone()
+	if zone == "" || zone == "Local" {
+		t.Fatalf("localTimezone() = %q", zone)
+	}
+	if _, err := time.LoadLocation(zone); err != nil {
+		t.Fatalf("localTimezone() = %q: %v", zone, err)
 	}
 }
 
@@ -238,10 +249,94 @@ func TestSyncCommandParsesDryRunAndRedactsFailure(t *testing.T) {
 	}
 }
 
+func TestGroupCommandsUseConfiguredMultiplayerBoundary(t *testing.T) {
+	manager := &fakeGroupManager{groups: []multiplayer.Group{{ID: "group-id", Name: "Quiet group", Role: "owner", Timezone: "UTC"}}}
+	deps := dependencies{
+		getenv: func(name string) string {
+			if name == "OVERTOK_API_URL" {
+				return "https://api.example.test"
+			}
+			return ""
+		},
+		groups: func(apiURL string) (groupManager, error) {
+			if apiURL != "https://api.example.test" {
+				t.Fatalf("api URL = %q", apiURL)
+			}
+			return manager, nil
+		},
+	}
+	tests := []struct {
+		args []string
+		want string
+	}{
+		{args: []string{"group", "list"}, want: "Quiet group · owner · UTC"},
+		{args: []string{"group", "create", "New group"}, want: "Created private group New group"},
+		{args: []string{"group", "join", "ovt_synthetic"}, want: "Joined private group Joined"},
+		{args: []string{"group", "invite", "--expires", "1h", "--uses", "2", "Quiet group"}, want: "Invite code: ovt_invite"},
+		{args: []string{"group", "leave", "Quiet group"}, want: "Left private group Quiet group"},
+	}
+	for _, test := range tests {
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		if code := run(test.args, &stdout, &stderr, deps); code != 0 || !strings.Contains(stdout.String(), test.want) || stderr.Len() != 0 {
+			t.Fatalf("run(%v) = %d/%q/%q", test.args, code, stdout.String(), stderr.String())
+		}
+	}
+	if manager.created != "New group" || manager.joined != "ovt_synthetic" || manager.inviteUses != 2 || manager.left != "Quiet group" {
+		t.Fatalf("group manager = %#v", manager)
+	}
+}
+
+func TestGroupCommandRequiresAPIAndRedactsFailure(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if code := run([]string{"group", "list"}, &stdout, &stderr, dependencies{getenv: func(string) string { return "" }}); code != 1 || !strings.Contains(stderr.String(), "OVERTOK_API_URL") {
+		t.Fatalf("missing API = %d/%q", code, stderr.String())
+	}
+	manager := &fakeGroupManager{err: errors.New("credential at /private/path")}
+	deps := dependencies{
+		getenv: func(string) string { return "https://api.example.test" },
+		groups: func(string) (groupManager, error) { return manager, nil },
+	}
+	stderr.Reset()
+	if code := run([]string{"group", "list"}, &stdout, &stderr, deps); code != 1 || strings.Contains(stderr.String(), "credential") || strings.Contains(stderr.String(), "/private/path") {
+		t.Fatalf("failed group command = %d/%q", code, stderr.String())
+	}
+}
+
 type fakeAccountManager struct {
 	loginVersion string
 	loginErr     error
 	loggedOut    bool
+}
+
+type fakeGroupManager struct {
+	groups     []multiplayer.Group
+	created    string
+	joined     string
+	inviteUses int
+	left       string
+	err        error
+}
+
+func (f *fakeGroupManager) List(context.Context) ([]multiplayer.Group, error) {
+	return f.groups, f.err
+}
+func (f *fakeGroupManager) Create(_ context.Context, name string) (multiplayer.Group, error) {
+	f.created = name
+	return multiplayer.Group{Name: name, Timezone: "UTC"}, f.err
+}
+func (f *fakeGroupManager) Join(_ context.Context, code string) (multiplayer.Group, error) {
+	f.joined = code
+	return multiplayer.Group{Name: "Joined"}, f.err
+}
+func (f *fakeGroupManager) Invite(_ context.Context, _ string, lifetime time.Duration, uses int) (multiplayer.Invite, error) {
+	f.inviteUses = uses
+	return multiplayer.Invite{Code: "ovt_invite", ExpiresAt: time.Now().UTC().Add(lifetime), MaxUses: uses}, f.err
+}
+func (f *fakeGroupManager) Leave(_ context.Context, group string) error {
+	f.left = group
+	return f.err
 }
 
 func (f *fakeAccountManager) Login(_ context.Context, version string, _ io.Writer) error {

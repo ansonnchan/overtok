@@ -1,6 +1,6 @@
 # Architecture
 
-Status: leaderboard queries implemented; multiplayer TUI next
+Status: multiplayer TUI implemented; account deletion next
 Last updated: November 18, 2026
 
 ## System goals
@@ -237,6 +237,12 @@ TUI
     -> aggregate account devices
     -> rank by period and metric
 ```
+
+The native `multiplayer` boundary owns authenticated group HTTP calls and reads
+the existing device session from the operating-system credential vault. The
+TUI consumes its presentation-safe snapshots; it does not own credentials,
+HTTP, group mutation policy, or leaderboard aggregation. With no API origin,
+the local TUI remains fully usable and the Groups area explains how to opt in.
 
 ### Identity and devices
 

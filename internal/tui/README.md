@@ -2,8 +2,10 @@
 
 This package is Overtok's presentation boundary. It converts privacy-safe
 dashboard snapshots from the application interface into Overview, Sources,
-Models, and Settings pages, and requests refresh through that same interface.
-It must not import provider adapters or query SQLite directly.
+Models, Settings, and Groups pages. Local refresh stays on the application
+interface; private-group reads and mutations stay on the multiplayer client
+interface. The TUI must not import provider adapters, own HTTP or credentials,
+or query SQLite directly.
 
 The Overview uses Today as its current period and shows Today, This week,
 30 days, and All time together. Sources renders persisted adapter health;
@@ -11,6 +13,12 @@ Models retains reported, resolved, inferred, and unknown attribution; Settings
 explains the local-only privacy boundary. API-equivalent values always include
 the word `estimate`, and missing coverage renders as `no data`, `partial`, or
 `unavailable` rather than zero.
+
+Groups supports create, join, selection, period, and metric controls. Ranking
+rows preserve partial and unavailable coverage, source mix, model resolution,
+and server freshness. Invite entry is masked and never rendered back to the
+screen. With no configured multiplayer client, the first four views behave as
+before and Groups shows an opt-in instruction.
 
 ## Dependency pin
 

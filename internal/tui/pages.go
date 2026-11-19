@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ansonnchan/overtok/internal/application"
+	"github.com/ansonnchan/overtok/internal/multiplayer"
 	"github.com/ansonnchan/overtok/internal/normalize"
 	"github.com/ansonnchan/overtok/internal/store"
 )
@@ -23,6 +24,8 @@ func buildPage(section Section, dashboard application.Dashboard) Page {
 		return modelsPage(dashboard)
 	case SettingsSection:
 		return settingsPage(dashboard)
+	case GroupsSection:
+		return Page{Warning: "Group data requires the multiplayer client"}
 	default:
 		return Page{Warning: "Unknown local view"}
 	}
@@ -131,13 +134,171 @@ func settingsPage(dashboard application.Dashboard) Page {
 		"Never stored: paths, project names, repository names, or branch names.",
 		"",
 		"Controls",
-		"1–4 switch views · tab/arrows navigate · r collect and refresh · ? help · q quit",
+		"1–5 switch views · tab/arrows navigate · r collect and refresh · ? help · q quit",
 		"",
 		fmt.Sprintf("Timezone: %s", dashboard.Timezone),
 		fmt.Sprintf("Database schema: %d (supported %d)", dashboard.Diagnostics.SchemaVersion, dashboard.Diagnostics.SupportedSchemaVersion),
 		"Collection freshness: " + collectionFreshness(dashboard.Diagnostics.LastSuccessfulCollection, dashboard.GeneratedAt),
 		"Run `overtok doctor` for detailed, path-redacted diagnostics.",
 	}}
+}
+
+func groupPage(snapshot multiplayer.Snapshot) Page {
+	if len(snapshot.Groups) == 0 {
+		return Page{Lines: []string{
+			"No private groups yet.",
+			"Press c to create one or i to join with an invite code.",
+			"New groups use this device's IANA timezone.",
+		}}
+	}
+	groupIndex := 0
+	for index, group := range snapshot.Groups {
+		if group.ID == snapshot.Selected.ID {
+			groupIndex = index
+			break
+		}
+	}
+	page := Page{Lines: []string{
+		fmt.Sprintf("Group %d/%d · %s · %s · %s", groupIndex+1, len(snapshot.Groups), snapshot.Selected.Name, snapshot.Selected.Role, snapshot.Selected.Timezone),
+		"j/k switch group · p period · m metric · c create · i join",
+	}}
+	if snapshot.Selected.Role == "owner" {
+		page.Lines = append(page.Lines, "Create an invite with `overtok group invite <name>`.")
+	}
+	if snapshot.Board == nil {
+		return page
+	}
+	board := snapshot.Board
+	page.Lines = append(page.Lines,
+		fmt.Sprintf("Period: %s · Metric: %s", periodLabel(board.Period), metricLabel(board.Metric)),
+		fmt.Sprintf("Window: %s · generated %s", windowLabel(board.Window), board.GeneratedAt.UTC().Format(time.RFC3339)),
+	)
+	for _, row := range board.Rows {
+		if !row.CurrentUser {
+			continue
+		}
+		standing := "unranked"
+		if row.Rank != nil {
+			standing = fmt.Sprintf("#%d of %d", *row.Rank, len(board.Rows))
+		}
+		page.Lines = append(page.Lines, fmt.Sprintf("Your standing: %s · %s", standing, formatRemoteValue(row.Value, board.Metric)))
+		break
+	}
+	page.Lines = append(page.Lines, "", "Leaderboard")
+	if len(board.Rows) == 0 {
+		page.Lines = append(page.Lines, "No active members to rank.")
+		return page
+	}
+	for _, row := range board.Rows {
+		rank := "--"
+		if row.Rank != nil {
+			rank = fmt.Sprintf("#%d", *row.Rank)
+		}
+		name := row.DisplayName
+		if row.CurrentUser {
+			name += " (you)"
+		}
+		page.Lines = append(page.Lines, fmt.Sprintf(
+			"%s %s · %s · last synced %s",
+			rank, name, formatRemoteValue(row.Value, board.Metric), collectionFreshness(row.LastSyncedAt, board.GeneratedAt),
+		))
+		context := make([]string, 0, 2)
+		if row.MostUsedModel != nil {
+			context = append(context, fmt.Sprintf("model %s (%s)", row.MostUsedModel.ModelID, row.MostUsedModel.Resolution))
+		}
+		if len(row.SourceMix) > 0 {
+			sources := make([]string, 0, len(row.SourceMix))
+			for _, source := range row.SourceMix {
+				sources = append(sources, source.Source+" "+formatRemoteValue(source.TotalTokens, multiplayer.MetricTotalTokens))
+			}
+			context = append(context, "sources "+strings.Join(sources, ", "))
+		}
+		if len(context) > 0 {
+			page.Lines = append(page.Lines, "  "+strings.Join(context, " · "))
+		}
+		limitations := row.Limitations
+		if limitations.UnknownModelBuckets > 0 || limitations.InferredModelBuckets > 0 || limitations.APIEstimateUnavailableBuckets > 0 {
+			page.Lines = append(page.Lines, fmt.Sprintf(
+				"  coverage: unknown model %d · inferred model %d · API estimate unavailable %d",
+				limitations.UnknownModelBuckets, limitations.InferredModelBuckets, limitations.APIEstimateUnavailableBuckets,
+			))
+			page.Warning = "Some leaderboard rows have model or API-estimate limitations"
+		}
+		if row.Value.State == multiplayer.AvailabilityPartial || row.Value.State == multiplayer.AvailabilityUnavailable {
+			page.Warning = "Some leaderboard values are partial or unavailable and remain unranked"
+		}
+	}
+	return page
+}
+
+func periodLabel(period multiplayer.Period) string {
+	switch period {
+	case multiplayer.PeriodToday:
+		return "Today"
+	case multiplayer.PeriodWeek:
+		return "This week"
+	case multiplayer.PeriodLast30Days:
+		return "30 days"
+	case multiplayer.PeriodAllTime:
+		return "All time"
+	default:
+		return "Unknown"
+	}
+}
+
+func metricLabel(metric multiplayer.Metric) string {
+	switch metric {
+	case multiplayer.MetricTotalTokens:
+		return "Tokens"
+	case multiplayer.MetricOutput:
+		return "Output"
+	case multiplayer.MetricAPIEstimate:
+		return "API estimate"
+	default:
+		return "Unknown"
+	}
+}
+
+func windowLabel(window multiplayer.Window) string {
+	if window.Start == nil {
+		return "all synchronized history"
+	}
+	return window.Start.UTC().Format(time.RFC3339) + " to " + window.End.UTC().Format(time.RFC3339)
+}
+
+func formatRemoteValue(value multiplayer.Value, metric multiplayer.Metric) string {
+	if value.Value == nil {
+		switch value.State {
+		case multiplayer.AvailabilityEmpty:
+			return "no data"
+		default:
+			return "unavailable"
+		}
+	}
+	formatted := formatDigits(*value.Value)
+	if metric == multiplayer.MetricAPIEstimate {
+		formatted = formatMicroUSD(*value.Value) + " (estimate)"
+	} else if metric == multiplayer.MetricOutput {
+		formatted += " output tokens"
+	} else {
+		formatted += " tokens"
+	}
+	if value.State == multiplayer.AvailabilityPartial {
+		formatted += " (partial; unranked)"
+	}
+	return formatted
+}
+
+func formatMicroUSD(value string) string {
+	micros, ok := new(big.Int).SetString(value, 10)
+	if !ok || micros.Sign() < 0 {
+		return "unavailable"
+	}
+	dollars, remainder := new(big.Int), new(big.Int)
+	dollars.QuoRem(micros, big.NewInt(1_000_000), remainder)
+	fraction := remainder.String()
+	fraction = strings.Repeat("0", 6-len(fraction)) + fraction
+	return "$" + formatDigits(dollars.String()) + "." + fraction
 }
 
 func summaryEmpty(summary store.UsageSummary) bool {

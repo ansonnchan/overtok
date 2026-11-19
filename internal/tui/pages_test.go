@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ansonnchan/overtok/internal/application"
+	"github.com/ansonnchan/overtok/internal/multiplayer"
 	"github.com/ansonnchan/overtok/internal/normalize"
 	"github.com/ansonnchan/overtok/internal/store"
 )
@@ -106,5 +107,40 @@ func TestTotalTokensDoesNotDoubleCountReasoningSubset(t *testing.T) {
 	}
 	if got := totalTokens(tokens); got != "17" {
 		t.Fatalf("totalTokens() = %q, want 17", got)
+	}
+}
+
+func TestGroupPageKeepsPartialAndEstimateMeaningVisible(t *testing.T) {
+	t.Parallel()
+	partial, estimate := "12345", "1500001"
+	rank := 1
+	now := time.Date(2026, 11, 18, 12, 0, 0, 0, time.UTC)
+	page := groupPage(multiplayer.Snapshot{
+		Groups:   []multiplayer.Group{{ID: "group", Name: "Quiet", Timezone: "UTC", Role: "member"}},
+		Selected: multiplayer.Group{ID: "group", Name: "Quiet", Timezone: "UTC", Role: "member"},
+		Board: &multiplayer.Board{
+			Period: multiplayer.PeriodToday, Metric: multiplayer.MetricAPIEstimate, GeneratedAt: now,
+			Rows: []multiplayer.Row{
+				{Rank: &rank, DisplayName: "Complete", Value: multiplayer.Value{Value: &estimate, State: multiplayer.AvailabilityComplete}},
+				{DisplayName: "Partial", CurrentUser: true, Value: multiplayer.Value{Value: &partial, State: multiplayer.AvailabilityPartial}},
+			},
+		},
+	})
+	joined := strings.Join(page.Lines, "\n")
+	for _, want := range []string{"Metric: API estimate", "$1.500001 (estimate)", "$0.012345 (estimate) (partial; unranked)", "Your standing: unranked"} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("group page = %q, want %q", joined, want)
+		}
+	}
+	if page.Warning == "" {
+		t.Fatal("partial leaderboard did not warn")
+	}
+}
+
+func TestCleanLineRemovesTerminalControlCharacters(t *testing.T) {
+	t.Parallel()
+	cleaned := cleanLine("safe\x1b[31m\nnext")
+	if strings.ContainsRune(cleaned, '\x1b') || strings.ContainsRune(cleaned, '\n') || !strings.Contains(cleaned, "safe") {
+		t.Fatalf("cleanLine() = %q", cleaned)
 	}
 }
