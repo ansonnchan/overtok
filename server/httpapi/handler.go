@@ -14,6 +14,7 @@ import (
 	serveraccount "github.com/ansonnchan/overtok/server/account"
 	serverauth "github.com/ansonnchan/overtok/server/auth"
 	servergroup "github.com/ansonnchan/overtok/server/group"
+	serverleaderboard "github.com/ansonnchan/overtok/server/leaderboard"
 	serversync "github.com/ansonnchan/overtok/server/sync"
 )
 
@@ -47,21 +48,29 @@ type groupService interface {
 	Revoke(context.Context, string, string, string) error
 }
 
+type leaderboardService interface {
+	Get(context.Context, string, string, serverleaderboard.Period, serverleaderboard.Metric) (serverleaderboard.Board, error)
+}
+
 // Handler is the hosted Overtok HTTP API.
 type Handler struct {
-	auth    authenticationService
-	sync    usageSyncService
-	account accountUsageService
-	groups  groupService
-	mux     *http.ServeMux
+	auth         authenticationService
+	sync         usageSyncService
+	account      accountUsageService
+	groups       groupService
+	leaderboards leaderboardService
+	mux          *http.ServeMux
 }
 
 // New constructs the API handler with exact method-aware routes.
-func New(authService authenticationService, syncService usageSyncService, accountService accountUsageService, groups groupService) (*Handler, error) {
-	if authService == nil || syncService == nil || accountService == nil || groups == nil {
-		return nil, errors.New("initialize HTTP API: authentication, synchronization, account, and group services are required")
+func New(authService authenticationService, syncService usageSyncService, accountService accountUsageService, groups groupService, leaderboards leaderboardService) (*Handler, error) {
+	if authService == nil || syncService == nil || accountService == nil || groups == nil || leaderboards == nil {
+		return nil, errors.New("initialize HTTP API: authentication, synchronization, account, group, and leaderboard services are required")
 	}
-	handler := &Handler{auth: authService, sync: syncService, account: accountService, groups: groups, mux: http.NewServeMux()}
+	handler := &Handler{
+		auth: authService, sync: syncService, account: accountService,
+		groups: groups, leaderboards: leaderboards, mux: http.NewServeMux(),
+	}
 	handler.mux.HandleFunc("GET /healthz", handler.health)
 	handler.mux.HandleFunc("POST /v1/auth/device/start", handler.startDevice)
 	handler.mux.HandleFunc("POST /v1/auth/device/poll", handler.pollDevice)
@@ -76,7 +85,29 @@ func New(authService authenticationService, syncService usageSyncService, accoun
 	handler.mux.HandleFunc("POST /v1/group-invites/join", handler.joinGroup)
 	handler.mux.HandleFunc("DELETE /v1/groups/{group_id}/membership", handler.leaveGroup)
 	handler.mux.HandleFunc("DELETE /v1/groups/{group_id}/members/{user_id}", handler.revokeGroupMember)
+	handler.mux.HandleFunc("GET /v1/groups/{group_id}/leaderboard", handler.groupLeaderboard)
 	return handler, nil
+}
+
+func (h *Handler) groupLeaderboard(response http.ResponseWriter, request *http.Request) {
+	credential, ok := bearerCredential(request)
+	if !ok {
+		writeError(response, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	period := serverleaderboard.Period(request.URL.Query().Get("period"))
+	if period == "" {
+		period = serverleaderboard.PeriodToday
+	}
+	metric := serverleaderboard.Metric(request.URL.Query().Get("metric"))
+	if metric == "" {
+		metric = serverleaderboard.MetricTotalTokens
+	}
+	board, err := h.leaderboards.Get(request.Context(), credential, request.PathValue("group_id"), period, metric)
+	if writeGroupError(response, err) {
+		return
+	}
+	writeJSON(response, http.StatusOK, board)
 }
 
 func (h *Handler) createGroup(response http.ResponseWriter, request *http.Request) {

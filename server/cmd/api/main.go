@@ -17,6 +17,7 @@ import (
 	serverauth "github.com/ansonnchan/overtok/server/auth"
 	servergroup "github.com/ansonnchan/overtok/server/group"
 	"github.com/ansonnchan/overtok/server/httpapi"
+	serverleaderboard "github.com/ansonnchan/overtok/server/leaderboard"
 	"github.com/ansonnchan/overtok/server/postgres"
 	serversync "github.com/ansonnchan/overtok/server/sync"
 )
@@ -91,7 +92,15 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	handler, err := httpapi.New(authentication, synchronization, accountUsage, groups)
+	leaderboardRepository, err := postgres.NewLeaderboardRepository(pool)
+	if err != nil {
+		return err
+	}
+	leaderboards, err := serverleaderboard.NewService(authentication, leaderboardRepository)
+	if err != nil {
+		return err
+	}
+	handler, err := httpapi.New(authentication, synchronization, accountUsage, groups, leaderboards)
 	if err != nil {
 		return err
 	}

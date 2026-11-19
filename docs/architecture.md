@@ -1,6 +1,6 @@
 # Architecture
 
-Status: private groups implemented; leaderboard queries next
+Status: leaderboard queries implemented; multiplayer TUI next
 Last updated: November 18, 2026
 
 ## System goals
@@ -269,7 +269,22 @@ leaving, and member revocation authorize active membership inside the same
 repository boundary that performs the operation. Non-members receive the same
 not-found result whether a group exists or not.
 
-Leaderboard authorization checks membership on every request. A member of one group cannot enumerate another group or its users.
+Leaderboard authorization checks membership on every request. A member of one
+group cannot enumerate another group or its users.
+
+### Leaderboards
+
+One repeatable-read snapshot aggregates every active member's active devices.
+The query calculates Today, current week, and 30-local-date boundaries from the
+group's IANA timezone; all periods end at the response generation time. Weeks
+start Monday. All-time has no lower bound.
+
+Rows rank by complete total tokens, output tokens, or API-equivalent estimates.
+Partial lower-bound values remain visible but unranked, while unavailable and
+empty values remain distinct from zero. Equal complete values use competition
+ranking. Every row includes last-upload freshness, source mix, most-used model,
+and counts for unknown or inferred model resolution and unavailable API
+estimates. Revoked devices and inactive memberships do not contribute.
 
 ### Pricing
 
