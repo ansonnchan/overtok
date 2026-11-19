@@ -57,7 +57,11 @@ func TestPostgresMigrationsAndOwnershipConstraints(t *testing.T) {
 		t.Fatalf("repeat migration: %v", err)
 	}
 	var migrationCount int
-	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM schema_migrations`).Scan(&migrationCount); err != nil || migrationCount != 1 {
+	available, err := migrations.All()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM schema_migrations`).Scan(&migrationCount); err != nil || migrationCount != len(available) {
 		t.Fatalf("migration count = %d, %v", migrationCount, err)
 	}
 

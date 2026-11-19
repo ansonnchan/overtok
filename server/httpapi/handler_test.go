@@ -16,6 +16,7 @@ import (
 	protocol "github.com/ansonnchan/overtok/internal/sync"
 	serveraccount "github.com/ansonnchan/overtok/server/account"
 	serverauth "github.com/ansonnchan/overtok/server/auth"
+	servergroup "github.com/ansonnchan/overtok/server/group"
 )
 
 func TestAuthenticationRoutesAndStableErrors(t *testing.T) {
@@ -27,7 +28,7 @@ func TestAuthenticationRoutesAndStableErrors(t *testing.T) {
 		poll:    serverauth.PollResponse{Status: serverauth.FlowPending, RetryAfter: 7 * time.Second},
 		refresh: serverauth.Session{Credential: "replacement", DeviceID: "device", UserID: "user"},
 	}
-	handler, err := New(service, &fakeUsageSyncService{}, &fakeAccountUsageService{})
+	handler, err := New(service, &fakeUsageSyncService{}, &fakeAccountUsageService{}, &fakeGroupService{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +67,7 @@ func TestAuthenticationRoutesAndStableErrors(t *testing.T) {
 
 func TestHandlerRedactsServiceFailures(t *testing.T) {
 	service := &fakeAuthService{startErr: errors.New("provider token and private/path")}
-	handler, err := New(service, &fakeUsageSyncService{}, &fakeAccountUsageService{})
+	handler, err := New(service, &fakeUsageSyncService{}, &fakeAccountUsageService{}, &fakeGroupService{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +82,7 @@ func TestHandlerRedactsServiceFailures(t *testing.T) {
 func TestSyncRouteAuthenticatesAndReturnsExactAcknowledgement(t *testing.T) {
 	service := &fakeAuthService{}
 	syncService := &fakeUsageSyncService{}
-	handler, err := New(service, syncService, &fakeAccountUsageService{})
+	handler, err := New(service, syncService, &fakeAccountUsageService{}, &fakeGroupService{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +104,7 @@ func TestAccountUsageRouteRequiresCredential(t *testing.T) {
 	accountService := &fakeAccountUsageService{usage: serveraccount.Usage{
 		UserID: "user", DisplayName: "synthetic-user", GeneratedAt: time.Now().UTC(),
 	}}
-	handler, err := New(&fakeAuthService{}, &fakeUsageSyncService{}, accountService)
+	handler, err := New(&fakeAuthService{}, &fakeUsageSyncService{}, accountService, &fakeGroupService{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,6 +120,59 @@ func TestAccountUsageRouteRequiresCredential(t *testing.T) {
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusUnauthorized {
 		t.Fatalf("unauthorized account response = %d %q", response.Code, response.Body.String())
+	}
+}
+
+func TestGroupRoutesPreserveAuthorizationAndStableErrors(t *testing.T) {
+	groupID := "10000000-0000-4000-8000-000000000001"
+	userID := "10000000-0000-4000-8000-000000000002"
+	groups := &fakeGroupService{
+		group:  servergroup.Group{ID: groupID, Name: "Private group", Timezone: "America/Vancouver", Role: servergroup.RoleOwner},
+		detail: servergroup.Detail{Group: servergroup.Group{ID: groupID, Name: "Private group"}},
+		invite: servergroup.Invite{Code: "ovt_synthetic", MaxUses: 2, ExpiresAt: time.Now().UTC().Add(time.Hour)},
+	}
+	handler, err := New(&fakeAuthService{}, &fakeUsageSyncService{}, &fakeAccountUsageService{}, groups)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name       string
+		method     string
+		path       string
+		body       string
+		credential string
+		wantStatus int
+		wantBody   string
+	}{
+		{name: "create", method: http.MethodPost, path: "/v1/groups", body: `{"name":"Private group","timezone":"America/Vancouver"}`, credential: "device", wantStatus: http.StatusCreated, wantBody: "Private group"},
+		{name: "list", method: http.MethodGet, path: "/v1/groups", credential: "device", wantStatus: http.StatusOK, wantBody: "groups"},
+		{name: "read", method: http.MethodGet, path: "/v1/groups/" + groupID, credential: "device", wantStatus: http.StatusOK, wantBody: "Private group"},
+		{name: "invite", method: http.MethodPost, path: "/v1/groups/" + groupID + "/invites", body: `{"expires_in_seconds":3600,"max_uses":2}`, credential: "device", wantStatus: http.StatusCreated, wantBody: "ovt_synthetic"},
+		{name: "join", method: http.MethodPost, path: "/v1/group-invites/join", body: `{"code":"ovt_synthetic"}`, credential: "device", wantStatus: http.StatusOK, wantBody: "Private group"},
+		{name: "leave", method: http.MethodDelete, path: "/v1/groups/" + groupID + "/membership", credential: "device", wantStatus: http.StatusNoContent},
+		{name: "revoke", method: http.MethodDelete, path: "/v1/groups/" + groupID + "/members/" + userID, credential: "device", wantStatus: http.StatusNoContent},
+		{name: "missing credential", method: http.MethodGet, path: "/v1/groups", wantStatus: http.StatusUnauthorized, wantBody: "unauthorized"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := httptest.NewRequest(test.method, test.path, strings.NewReader(test.body))
+			if test.credential != "" {
+				request.Header.Set("Authorization", "Bearer "+test.credential)
+			}
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, request)
+			if response.Code != test.wantStatus || !strings.Contains(response.Body.String(), test.wantBody) {
+				t.Fatalf("response = %d %q", response.Code, response.Body.String())
+			}
+		})
+	}
+	groups.err = servergroup.ErrForbidden
+	request := httptest.NewRequest(http.MethodPost, "/v1/groups/"+groupID+"/invites", strings.NewReader(`{"expires_in_seconds":3600,"max_uses":1}`))
+	request.Header.Set("Authorization", "Bearer device")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusForbidden || strings.Contains(response.Body.String(), groupID) {
+		t.Fatalf("forbidden response = %d %q", response.Code, response.Body.String())
 	}
 }
 
@@ -174,6 +228,33 @@ type fakeUsageSyncService struct {
 type fakeAccountUsageService struct {
 	credential string
 	usage      serveraccount.Usage
+}
+
+type fakeGroupService struct {
+	group  servergroup.Group
+	detail servergroup.Detail
+	invite servergroup.Invite
+	err    error
+}
+
+func (f *fakeGroupService) Create(context.Context, string, string, string) (servergroup.Group, error) {
+	return f.group, f.err
+}
+func (f *fakeGroupService) List(context.Context, string) ([]servergroup.Group, error) {
+	return []servergroup.Group{f.group}, f.err
+}
+func (f *fakeGroupService) Get(context.Context, string, string) (servergroup.Detail, error) {
+	return f.detail, f.err
+}
+func (f *fakeGroupService) Invite(context.Context, string, string, time.Duration, int) (servergroup.Invite, error) {
+	return f.invite, f.err
+}
+func (f *fakeGroupService) Join(context.Context, string, string) (servergroup.Group, error) {
+	return f.group, f.err
+}
+func (f *fakeGroupService) Leave(context.Context, string, string) error { return f.err }
+func (f *fakeGroupService) Revoke(context.Context, string, string, string) error {
+	return f.err
 }
 
 func (f *fakeAccountUsageService) Usage(_ context.Context, credential string) (serveraccount.Usage, error) {

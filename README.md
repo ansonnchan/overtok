@@ -32,7 +32,8 @@ The native Go command currently provides:
 - a keyboard-first Overview, Sources, Models, and Settings TUI with manual collection;
 - GitHub device-flow `login` and revoking `logout` commands backed by the OS credential vault;
 - bounded `sync` and exact-payload `sync --dry-run` commands with durable acknowledgements;
-- one authenticated account usage row across active devices with independent revocation and freshness; and
+- one authenticated account usage row across active devices with independent revocation and freshness;
+- private groups with owner/member roles, expiring limited-use invites, and membership-authorized reads; and
 - privacy-safe source and storage diagnostics through `overtok doctor`.
 
 Model names are not allowlisted. A previously unseen, non-empty observed identifier can retain its token counts while canonical resolution and pricing remain unavailable. Reported, resolved, inferred, and unknown attribution are separate states.

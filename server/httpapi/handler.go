@@ -13,6 +13,7 @@ import (
 	protocol "github.com/ansonnchan/overtok/internal/sync"
 	serveraccount "github.com/ansonnchan/overtok/server/account"
 	serverauth "github.com/ansonnchan/overtok/server/auth"
+	servergroup "github.com/ansonnchan/overtok/server/group"
 	serversync "github.com/ansonnchan/overtok/server/sync"
 )
 
@@ -36,20 +37,31 @@ type accountUsageService interface {
 	Usage(context.Context, string) (serveraccount.Usage, error)
 }
 
+type groupService interface {
+	Create(context.Context, string, string, string) (servergroup.Group, error)
+	List(context.Context, string) ([]servergroup.Group, error)
+	Get(context.Context, string, string) (servergroup.Detail, error)
+	Invite(context.Context, string, string, time.Duration, int) (servergroup.Invite, error)
+	Join(context.Context, string, string) (servergroup.Group, error)
+	Leave(context.Context, string, string) error
+	Revoke(context.Context, string, string, string) error
+}
+
 // Handler is the hosted Overtok HTTP API.
 type Handler struct {
 	auth    authenticationService
 	sync    usageSyncService
 	account accountUsageService
+	groups  groupService
 	mux     *http.ServeMux
 }
 
 // New constructs the API handler with exact method-aware routes.
-func New(authService authenticationService, syncService usageSyncService, accountService accountUsageService) (*Handler, error) {
-	if authService == nil || syncService == nil || accountService == nil {
-		return nil, errors.New("initialize HTTP API: authentication, synchronization, and account services are required")
+func New(authService authenticationService, syncService usageSyncService, accountService accountUsageService, groups groupService) (*Handler, error) {
+	if authService == nil || syncService == nil || accountService == nil || groups == nil {
+		return nil, errors.New("initialize HTTP API: authentication, synchronization, account, and group services are required")
 	}
-	handler := &Handler{auth: authService, sync: syncService, account: accountService, mux: http.NewServeMux()}
+	handler := &Handler{auth: authService, sync: syncService, account: accountService, groups: groups, mux: http.NewServeMux()}
 	handler.mux.HandleFunc("GET /healthz", handler.health)
 	handler.mux.HandleFunc("POST /v1/auth/device/start", handler.startDevice)
 	handler.mux.HandleFunc("POST /v1/auth/device/poll", handler.pollDevice)
@@ -57,7 +69,152 @@ func New(authService authenticationService, syncService usageSyncService, accoun
 	handler.mux.HandleFunc("POST /v1/auth/logout", handler.logout)
 	handler.mux.HandleFunc("POST /v1/sync/buckets", handler.syncBuckets)
 	handler.mux.HandleFunc("GET /v1/account/usage", handler.accountUsage)
+	handler.mux.HandleFunc("POST /v1/groups", handler.createGroup)
+	handler.mux.HandleFunc("GET /v1/groups", handler.listGroups)
+	handler.mux.HandleFunc("GET /v1/groups/{group_id}", handler.getGroup)
+	handler.mux.HandleFunc("POST /v1/groups/{group_id}/invites", handler.createGroupInvite)
+	handler.mux.HandleFunc("POST /v1/group-invites/join", handler.joinGroup)
+	handler.mux.HandleFunc("DELETE /v1/groups/{group_id}/membership", handler.leaveGroup)
+	handler.mux.HandleFunc("DELETE /v1/groups/{group_id}/members/{user_id}", handler.revokeGroupMember)
 	return handler, nil
+}
+
+func (h *Handler) createGroup(response http.ResponseWriter, request *http.Request) {
+	credential, ok := bearerCredential(request)
+	if !ok {
+		writeError(response, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var input struct {
+		Name     string `json:"name"`
+		Timezone string `json:"timezone"`
+	}
+	if err := decodeRequest(response, request, &input); err != nil {
+		writeError(response, http.StatusBadRequest, "invalid_request")
+		return
+	}
+	group, err := h.groups.Create(request.Context(), credential, input.Name, input.Timezone)
+	if writeGroupError(response, err) {
+		return
+	}
+	writeJSON(response, http.StatusCreated, group)
+}
+
+func (h *Handler) listGroups(response http.ResponseWriter, request *http.Request) {
+	credential, ok := bearerCredential(request)
+	if !ok {
+		writeError(response, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	groups, err := h.groups.List(request.Context(), credential)
+	if writeGroupError(response, err) {
+		return
+	}
+	writeJSON(response, http.StatusOK, map[string]any{"groups": groups})
+}
+
+func (h *Handler) getGroup(response http.ResponseWriter, request *http.Request) {
+	credential, ok := bearerCredential(request)
+	if !ok {
+		writeError(response, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	detail, err := h.groups.Get(request.Context(), credential, request.PathValue("group_id"))
+	if writeGroupError(response, err) {
+		return
+	}
+	writeJSON(response, http.StatusOK, detail)
+}
+
+func (h *Handler) createGroupInvite(response http.ResponseWriter, request *http.Request) {
+	credential, ok := bearerCredential(request)
+	if !ok {
+		writeError(response, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var input struct {
+		ExpiresInSeconds int64 `json:"expires_in_seconds"`
+		MaxUses          int   `json:"max_uses"`
+	}
+	if err := decodeRequest(response, request, &input); err != nil || input.ExpiresInSeconds < 300 || input.ExpiresInSeconds > 30*24*60*60 {
+		writeError(response, http.StatusBadRequest, "invalid_request")
+		return
+	}
+	invite, err := h.groups.Invite(
+		request.Context(), credential, request.PathValue("group_id"),
+		time.Duration(input.ExpiresInSeconds)*time.Second, input.MaxUses,
+	)
+	if writeGroupError(response, err) {
+		return
+	}
+	writeJSON(response, http.StatusCreated, invite)
+}
+
+func (h *Handler) joinGroup(response http.ResponseWriter, request *http.Request) {
+	credential, ok := bearerCredential(request)
+	if !ok {
+		writeError(response, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var input struct {
+		Code string `json:"code"`
+	}
+	if err := decodeRequest(response, request, &input); err != nil {
+		writeError(response, http.StatusBadRequest, "invalid_request")
+		return
+	}
+	group, err := h.groups.Join(request.Context(), credential, input.Code)
+	if writeGroupError(response, err) {
+		return
+	}
+	writeJSON(response, http.StatusOK, group)
+}
+
+func (h *Handler) leaveGroup(response http.ResponseWriter, request *http.Request) {
+	credential, ok := bearerCredential(request)
+	if !ok {
+		writeError(response, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	err := h.groups.Leave(request.Context(), credential, request.PathValue("group_id"))
+	if writeGroupError(response, err) {
+		return
+	}
+	response.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) revokeGroupMember(response http.ResponseWriter, request *http.Request) {
+	credential, ok := bearerCredential(request)
+	if !ok {
+		writeError(response, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	err := h.groups.Revoke(request.Context(), credential, request.PathValue("group_id"), request.PathValue("user_id"))
+	if writeGroupError(response, err) {
+		return
+	}
+	response.WriteHeader(http.StatusNoContent)
+}
+
+func writeGroupError(response http.ResponseWriter, err error) bool {
+	if err == nil {
+		return false
+	}
+	switch {
+	case errors.Is(err, serverauth.ErrUnauthorized):
+		writeError(response, http.StatusUnauthorized, "unauthorized")
+	case errors.Is(err, servergroup.ErrNotFound), errors.Is(err, servergroup.ErrInvalidInvite):
+		writeError(response, http.StatusNotFound, "group_not_found")
+	case errors.Is(err, servergroup.ErrForbidden):
+		writeError(response, http.StatusForbidden, "forbidden")
+	case errors.Is(err, servergroup.ErrOwnerMustRemain), errors.Is(err, servergroup.ErrAlreadyMember), errors.Is(err, servergroup.ErrGroupFull):
+		writeError(response, http.StatusConflict, "group_conflict")
+	case errors.Is(err, servergroup.ErrInvalidInput):
+		writeError(response, http.StatusBadRequest, "invalid_request")
+	default:
+		writeError(response, http.StatusInternalServerError, "internal_error")
+	}
+	return true
 }
 
 func (h *Handler) accountUsage(response http.ResponseWriter, request *http.Request) {

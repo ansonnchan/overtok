@@ -13,11 +13,16 @@ partial coverage, and reports device freshness and revocation without local
 machine identity. Revoked-device history remains stored but no longer
 contributes to active account totals.
 
+`group` implements private group creation, member-authorized reads, and
+owner-only invitation and revocation operations. Invitations expire, have a
+fixed use limit, and are stored only as SHA-256 hashes. PostgreSQL locks invite
+and membership state in the same transaction so retries cannot over-consume a
+code or leave a group without its owner.
+
 The schema contains users, stable GitHub identities, independently revocable
-devices and hashed credentials, pricing revisions, and privacy-limited absolute
-usage buckets. Bucket identity is unique per device. Network code will later
-define how equal and newer revisions become no-ops or replacements; the schema
-does not implement upload behavior by itself.
+devices and hashed credentials, pricing revisions, privacy-limited absolute
+usage buckets, private groups, memberships, and hashed invites. Bucket identity
+is unique per device.
 
 The server must never accept prompts, responses, source code, command text,
 local paths, project or repository metadata, provider credentials, or raw
