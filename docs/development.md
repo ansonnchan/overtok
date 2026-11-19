@@ -18,6 +18,7 @@ make check       # formatting, vet, race tests, build, and diff hygiene
 make test        # standard Go tests
 make test-race   # race-enabled Go tests
 make build       # build every Go package
+make release VERSION=1.2.3 # reproducible macOS arm64/x64 archives
 ```
 
 Run the hosted schema integration test against an isolated PostgreSQL database:

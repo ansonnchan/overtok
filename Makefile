@@ -1,4 +1,4 @@
-.PHONY: build check fmt test test-postgres test-race vet
+.PHONY: build check fmt release test test-postgres test-race vet
 
 # Keep build artifacts out of user-global caches so clean-checkout verification
 # behaves consistently in local sandboxes and CI.
@@ -9,6 +9,10 @@ export GOPATH
 
 build:
 	go build ./...
+
+release:
+	test -n "$(VERSION)"
+	go run ./cmd/release -version "$(VERSION)" -output dist
 
 fmt:
 	test -z "$$(gofmt -l .)"

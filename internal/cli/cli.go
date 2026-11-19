@@ -17,7 +17,8 @@ import (
 	"github.com/ansonnchan/overtok/internal/store"
 )
 
-const version = "dev"
+// version is replaced at link time for release artifacts.
+var version = "dev"
 
 // Run executes the native command without owning process termination.
 func Run(args []string, stdout, stderr io.Writer) int {

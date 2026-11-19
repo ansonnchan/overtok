@@ -2,7 +2,6 @@ package ccusage
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -150,20 +149,8 @@ func TestLockManifestMatchesCode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var lock struct {
-		Tool     string              `json:"tool"`
-		Version  string              `json:"version"`
-		Schema   string              `json:"schema"`
-		Commands map[string][]string `json:"commands"`
-	}
-	if err := json.Unmarshal(data, &lock); err != nil {
+	if err := ValidateLock(data); err != nil {
 		t.Fatal(err)
-	}
-	claudeArgs, _, _ := commandFor(AgentClaude)
-	codexArgs, _, _ := commandFor(AgentCodex)
-	if lock.Tool != "ccusage" || lock.Version != PinnedVersion || lock.Schema != SchemaID ||
-		!reflect.DeepEqual(lock.Commands[string(AgentClaude)], claudeArgs) || !reflect.DeepEqual(lock.Commands[string(AgentCodex)], codexArgs) {
-		t.Fatalf("lock manifest does not match code: %#v", lock)
 	}
 }
 
