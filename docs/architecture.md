@@ -55,7 +55,7 @@ The implemented local collection path is:
 
 ```text
 Narrow read-only source discovery
-    -> provider JSONL parser or pinned ccusage contract
+    -> provider JSONL parser
     -> validated normalized observations
     -> raw source-identity deduplication
     -> per-session cumulative-counter reduction
@@ -110,7 +110,10 @@ Adapters emit observations; they do not calculate leaderboard ranks or perform u
 
 The implemented adapters parse supported Claude and Codex JSONL natively. They recover from malformed complete records, defer actively written final lines, preserve nullable categories, and emit stable local identities.
 
-The optional ccusage integration invokes version 20.0.51 with pinned offline daily JSON commands. Tokenholic rejects any other version, unknown or duplicate fields, invalid counter relationships, and inconsistent totals before normalization. It never downloads the binary at runtime.
+The retained ccusage compatibility contract pins version 20.0.51 and its
+offline daily JSON commands. Release tooling validates the manifest, diagnostics
+can probe an installed version, and CI validates synthetic report fixtures.
+Native collection does not invoke or download ccusage.
 
 Claude Desktop discovery is limited to Code sessions and local Agent/Cowork evidence. Ordinary Claude Desktop chat storage is never scanned. Default Codex storage is classified as shared local evidence when CLI and Desktop attribution cannot be proven.
 
@@ -379,7 +382,7 @@ binary, plist, and logs without touching SQLite usage or the OS-vault session.
 
 M0 established these local rules:
 
-- Pinned ccusage daily rows receive deterministic identities from schema, source, surface, UTC day, and observed model.
+- ccusage remains a pinned compatibility contract, not an active collection path.
 - Claude Desktop coding roots are discovered narrowly and parsed through native compatible-record adapters.
 - Default Codex CLI and Desktop evidence is represented once as `shared_local`; a distinct `CODEX_HOME` permits separate CLI and Desktop roots.
 - Cross-root deduplication happens before cumulative snapshots become deltas.

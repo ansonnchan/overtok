@@ -13,10 +13,6 @@ import (
 	"github.com/ansonnchan/tokenholic/internal/normalize"
 )
 
-type fakeDiscovery struct{ findings []adapters.Finding }
-
-func (f fakeDiscovery) Discover(context.Context) []adapters.Finding { return f.findings }
-
 type fakeParser struct{ status ParserStatus }
 
 func (f fakeParser) Check(context.Context) ParserStatus { return f.status }

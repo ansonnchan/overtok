@@ -9,23 +9,20 @@ import (
 	"github.com/ansonnchan/tokenholic/internal/normalize"
 )
 
-// ModelSummary aggregates one source, observed model, and resolution quality.
-type ModelSummary struct {
+type modelSummary struct {
 	Source          normalize.Source
 	ObservedModelID string
 	Resolution      normalize.ModelResolution
 	Tokens          normalize.TokenCounts
 }
 
-// Summarize returns deterministic per-model totals without combining different
-// attribution qualities for the same observed identifier.
-func Summarize(observations []normalize.Observation) ([]ModelSummary, error) {
-	byModel := make(map[string]ModelSummary)
+func summarize(observations []normalize.Observation) ([]modelSummary, error) {
+	byModel := make(map[string]modelSummary)
 	for _, observation := range observations {
 		key := strings.Join([]string{string(observation.Source), observation.ObservedModelID, string(observation.ModelResolution)}, "\x00")
 		summary, found := byModel[key]
 		if !found {
-			byModel[key] = ModelSummary{Source: observation.Source, ObservedModelID: observation.ObservedModelID, Resolution: observation.ModelResolution, Tokens: cloneTokens(observation.Tokens)}
+			byModel[key] = modelSummary{Source: observation.Source, ObservedModelID: observation.ObservedModelID, Resolution: observation.ModelResolution, Tokens: cloneTokens(observation.Tokens)}
 			continue
 		}
 		var err error
@@ -35,7 +32,7 @@ func Summarize(observations []normalize.Observation) ([]ModelSummary, error) {
 		}
 		byModel[key] = summary
 	}
-	result := make([]ModelSummary, 0, len(byModel))
+	result := make([]modelSummary, 0, len(byModel))
 	for _, summary := range byModel {
 		result = append(result, summary)
 	}
@@ -95,12 +92,4 @@ func cloneTokens(tokens normalize.TokenCounts) normalize.TokenCounts {
 		InputUncached: cloneUint(tokens.InputUncached), InputCacheRead: cloneUint(tokens.InputCacheRead),
 		InputCacheWrite: cloneUint(tokens.InputCacheWrite), Output: cloneUint(tokens.Output), ReasoningOutput: cloneUint(tokens.ReasoningOutput),
 	}
-}
-
-func cloneUint(value *uint64) *uint64 {
-	if value == nil {
-		return nil
-	}
-	copy := *value
-	return &copy
 }

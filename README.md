@@ -27,7 +27,7 @@ The native Go command currently provides:
 - read-only discovery for Claude Desktop Code, Agent, and Cowork sessions;
 - read-only discovery for Codex CLI and Codex Desktop/shared local storage;
 - native parsing of supported Claude and Codex JSONL evidence;
-- strict validation of pinned ccusage Claude and Codex daily JSON;
+- CI validation of the pinned ccusage compatibility contract;
 - deterministic per-model normalization, cumulative-counter reduction, recovery from partial records, and deduplication;
 - transactional local SQLite observations, checkpoints, health, and absolute usage buckets;
 - timezone-aware local totals with explicit complete, partial, unavailable, and empty states;
@@ -48,7 +48,7 @@ Model names are not allowlisted. A previously unseen, non-empty observed identif
 - Go 1.25 or newer.
 - macOS for the currently implemented discovery paths.
 - PostgreSQL 18 only when exercising the hosted schema integration tests.
-- ccusage 20.0.51 only when exercising the optional ccusage integration. Tokenholic does not download it at runtime.
+- ccusage 20.0.51 only when manually checking the optional compatibility probe; native collection does not require it.
 
 The pnpm workspace owns npm distribution tooling; it is not needed to build the native command from source. Checksummed macOS arm64/x64 archives are produced by the release workflow.
 

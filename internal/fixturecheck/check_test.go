@@ -10,7 +10,7 @@ import (
 func TestCommittedFixturesAreSanitized(t *testing.T) {
 	t.Parallel()
 
-	if err := CheckDir(filepath.Join("..", "..", "fixtures")); err != nil {
+	if err := checkDir(filepath.Join("..", "..", "fixtures")); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -45,7 +45,7 @@ func TestCheckDirRejectsPrivateMaterial(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(root, "fixture.json"), []byte(tt.data), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			if err := CheckDir(root); err == nil {
+			if err := checkDir(root); err == nil {
 				t.Fatal("CheckDir() error = nil, want privacy validation error")
 			}
 		})
@@ -59,7 +59,7 @@ func TestCheckDirScansNonJSONFiles(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "fixture.txt"), []byte("git@example.com:private/repository"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := CheckDir(root); err == nil || !strings.Contains(err.Error(), "prohibited") {
+	if err := checkDir(root); err == nil || !strings.Contains(err.Error(), "prohibited") {
 		t.Fatalf("CheckDir() error = %v, want prohibited material error", err)
 	}
 }
@@ -72,7 +72,7 @@ func TestMalformedFixtureCannotHidePrivateKey(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "malformed.jsonl"), data, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := CheckDir(root); err == nil {
+	if err := checkDir(root); err == nil {
 		t.Fatal("CheckDir() error = nil, want prohibited key error")
 	}
 }

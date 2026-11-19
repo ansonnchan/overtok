@@ -132,8 +132,8 @@ Leaderboard responses
 - Go CLI and collector.
 - Bubble Tea and Lip Gloss for the TUI.
 - SQLite in WAL mode for checkpoints, observations, buckets, and the outbox.
-- Pinned ccusage native executable for the first parser integration, invoked with structured JSON output.
-- Native adapters only where ccusage does not discover the required surface, beginning with Claude Desktop local-agent sessions if needed.
+- Pinned ccusage manifest and fixtures preserve the reviewed external contract.
+- Native adapters provide the implemented Claude and Codex collection paths.
 
 ### Server technology
 

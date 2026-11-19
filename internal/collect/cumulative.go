@@ -114,3 +114,11 @@ func cloneTokenCounts(tokens normalize.TokenCounts) normalize.TokenCounts {
 		ReasoningOutput: cloneUint(tokens.ReasoningOutput),
 	}
 }
+
+func cloneUint(value *uint64) *uint64 {
+	if value == nil {
+		return nil
+	}
+	copy := *value
+	return &copy
+}

@@ -10,7 +10,9 @@ This guide covers the current native Go workspace. The pnpm workspace is reserve
 - Git for the repository hygiene check.
 - Docker or another PostgreSQL 18 installation only for hosted schema tests.
 
-ccusage is optional. Tests inject a fake executor and read synthetic fixtures, so the verification suite does not require an installed binary or inspect real local agent data.
+ccusage is optional. CI validates only synthetic contract fixtures and the
+release lock, so verification never executes an installed binary or inspects
+real local agent data.
 
 ## Common commands
 

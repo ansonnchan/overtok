@@ -21,7 +21,7 @@ func TestManagerInstallsInspectsAndRemovesLaunchAgent(t *testing.T) {
 	launcher := &fakeLauncher{}
 	manager, err := NewManager(Config{
 		Home: home, Executable: source, APIURL: "https://api.example.test", CodexHome: filepath.Join(home, "codex"),
-		Platform: "darwin", UID: 501, Launcher: launcher,
+		platform: "darwin", uid: 501, launcher: launcher,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -90,9 +90,9 @@ func TestManagerRequiresMacOSAndValidAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, config := range []Config{
-		{Home: t.TempDir(), Executable: executable, APIURL: "https://api.example.test", Platform: "linux", UID: 501, Launcher: &fakeLauncher{}},
-		{Home: t.TempDir(), Executable: executable, APIURL: "http://remote.example.test", Platform: "darwin", UID: 501, Launcher: &fakeLauncher{}},
-		{Home: t.TempDir(), Executable: executable, APIURL: "https://user:secret@api.example.test", Platform: "darwin", UID: 501, Launcher: &fakeLauncher{}},
+		{Home: t.TempDir(), Executable: executable, APIURL: "https://api.example.test", platform: "linux", uid: 501, launcher: &fakeLauncher{}},
+		{Home: t.TempDir(), Executable: executable, APIURL: "http://remote.example.test", platform: "darwin", uid: 501, launcher: &fakeLauncher{}},
+		{Home: t.TempDir(), Executable: executable, APIURL: "https://user:secret@api.example.test", platform: "darwin", uid: 501, launcher: &fakeLauncher{}},
 	} {
 		manager, err := NewManager(config)
 		if err != nil {

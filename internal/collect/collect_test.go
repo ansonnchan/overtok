@@ -62,7 +62,7 @@ func TestCodexCumulativeAttribution(t *testing.T) {
 	if len(result.Observations) != 3 {
 		t.Fatalf("observations = %d, want 3", len(result.Observations))
 	}
-	summaries, err := Summarize(result.Observations)
+	summaries, err := summarize(result.Observations)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func TestCodexMidstreamOverlapIsReducedAfterDeduplication(t *testing.T) {
 	if len(result.Observations) != 3 {
 		t.Fatalf("observations = %d, want 3", len(result.Observations))
 	}
-	summaries, err := Summarize(result.Observations)
+	summaries, err := summarize(result.Observations)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +181,7 @@ func TestSummaryPreservesResolutionStates(t *testing.T) {
 	inferred := reported
 	inferred.SourceRecordID = "inferred"
 	inferred.ModelResolution = normalize.ModelInferred
-	summaries, err := Summarize([]normalize.Observation{reported, inferred})
+	summaries, err := summarize([]normalize.Observation{reported, inferred})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +198,7 @@ func TestCounterResetStartsNewSegment(t *testing.T) {
 	if len(result.Observations) != 2 || !hasWarning(result.Warnings, "counter_reset") {
 		t.Fatalf("Collect() = %#v", result)
 	}
-	summaries, err := Summarize(result.Observations)
+	summaries, err := summarize(result.Observations)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +243,7 @@ func cumulativeObservation(id string, session *string, minute int, tokens normal
 	}
 }
 
-func assertTokens(t *testing.T, summary ModelSummary, model string, input, cacheRead, output uint64) {
+func assertTokens(t *testing.T, summary modelSummary, model string, input, cacheRead, output uint64) {
 	t.Helper()
 	if summary.ObservedModelID != model || summary.Tokens.InputUncached == nil || *summary.Tokens.InputUncached != input ||
 		summary.Tokens.InputCacheRead == nil || *summary.Tokens.InputCacheRead != cacheRead ||

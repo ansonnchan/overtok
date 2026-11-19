@@ -1,44 +1,20 @@
 # Pinned ccusage contract
 
-This package treats ccusage as an external, versioned parser rather than a library dependency. Tokenholic accepts only version `20.0.51` and validates its complete JSON contract before creating normalized observations.
+The native collector does not invoke ccusage. This package retains the reviewed
+`20.0.51` compatibility boundary used by releases and diagnostics:
 
-The authoritative pin is [`ccusage.lock.json`](../../../ccusage.lock.json). Runtime code and tests must agree with its version, schema identifier, and commands.
+- [`ccusage.lock.json`](../../../ccusage.lock.json) pins the version, schema ID,
+  and offline daily JSON commands;
+- release tooling rejects a lock that differs from the compiled contract;
+- `tokenholic doctor` reports whether an installed binary matches the pin; and
+- synthetic Claude and Codex reports validate the expected JSON contract in CI.
 
-## Commands
+The fixture tests reject unknown or duplicate fields, malformed counters,
+invalid dates or models, inconsistent totals, and reasoning counts greater than
+output. Fixtures must remain synthetic and contain no paths, transcripts, or
+credentials.
 
-```text
-ccusage daily --json --no-cost --offline --timezone UTC
-ccusage codex daily --json --no-cost --offline --timezone UTC
-```
-
-`--offline` prevents update or metadata fetches, `--no-cost` keeps pricing outside this collection boundary, and UTC makes daily identities deterministic. Tokenholic checks `ccusage --version` before running either report.
-
-Tokenholic does not install or update ccusage. A missing or incompatible binary is reported by `tokenholic doctor` and collection fails visibly rather than silently falling back to a different schema.
-
-## Validation
-
-Claude and Codex daily reports have different shapes and are decoded separately. Validation rejects:
-
-- an unsupported version;
-- unknown or duplicate JSON fields;
-- multiple top-level JSON values;
-- missing, null, fractional, negative, or overflowing required counters;
-- duplicate or invalid dates;
-- empty or duplicate model identifiers;
-- model breakdowns that disagree with daily or report totals;
-- reasoning output greater than total output;
-- output beyond the configured process limit.
-
-Pointer fields distinguish a reported zero from a missing or null property. Reasoning output is validated as a subset of output and is not added again when checking `totalTokens`.
-
-## Attribution and identity
-
-Claude `modelBreakdowns` identifiers are retained as `reported`. Codex model-map keys are retained as `inferred` because the external report has already attributed snapshots to models outside Tokenholic's native record context.
-
-Each daily model row receives a stable identifier derived from the contract schema, source, surface, UTC day, and observed model. Repeating the same report therefore produces the same normalized identities.
-
-The committed files under `fixtures/ccusage` are synthetic contract examples, not a model allowlist. Any non-empty model identifier is accepted when the surrounding pinned schema remains valid.
-
-## Privacy and process safety
-
-Subprocess output is bounded. stderr is never included in returned diagnostics because external tools may print local paths. Tests use an injected executor and synthetic JSON, so the compatibility suite never reads a developer's real agent data.
+Keeping this contract does not make ccusage a runtime dependency. tokenholic
+never installs, downloads, or executes it during collection. A future adapter
+must be wired through the normal discovery and normalization boundaries before
+the product can claim that integration.
