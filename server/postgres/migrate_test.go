@@ -12,13 +12,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ansonnchan/overtok/migrations"
+	"github.com/ansonnchan/tokenholic/migrations"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const testDatabaseEnv = "OVERTOK_TEST_DATABASE_URL"
+const testDatabaseEnv = "TOKENHOLIC_TEST_DATABASE_URL"
 
 func TestOpenRequiresDatabaseURL(t *testing.T) {
 	t.Parallel()
@@ -171,7 +171,7 @@ func integrationPool(t *testing.T) *pgxpool.Pool {
 		admin.Close()
 		t.Fatal(err)
 	}
-	schema := "overtok_test_" + hex.EncodeToString(random[:])
+	schema := "tokenholic_test_" + hex.EncodeToString(random[:])
 	identifier := pgx.Identifier{schema}.Sanitize()
 	if _, err := admin.Exec(t.Context(), `CREATE SCHEMA `+identifier); err != nil {
 		admin.Close()

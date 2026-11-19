@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ansonnchan/overtok/internal/normalize"
+	"github.com/ansonnchan/tokenholic/internal/normalize"
 )
 
 type fakeExecutor struct {

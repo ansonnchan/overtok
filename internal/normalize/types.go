@@ -63,7 +63,7 @@ type Measurement string
 const (
 	// MeasurementReported means the source provided the normalized value directly.
 	MeasurementReported Measurement = "reported"
-	// MeasurementDerived means Overtok computed the value deterministically.
+	// MeasurementDerived means Tokenholic computed the value deterministically.
 	MeasurementDerived Measurement = "derived"
 	// MeasurementEstimated means the value relies on an explicit approximation.
 	MeasurementEstimated Measurement = "estimated"

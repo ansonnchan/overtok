@@ -3,7 +3,7 @@ package postgres
 import (
 	"testing"
 
-	serveraccount "github.com/ansonnchan/overtok/server/account"
+	serveraccount "github.com/ansonnchan/tokenholic/server/account"
 )
 
 func TestAggregateCoverageStates(t *testing.T) {

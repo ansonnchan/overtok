@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/adapters/jsonl"
-	"github.com/ansonnchan/overtok/internal/normalize"
+	"github.com/ansonnchan/tokenholic/internal/adapters/jsonl"
+	"github.com/ansonnchan/tokenholic/internal/normalize"
 )
 
 // AdapterVersion identifies the Claude-to-normalized mapping contract.

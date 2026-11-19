@@ -10,10 +10,10 @@ importers:
 
   packages/cli:
     optionalDependencies:
-      '@overtok/darwin-arm64':
+      '@tokenholic/darwin-arm64':
         specifier: workspace:*
         version: link:../darwin-arm64
-      '@overtok/darwin-x64':
+      '@tokenholic/darwin-x64':
         specifier: workspace:*
         version: link:../darwin-x64
 

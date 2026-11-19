@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	serverauth "github.com/ansonnchan/overtok/server/auth"
+	serverauth "github.com/ansonnchan/tokenholic/server/auth"
 )
 
 // Availability preserves complete, partial, unavailable, and empty coverage.
@@ -55,7 +55,7 @@ type Usage struct {
 	Devices       []Device   `json:"devices"`
 }
 
-// Authenticator resolves an Overtok device credential.
+// Authenticator resolves a Tokenholic device credential.
 type Authenticator interface {
 	Authenticate(context.Context, string) (serverauth.Principal, error)
 }

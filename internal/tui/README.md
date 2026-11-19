@@ -1,6 +1,6 @@
 # Terminal application
 
-This package is Overtok's presentation boundary. It converts privacy-safe
+This package is Tokenholic's presentation boundary. It converts privacy-safe
 dashboard snapshots from the application interface into Overview, Sources,
 Models, Settings, and Groups pages. Local refresh stays on the application
 interface; private-group reads and mutations stay on the multiplayer client
@@ -22,7 +22,7 @@ before and Groups shows an opt-in instruction.
 
 ## Dependency pin
 
-Overtok pins Bubble Tea v1.3.10 and Lip Gloss v1.1.0. Bubble Tea v1.3.10 is the
+Tokenholic pins Bubble Tea v1.3.10 and Lip Gloss v1.1.0. Bubble Tea v1.3.10 is the
 newest v1 release and supports the project's Go 1.24.0 minimum. Bubble Tea v2
 requires at least Go 1.24.2 at its initial release and Go 1.26 in current patch
 releases, so adopting it would silently raise the supported toolchain.

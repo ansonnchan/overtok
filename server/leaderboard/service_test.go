@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	serveraccount "github.com/ansonnchan/overtok/server/account"
-	serverauth "github.com/ansonnchan/overtok/server/auth"
-	servergroup "github.com/ansonnchan/overtok/server/group"
+	serveraccount "github.com/ansonnchan/tokenholic/server/account"
+	serverauth "github.com/ansonnchan/tokenholic/server/auth"
+	servergroup "github.com/ansonnchan/tokenholic/server/group"
 )
 
 func TestWindowForCalendarPeriodsAcrossDST(t *testing.T) {

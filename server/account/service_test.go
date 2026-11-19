@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	serverauth "github.com/ansonnchan/overtok/server/auth"
+	serverauth "github.com/ansonnchan/tokenholic/server/auth"
 )
 
 func TestDeleteAuthenticatesBeforeRepository(t *testing.T) {

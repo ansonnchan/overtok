@@ -8,8 +8,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/ansonnchan/overtok/internal/application"
-	"github.com/ansonnchan/overtok/internal/multiplayer"
+	"github.com/ansonnchan/tokenholic/internal/application"
+	"github.com/ansonnchan/tokenholic/internal/multiplayer"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -199,13 +199,13 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		case errors.Is(message.err, errMultiplayerNotConfigured):
 			m.page = Page{Warning: "Multiplayer needs an API configuration", Lines: []string{
 				"Multiplayer is not configured.",
-				"Set OVERTOK_API_URL and run `overtok login`, then reopen Overtok.",
+				"Set TOKENHOLIC_API_URL and run `tokenholic login`, then reopen Tokenholic.",
 			}}
 			m.state = StateWarning
 		case errors.Is(message.err, multiplayer.ErrSignedOut):
 			m.page = Page{Warning: "Sign in is required for private groups", Lines: []string{
 				"No signed-in multiplayer account.",
-				"Run `overtok login`, then press r to retry.",
+				"Run `tokenholic login`, then press r to retry.",
 			}}
 			m.state = StateWarning
 		case message.err != nil:

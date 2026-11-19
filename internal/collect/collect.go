@@ -12,10 +12,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ansonnchan/overtok/internal/adapters"
-	"github.com/ansonnchan/overtok/internal/adapters/claude"
-	"github.com/ansonnchan/overtok/internal/adapters/codex"
-	"github.com/ansonnchan/overtok/internal/normalize"
+	"github.com/ansonnchan/tokenholic/internal/adapters"
+	"github.com/ansonnchan/tokenholic/internal/adapters/claude"
+	"github.com/ansonnchan/tokenholic/internal/adapters/codex"
+	"github.com/ansonnchan/tokenholic/internal/normalize"
 )
 
 // Result contains deterministic normalized observations and safe warning codes.

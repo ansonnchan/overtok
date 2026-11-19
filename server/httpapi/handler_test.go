@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	protocol "github.com/ansonnchan/overtok/internal/sync"
-	serveraccount "github.com/ansonnchan/overtok/server/account"
-	serverauth "github.com/ansonnchan/overtok/server/auth"
-	servergroup "github.com/ansonnchan/overtok/server/group"
-	serverleaderboard "github.com/ansonnchan/overtok/server/leaderboard"
+	protocol "github.com/ansonnchan/tokenholic/internal/sync"
+	serveraccount "github.com/ansonnchan/tokenholic/server/account"
+	serverauth "github.com/ansonnchan/tokenholic/server/auth"
+	servergroup "github.com/ansonnchan/tokenholic/server/group"
+	serverleaderboard "github.com/ansonnchan/tokenholic/server/leaderboard"
 )
 
 func TestAuthenticationRoutesAndStableErrors(t *testing.T) {

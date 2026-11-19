@@ -7,9 +7,9 @@ import (
 	"sort"
 	"time"
 
-	serveraccount "github.com/ansonnchan/overtok/server/account"
-	serverauth "github.com/ansonnchan/overtok/server/auth"
-	servergroup "github.com/ansonnchan/overtok/server/group"
+	serveraccount "github.com/ansonnchan/tokenholic/server/account"
+	serverauth "github.com/ansonnchan/tokenholic/server/auth"
+	servergroup "github.com/ansonnchan/tokenholic/server/group"
 )
 
 // Period is a timezone-relative leaderboard window.
@@ -91,7 +91,7 @@ type Query struct {
 	GeneratedAt time.Time
 }
 
-// Authenticator resolves an Overtok device credential.
+// Authenticator resolves a Tokenholic device credential.
 type Authenticator interface {
 	Authenticate(context.Context, string) (serverauth.Principal, error)
 }

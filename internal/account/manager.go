@@ -39,7 +39,7 @@ func NewManager(client authClient, store Store) (*Manager, error) {
 }
 
 // Login completes GitHub device authorization and stores only the resulting
-// Overtok device session.
+// Tokenholic device session.
 func (m *Manager) Login(ctx context.Context, clientVersion string, output io.Writer) error {
 	started, err := m.client.Start(ctx, clientVersion)
 	if err != nil {

@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/account"
-	"github.com/ansonnchan/overtok/internal/adapters"
-	"github.com/ansonnchan/overtok/internal/autosync"
-	"github.com/ansonnchan/overtok/internal/doctor"
-	"github.com/ansonnchan/overtok/internal/multiplayer"
-	"github.com/ansonnchan/overtok/internal/store"
+	"github.com/ansonnchan/tokenholic/internal/account"
+	"github.com/ansonnchan/tokenholic/internal/adapters"
+	"github.com/ansonnchan/tokenholic/internal/autosync"
+	"github.com/ansonnchan/tokenholic/internal/doctor"
+	"github.com/ansonnchan/tokenholic/internal/multiplayer"
+	"github.com/ansonnchan/tokenholic/internal/store"
 )
 
 // version is replaced at link time for release artifacts.
@@ -115,7 +115,7 @@ func run(args []string, stdout, stderr io.Writer, deps dependencies) int {
 	if len(args) > 0 && args[0] == "autosync" {
 		return runAutosyncCommand(args[1:], stdout, stderr, deps)
 	}
-	flags := flag.NewFlagSet("overtok", flag.ContinueOnError)
+	flags := flag.NewFlagSet("tokenholic", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	showVersion := flags.Bool("version", false, "print the version")
 	if err := flags.Parse(args); err != nil {
@@ -144,7 +144,7 @@ func run(args []string, stdout, stderr io.Writer, deps dependencies) int {
 }
 
 func runSyncCommand(args []string, stdout, stderr io.Writer, deps dependencies) int {
-	flags := flag.NewFlagSet("overtok sync", flag.ContinueOnError)
+	flags := flag.NewFlagSet("tokenholic sync", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	dryRun := flags.Bool("dry-run", false, "show the exact upload requests without sending them")
 	if err := flags.Parse(args); err != nil {
@@ -164,9 +164,9 @@ func runSyncCommand(args []string, stdout, stderr io.Writer, deps dependencies) 
 		fmt.Fprintln(stderr, "CODEX_HOME must be an absolute directory")
 		return 1
 	}
-	apiURL := strings.TrimSpace(deps.getenv("OVERTOK_API_URL"))
+	apiURL := strings.TrimSpace(deps.getenv("TOKENHOLIC_API_URL"))
 	if apiURL == "" {
-		fmt.Fprintln(stderr, "OVERTOK_API_URL is required for synchronization")
+		fmt.Fprintln(stderr, "TOKENHOLIC_API_URL is required for synchronization")
 		return 1
 	}
 	if deps.sync == nil {
@@ -214,9 +214,9 @@ func runLogout(stdout, stderr io.Writer, deps dependencies) int {
 }
 
 func configuredAccountManager(stderr io.Writer, deps dependencies) (accountManager, bool) {
-	apiURL := strings.TrimSpace(deps.getenv("OVERTOK_API_URL"))
+	apiURL := strings.TrimSpace(deps.getenv("TOKENHOLIC_API_URL"))
 	if apiURL == "" {
-		fmt.Fprintln(stderr, "OVERTOK_API_URL is required for account commands")
+		fmt.Fprintln(stderr, "TOKENHOLIC_API_URL is required for account commands")
 		return nil, false
 	}
 	if deps.account == nil {
@@ -225,7 +225,7 @@ func configuredAccountManager(stderr io.Writer, deps dependencies) (accountManag
 	}
 	manager, err := deps.account(apiURL)
 	if err != nil {
-		fmt.Fprintln(stderr, "OVERTOK_API_URL is invalid")
+		fmt.Fprintln(stderr, "TOKENHOLIC_API_URL is invalid")
 		return nil, false
 	}
 	return manager, true
@@ -246,10 +246,10 @@ func runTUI(stdout, stderr io.Writer, deps dependencies) int {
 		fmt.Fprintln(stderr, "could not start the local application")
 		return 1
 	}
-	if err := deps.launch(context.Background(), home, codexHome, strings.TrimSpace(deps.getenv("OVERTOK_API_URL")), deps.input, stdout, deps.getenv("NO_COLOR") != ""); err != nil {
+	if err := deps.launch(context.Background(), home, codexHome, strings.TrimSpace(deps.getenv("TOKENHOLIC_API_URL")), deps.input, stdout, deps.getenv("NO_COLOR") != ""); err != nil {
 		// Runtime errors can wrap private local paths. Keep CLI output stable and
 		// direct detailed investigation through the redacted doctor report.
-		fmt.Fprintln(stderr, "could not start the local application; run `overtok doctor`")
+		fmt.Fprintln(stderr, "could not start the local application; run `tokenholic doctor`")
 		return 1
 	}
 	return 0

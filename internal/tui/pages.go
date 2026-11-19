@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/application"
-	"github.com/ansonnchan/overtok/internal/multiplayer"
-	"github.com/ansonnchan/overtok/internal/normalize"
-	"github.com/ansonnchan/overtok/internal/store"
+	"github.com/ansonnchan/tokenholic/internal/application"
+	"github.com/ansonnchan/tokenholic/internal/multiplayer"
+	"github.com/ansonnchan/tokenholic/internal/normalize"
+	"github.com/ansonnchan/tokenholic/internal/store"
 )
 
 func buildPage(section Section, dashboard application.Dashboard) Page {
@@ -90,7 +90,7 @@ func sourcesPage(dashboard application.Dashboard) Page {
 		}
 	}
 	if count := unhealthyAdapters(health); count > 0 {
-		page.Warning = fmt.Sprintf("%d local adapter state(s) need attention; run `overtok doctor`", count)
+		page.Warning = fmt.Sprintf("%d local adapter state(s) need attention; run `tokenholic doctor`", count)
 	}
 	return page
 }
@@ -129,7 +129,7 @@ func settingsPage(dashboard application.Dashboard) Page {
 		"No account, server, group, or synchronization is required.",
 		"",
 		"Privacy",
-		"Overtok stores normalized usage counts only.",
+		"Tokenholic stores normalized usage counts only.",
 		"Never stored: prompts, responses, source code, command text, or credentials.",
 		"Never stored: paths, project names, repository names, or branch names.",
 		"",
@@ -139,7 +139,7 @@ func settingsPage(dashboard application.Dashboard) Page {
 		fmt.Sprintf("Timezone: %s", dashboard.Timezone),
 		fmt.Sprintf("Database schema: %d (supported %d)", dashboard.Diagnostics.SchemaVersion, dashboard.Diagnostics.SupportedSchemaVersion),
 		"Collection freshness: " + collectionFreshness(dashboard.Diagnostics.LastSuccessfulCollection, dashboard.GeneratedAt),
-		"Run `overtok doctor` for detailed, path-redacted diagnostics.",
+		"Run `tokenholic doctor` for detailed, path-redacted diagnostics.",
 	}}
 }
 
@@ -163,7 +163,7 @@ func groupPage(snapshot multiplayer.Snapshot) Page {
 		"j/k switch group · p period · m metric · c create · i join",
 	}}
 	if snapshot.Selected.Role == "owner" {
-		page.Lines = append(page.Lines, "Create an invite with `overtok group invite <name>`.")
+		page.Lines = append(page.Lines, "Create an invite with `tokenholic group invite <name>`.")
 	}
 	if snapshot.Board == nil {
 		return page

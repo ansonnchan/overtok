@@ -13,7 +13,7 @@ func (m Model) render() string {
 	}
 	if width < MinimumWidth {
 		lines := []string{
-			m.styles.title.Render("Overtok"),
+			m.styles.title.Render("Tokenholic"),
 			"",
 			m.styles.warning.Render("[warning] Terminal is too narrow"),
 			fmt.Sprintf("Resize to at least %d columns.", MinimumWidth),
@@ -27,9 +27,9 @@ func (m Model) render() string {
 	}
 
 	var output strings.Builder
-	title := "Overtok · local usage"
+	title := "Tokenholic · local usage"
 	if m.section == GroupsSection {
-		title = "Overtok · private groups"
+		title = "Tokenholic · private groups"
 	}
 	fmt.Fprintln(&output, m.styles.title.Render(title))
 	fmt.Fprintln(&output, m.renderNavigation(width))
@@ -120,9 +120,9 @@ func (m Model) renderContent(output *strings.Builder, width int) {
 		for _, line := range wrap("[error] "+message+".", width) {
 			fmt.Fprintln(output, m.styles.failure.Render(line))
 		}
-		action := "Press r to retry or run `overtok doctor` for details."
+		action := "Press r to retry or run `tokenholic doctor` for details."
 		if m.section == GroupsSection {
-			action = "Press r to retry; check OVERTOK_API_URL and `overtok login`."
+			action = "Press r to retry; check TOKENHOLIC_API_URL and `tokenholic login`."
 		}
 		for _, line := range wrap(action, width) {
 			fmt.Fprintln(output, line)

@@ -1,14 +1,14 @@
 {
-  "name": "@overtok/darwin-x64",
+  "name": "@tokenholic/darwin-x64",
   "version": "0.0.0-development",
-  "description": "Overtok native binary for macOS x64",
+  "description": "Tokenholic native binary for macOS x64",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ansonnchan/overtok.git"
+    "url": "git+https://github.com/ansonnchan/tokenholic.git"
   },
   "os": ["darwin"],
   "cpu": ["x64"],
-  "files": ["bin/overtok", "ccusage.lock.json"],
+  "files": ["bin/tokenholic", "ccusage.lock.json"],
   "publishConfig": {
     "access": "public"
   },

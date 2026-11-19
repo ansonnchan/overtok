@@ -27,7 +27,7 @@ pnpm test                  # npm preparation and launcher tests
 Run the hosted schema integration test against an isolated PostgreSQL database:
 
 ```sh
-OVERTOK_TEST_DATABASE_URL='postgres://overtok:password@localhost:5432/overtok_test?sslmode=disable' make test-postgres
+TOKENHOLIC_TEST_DATABASE_URL='postgres://tokenholic:password@localhost:5432/tokenholic_test?sslmode=disable' make test-postgres
 ```
 
 The test creates a random schema, applies the embedded migrations twice, checks
@@ -38,10 +38,10 @@ CI runs the integration target separately against PostgreSQL 18.
 Build and run the command directly:
 
 ```sh
-go build -o ./bin/overtok ./cmd/overtok
-./bin/overtok --version
-./bin/overtok             # interactive local TUI
-./bin/overtok doctor
+go build -o ./bin/tokenholic ./cmd/tokenholic
+./bin/tokenholic --version
+./bin/tokenholic             # interactive local TUI
+./bin/tokenholic doctor
 ```
 
 ## Local account API
@@ -53,24 +53,24 @@ repository or organization scopes.
 Configure the API process with:
 
 ```sh
-export DATABASE_URL='postgres://overtok:password@localhost:5432/overtok?sslmode=disable'
+export DATABASE_URL='postgres://tokenholic:password@localhost:5432/tokenholic?sslmode=disable'
 export GITHUB_CLIENT_ID='your-github-oauth-client-id'
-export OVERTOK_AUTH_STATE_KEY="$(openssl rand -base64 32)"
-export OVERTOK_LISTEN_ADDR='127.0.0.1:8080'
+export TOKENHOLIC_AUTH_STATE_KEY="$(openssl rand -base64 32)"
+export TOKENHOLIC_LISTEN_ADDR='127.0.0.1:8080'
 go run ./server/cmd/api
 ```
 
 Then point the native client at the loopback API:
 
 ```sh
-OVERTOK_API_URL='http://127.0.0.1:8080' go run ./cmd/overtok login
-OVERTOK_API_URL='http://127.0.0.1:8080' go run ./cmd/overtok logout
-OVERTOK_API_URL='http://127.0.0.1:8080' go run ./cmd/overtok sync --dry-run
-OVERTOK_API_URL='http://127.0.0.1:8080' go run ./cmd/overtok sync
-OVERTOK_API_URL='http://127.0.0.1:8080' go run ./cmd/overtok account delete --confirm DELETE
-OVERTOK_API_URL='http://127.0.0.1:8080' go run ./cmd/overtok autosync enable
-go run ./cmd/overtok autosync status
-go run ./cmd/overtok autosync disable
+TOKENHOLIC_API_URL='http://127.0.0.1:8080' go run ./cmd/tokenholic login
+TOKENHOLIC_API_URL='http://127.0.0.1:8080' go run ./cmd/tokenholic logout
+TOKENHOLIC_API_URL='http://127.0.0.1:8080' go run ./cmd/tokenholic sync --dry-run
+TOKENHOLIC_API_URL='http://127.0.0.1:8080' go run ./cmd/tokenholic sync
+TOKENHOLIC_API_URL='http://127.0.0.1:8080' go run ./cmd/tokenholic account delete --confirm DELETE
+TOKENHOLIC_API_URL='http://127.0.0.1:8080' go run ./cmd/tokenholic autosync enable
+go run ./cmd/tokenholic autosync status
+go run ./cmd/tokenholic autosync disable
 ```
 
 Plain HTTP is accepted only for loopback development. Non-loopback API origins
@@ -95,7 +95,7 @@ without deleting local usage or credentials.
 An authenticated client can inspect the account-level aggregation endpoint:
 
 ```sh
-curl -H 'Authorization: Bearer OVERTOK-DEVICE-CREDENTIAL' \
+curl -H 'Authorization: Bearer TOKENHOLIC-DEVICE-CREDENTIAL' \
   http://127.0.0.1:8080/v1/account/usage
 ```
 

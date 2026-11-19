@@ -25,19 +25,19 @@ func runAutosyncCommand(args []string, stdout, stderr io.Writer, deps dependenci
 	}
 	executable, err := deps.executable()
 	if err != nil {
-		fmt.Fprintln(stderr, "could not resolve the current Overtok executable")
+		fmt.Fprintln(stderr, "could not resolve the current Tokenholic executable")
 		return 1
 	}
 	executable, err = filepath.Abs(executable)
 	if err != nil {
-		fmt.Fprintln(stderr, "could not resolve the current Overtok executable")
+		fmt.Fprintln(stderr, "could not resolve the current Tokenholic executable")
 		return 1
 	}
-	apiURL := strings.TrimSpace(deps.getenv("OVERTOK_API_URL"))
+	apiURL := strings.TrimSpace(deps.getenv("TOKENHOLIC_API_URL"))
 	codexHome := strings.TrimSpace(deps.getenv("CODEX_HOME"))
 	if args[0] == "enable" {
 		if apiURL == "" {
-			fmt.Fprintln(stderr, "OVERTOK_API_URL is required to enable autosync")
+			fmt.Fprintln(stderr, "TOKENHOLIC_API_URL is required to enable autosync")
 			return 1
 		}
 		if codexHome != "" && !filepath.IsAbs(codexHome) {
@@ -61,7 +61,7 @@ func runAutosyncCommand(args []string, stdout, stderr io.Writer, deps dependenci
 			fmt.Fprintln(stderr, "could not enable autosync; no schedule was activated")
 			return 1
 		}
-		fmt.Fprintln(stdout, "Enabled autosync at login and hourly. Re-enable it after upgrading Overtok.")
+		fmt.Fprintln(stdout, "Enabled autosync at login and hourly. Re-enable it after upgrading Tokenholic.")
 	case "disable":
 		if err := manager.Disable(ctx); err != nil {
 			fmt.Fprintln(stderr, "could not disable autosync; inspect its status and retry")
@@ -78,7 +78,7 @@ func runAutosyncCommand(args []string, stdout, stderr io.Writer, deps dependenci
 		case status.Installed && status.Loaded:
 			fmt.Fprintln(stdout, "Autosync is installed and loaded; it runs at login and hourly.")
 		case status.Installed:
-			fmt.Fprintln(stdout, "Autosync is installed but not loaded; run `overtok autosync enable` to repair it.")
+			fmt.Fprintln(stdout, "Autosync is installed but not loaded; run `tokenholic autosync enable` to repair it.")
 		case status.Loaded:
 			fmt.Fprintln(stdout, "Autosync is loaded with incomplete files; enable it to repair or disable it to remove the schedule.")
 		default:

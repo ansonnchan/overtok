@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ansonnchan/overtok/internal/normalize"
+	"github.com/ansonnchan/tokenholic/internal/normalize"
 )
 
 // RootKind names one supported provider storage layout.

@@ -9,7 +9,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/normalize"
+	"github.com/ansonnchan/tokenholic/internal/normalize"
 )
 
 const tokensPerMillion = 1_000_000

@@ -6,15 +6,15 @@ const path = require("node:path");
 const childProcess = require("node:child_process");
 
 const packageByTarget = Object.freeze({
-  "darwin-arm64": "@overtok/darwin-arm64",
-  "darwin-x64": "@overtok/darwin-x64",
+  "darwin-arm64": "@tokenholic/darwin-arm64",
+  "darwin-x64": "@tokenholic/darwin-x64",
 });
 
 function targetPackage(platform, arch) {
   const packageName = packageByTarget[`${platform}-${arch}`];
   if (!packageName) {
     throw new Error(
-      `Overtok does not support ${platform}/${arch}. Supported targets: macOS arm64 and x64.`,
+      `Tokenholic does not support ${platform}/${arch}. Supported targets: macOS arm64 and x64.`,
     );
   }
   return packageName;
@@ -27,12 +27,12 @@ function resolveExecutable(platform, arch, resolver = require.resolve) {
     manifest = resolver(`${packageName}/package.json`);
   } catch {
     throw new Error(
-      `The native package ${packageName} is missing. Reinstall @overtok/cli for this platform.`,
+      `The native package ${packageName} is missing. Reinstall @tokenholic/cli for this platform.`,
     );
   }
-  const executable = path.join(path.dirname(manifest), "bin", "overtok");
+  const executable = path.join(path.dirname(manifest), "bin", "tokenholic");
   if (!fs.existsSync(executable)) {
-    throw new Error(`The native package ${packageName} is incomplete. Reinstall @overtok/cli.`);
+    throw new Error(`The native package ${packageName} is incomplete. Reinstall @tokenholic/cli.`);
   }
   return executable;
 }
@@ -53,7 +53,7 @@ function run(argv, options = {}) {
       throw result.error;
     }
     if (result.signal) {
-      stderr.write(`Overtok stopped after signal ${result.signal}.\n`);
+      stderr.write(`Tokenholic stopped after signal ${result.signal}.\n`);
       return 1;
     }
     return result.status ?? 1;

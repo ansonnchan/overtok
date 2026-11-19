@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/account"
+	"github.com/ansonnchan/tokenholic/internal/account"
 )
 
 func TestClientGroupAndLeaderboardProtocol(t *testing.T) {

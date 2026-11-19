@@ -21,7 +21,7 @@ jobs:
         run: make release VERSION="${GITHUB_REF_NAME#v}"
       - uses: actions/upload-artifact@v4
         with:
-          name: overtok-${{ github.ref_name }}
+          name: tokenholic-${{ github.ref_name }}
           path: dist/
           if-no-files-found: error
       - name: Publish GitHub release
@@ -45,7 +45,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@v4
         with:
-          name: overtok-${{ github.ref_name }}
+          name: tokenholic-${{ github.ref_name }}
           path: dist/
       - name: Prepare and test npm packages
         run: |

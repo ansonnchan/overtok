@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/modelcatalog"
-	"github.com/ansonnchan/overtok/internal/normalize"
+	"github.com/ansonnchan/tokenholic/internal/modelcatalog"
+	"github.com/ansonnchan/tokenholic/internal/normalize"
 )
 
 const bucketInterval = time.Minute

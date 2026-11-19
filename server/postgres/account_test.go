@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/modelcatalog"
-	protocol "github.com/ansonnchan/overtok/internal/sync"
-	serveraccount "github.com/ansonnchan/overtok/server/account"
-	serverauth "github.com/ansonnchan/overtok/server/auth"
+	"github.com/ansonnchan/tokenholic/internal/modelcatalog"
+	protocol "github.com/ansonnchan/tokenholic/internal/sync"
+	serveraccount "github.com/ansonnchan/tokenholic/server/account"
+	serverauth "github.com/ansonnchan/tokenholic/server/auth"
 )
 
 func TestPostgresAccountAggregatesActiveDevicesAndRetainsRevokedHistory(t *testing.T) {

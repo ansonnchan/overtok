@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	protocol "github.com/ansonnchan/overtok/internal/sync"
-	serveraccount "github.com/ansonnchan/overtok/server/account"
-	serverauth "github.com/ansonnchan/overtok/server/auth"
-	servergroup "github.com/ansonnchan/overtok/server/group"
-	serverleaderboard "github.com/ansonnchan/overtok/server/leaderboard"
-	serversync "github.com/ansonnchan/overtok/server/sync"
+	protocol "github.com/ansonnchan/tokenholic/internal/sync"
+	serveraccount "github.com/ansonnchan/tokenholic/server/account"
+	serverauth "github.com/ansonnchan/tokenholic/server/auth"
+	servergroup "github.com/ansonnchan/tokenholic/server/group"
+	serverleaderboard "github.com/ansonnchan/tokenholic/server/leaderboard"
+	serversync "github.com/ansonnchan/tokenholic/server/sync"
 )
 
 const (
@@ -53,7 +53,7 @@ type leaderboardService interface {
 	Get(context.Context, string, string, serverleaderboard.Period, serverleaderboard.Metric) (serverleaderboard.Board, error)
 }
 
-// Handler is the hosted Overtok HTTP API.
+// Handler is the hosted Tokenholic HTTP API.
 type Handler struct {
 	auth         authenticationService
 	sync         usageSyncService

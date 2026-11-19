@@ -1,7 +1,7 @@
 # Native multiplayer boundary
 
 This package owns the native client's private-group HTTP contract. It loads an
-Overtok device session through an injected credential-vault interface, calls
+Tokenholic device session through an injected credential-vault interface, calls
 only the group and leaderboard routes, and returns presentation-safe snapshots
 to the CLI and TUI.
 

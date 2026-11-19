@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	protocol "github.com/ansonnchan/overtok/internal/sync"
-	serverauth "github.com/ansonnchan/overtok/server/auth"
+	protocol "github.com/ansonnchan/tokenholic/internal/sync"
+	serverauth "github.com/ansonnchan/tokenholic/server/auth"
 )
 
 // ErrRevisionConflict means equal device/key/revision identity was presented

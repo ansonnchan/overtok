@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/adapters"
-	"github.com/ansonnchan/overtok/internal/adapters/ccusage"
-	"github.com/ansonnchan/overtok/internal/normalize"
-	"github.com/ansonnchan/overtok/internal/store"
+	"github.com/ansonnchan/tokenholic/internal/adapters"
+	"github.com/ansonnchan/tokenholic/internal/adapters/ccusage"
+	"github.com/ansonnchan/tokenholic/internal/normalize"
+	"github.com/ansonnchan/tokenholic/internal/store"
 )
 
 // DiscoveryProbe supplies source health without requiring usage collection.
@@ -87,7 +87,7 @@ func (r Report) ExitCode() int {
 // Render formats a deterministic report using only redaction-safe finding fields.
 func (r Report) Render() string {
 	var output strings.Builder
-	fmt.Fprintln(&output, "Overtok doctor")
+	fmt.Fprintln(&output, "Tokenholic doctor")
 	fmt.Fprintf(&output, "Platform: %s/%s\n", r.GOOS, r.GOARCH)
 	switch {
 	case r.Parser.Compatible:
@@ -144,13 +144,13 @@ func (r Report) renderDatabase(output *strings.Builder) {
 		fmt.Fprintln(output, "  Integrity: ok")
 		fmt.Fprintf(output, "  Schema: %d (compatible; supported %d)\n", database.SchemaVersion, database.SupportedVersion)
 	case DatabaseNotInitialized:
-		fmt.Fprintln(output, "  Open: not initialized; run `overtok` to create local storage")
+		fmt.Fprintln(output, "  Open: not initialized; run `tokenholic` to create local storage")
 	case DatabaseLocked:
-		fmt.Fprintln(output, "  Open: locked; close other Overtok processes and retry")
+		fmt.Fprintln(output, "  Open: locked; close other Tokenholic processes and retry")
 	case DatabaseCorrupt:
 		fmt.Fprintln(output, "  Integrity: failed; restore or replace the local database")
 	case DatabaseIncompatible:
-		fmt.Fprintf(output, "  Schema: incompatible (supported %d); update Overtok before retrying\n", database.SupportedVersion)
+		fmt.Fprintf(output, "  Schema: incompatible (supported %d); update Tokenholic before retrying\n", database.SupportedVersion)
 	default:
 		fmt.Fprintln(output, "  Open: failed; check application-data permissions and retry")
 	}

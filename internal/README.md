@@ -21,7 +21,7 @@ multiplayer owns authenticated group and leaderboard HTTP calls
 
 | Package | Owns | Does not own |
 | --- | --- | --- |
-| `account` | Overtok API login, credential rotation/revocation, and OS vault storage | GitHub tokens, source collection, or server persistence |
+| `account` | Tokenholic API login, credential rotation/revocation, and OS vault storage | GitHub tokens, source collection, or server persistence |
 | `adapters` | Source discovery, source formats, and external parser contracts | Cross-source totals, persistence, or UI |
 | `normalize` | Provider-neutral records, capability vocabulary, and validation | Filesystem discovery or provider parsing |
 | `collect` | Application scan orchestration, deduplication, cumulative reduction, and summaries | SQL implementation or uploads |

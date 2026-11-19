@@ -1,6 +1,6 @@
-# Overtok
+# Tokenholic
 
-Overtok is a terminal-first application for understanding coding-agent usage.
+Tokenholic is a terminal-first application for understanding coding-agent usage.
 The current local implementation collects supported Claude and Codex evidence,
 normalizes token and model metadata, persists privacy-safe aggregates, reports
 installation health, and provides a keyboard-first application shell without
@@ -15,7 +15,7 @@ hosted account data without touching local usage.
 
 ## Privacy boundary
 
-Overtok is designed to count usage, not inspect work. Local collection must never upload or retain prompts, responses, source code, command text, credentials, identifying paths, project names, repository metadata, branch names, or raw transcripts.
+Tokenholic is designed to count usage, not inspect work. Local collection must never upload or retain prompts, responses, source code, command text, credentials, identifying paths, project names, repository metadata, branch names, or raw transcripts.
 
 The compatibility suite uses synthetic fixtures. Do not replace them with records copied from a real local agent installation. See [fixtures/README.md](./fixtures/README.md) before adding a source-format regression case.
 
@@ -39,7 +39,7 @@ The native Go command currently provides:
 - private groups with owner/member roles, expiring limited-use invites, and membership-authorized reads;
 - timezone-aware group leaderboards for total tokens, output, and API estimates with explicit coverage and freshness;
 - explicit authorization-checked deletion of the hosted account and uploaded aggregates; and
-- privacy-safe source and storage diagnostics through `overtok doctor`.
+- privacy-safe source and storage diagnostics through `tokenholic doctor`.
 
 Model names are not allowlisted. A previously unseen, non-empty observed identifier can retain its token counts while canonical resolution and pricing remain unavailable. Reported, resolved, inferred, and unknown attribution are separate states.
 
@@ -48,34 +48,34 @@ Model names are not allowlisted. A previously unseen, non-empty observed identif
 - Go 1.25 or newer.
 - macOS for the currently implemented discovery paths.
 - PostgreSQL 18 only when exercising the hosted schema integration tests.
-- ccusage 20.0.51 only when exercising the optional ccusage integration. Overtok does not download it at runtime.
+- ccusage 20.0.51 only when exercising the optional ccusage integration. Tokenholic does not download it at runtime.
 
 The pnpm workspace owns npm distribution tooling; it is not needed to build the native command from source. Checksummed macOS arm64/x64 archives are produced by the release workflow.
 
-Tagged releases publish the same native binaries through `npx @overtok/cli`.
+Tagged releases publish the same native binaries through `npx @tokenholic/cli`.
 The launcher installs only the optional package matching macOS arm64 or x64;
 other platforms fail with a supported-target message.
 
 ```sh
-npx @overtok/cli
+npx @tokenholic/cli
 ```
 
-Account commands require an Overtok API origin:
+Account commands require a Tokenholic API origin:
 
 ```sh
-OVERTOK_API_URL=https://api.example.test overtok login
-OVERTOK_API_URL=https://api.example.test overtok logout
-OVERTOK_API_URL=https://api.example.test overtok sync --dry-run
-OVERTOK_API_URL=https://api.example.test overtok sync
-OVERTOK_API_URL=https://api.example.test overtok autosync enable
-overtok autosync status
-overtok autosync disable
-OVERTOK_API_URL=https://api.example.test overtok group list
-OVERTOK_API_URL=https://api.example.test overtok group create "Quiet team"
-OVERTOK_API_URL=https://api.example.test overtok group invite --expires 24h --uses 10 "Quiet team"
-OVERTOK_API_URL=https://api.example.test overtok group join "$OVERTOK_INVITE_CODE"
-OVERTOK_API_URL=https://api.example.test overtok group leave "Quiet team"
-OVERTOK_API_URL=https://api.example.test overtok account delete --confirm DELETE
+TOKENHOLIC_API_URL=https://api.example.test tokenholic login
+TOKENHOLIC_API_URL=https://api.example.test tokenholic logout
+TOKENHOLIC_API_URL=https://api.example.test tokenholic sync --dry-run
+TOKENHOLIC_API_URL=https://api.example.test tokenholic sync
+TOKENHOLIC_API_URL=https://api.example.test tokenholic autosync enable
+tokenholic autosync status
+tokenholic autosync disable
+TOKENHOLIC_API_URL=https://api.example.test tokenholic group list
+TOKENHOLIC_API_URL=https://api.example.test tokenholic group create "Quiet team"
+TOKENHOLIC_API_URL=https://api.example.test tokenholic group invite --expires 24h --uses 10 "Quiet team"
+TOKENHOLIC_API_URL=https://api.example.test tokenholic group join "$TOKENHOLIC_INVITE_CODE"
+TOKENHOLIC_API_URL=https://api.example.test tokenholic group leave "Quiet team"
+TOKENHOLIC_API_URL=https://api.example.test tokenholic account delete --confirm DELETE
 ```
 
 Login requests public GitHub identity only. The CLI never receives a GitHub
@@ -95,8 +95,8 @@ That command checks formatting, runs `go vet`, executes the race-enabled test su
 Build a local executable:
 
 ```sh
-go build -o ./bin/overtok ./cmd/overtok
-./bin/overtok
+go build -o ./bin/tokenholic ./cmd/tokenholic
+./bin/tokenholic
 ```
 
 The TUI starts in local mode. Press `r` to collect supported evidence and
@@ -107,7 +107,7 @@ minimum supported width is 48 columns.
 Run the source diagnostic:
 
 ```sh
-./bin/overtok doctor
+./bin/tokenholic doctor
 ```
 
 `doctor` reports source types, health, candidate-file availability,
@@ -119,7 +119,7 @@ contents, or expose persisted observations.
 
 | Path | Responsibility |
 | --- | --- |
-| `cmd/overtok` | Native executable entry point |
+| `cmd/tokenholic` | Native executable entry point |
 | `internal/adapters` | Source discovery, ccusage validation, and source-specific parsers |
 | `internal/normalize` | Provider-neutral observations, capabilities, and invariants |
 | `internal/collect` | Parsing orchestration, deduplication, cumulative reduction, and summaries |

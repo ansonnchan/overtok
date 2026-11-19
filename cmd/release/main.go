@@ -1,4 +1,4 @@
-// Command release builds deterministic Overtok distribution archives.
+// Command release builds deterministic Tokenholic distribution archives.
 package main
 
 import (
@@ -20,13 +20,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/adapters/ccusage"
+	"github.com/ansonnchan/tokenholic/internal/adapters/ccusage"
 )
 
 const (
-	binaryName = "overtok"
+	binaryName = "tokenholic"
 	lockName   = "ccusage.lock.json"
-	versionKey = "github.com/ansonnchan/overtok/internal/cli.version"
+	versionKey = "github.com/ansonnchan/tokenholic/internal/cli.version"
 )
 
 var semanticVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$`)
@@ -56,7 +56,7 @@ func main() {
 }
 
 func run(args []string, output io.Writer) error {
-	flags := flag.NewFlagSet("overtok-release", flag.ContinueOnError)
+	flags := flag.NewFlagSet("tokenholic-release", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	version := flags.String("version", "", "release version without a v prefix")
 	outputDir := flags.String("output", "dist", "artifact output directory")
@@ -79,7 +79,7 @@ func run(args []string, output io.Writer) error {
 	if err := os.MkdirAll(*outputDir, 0o755); err != nil {
 		return fmt.Errorf("create release output: %w", err)
 	}
-	temporary, err := os.MkdirTemp("", "overtok-release-")
+	temporary, err := os.MkdirTemp("", "tokenholic-release-")
 	if err != nil {
 		return fmt.Errorf("create release workspace: %w", err)
 	}
@@ -87,7 +87,7 @@ func run(args []string, output io.Writer) error {
 
 	checksums := make(map[string]string, len(targets))
 	for _, target := range targets {
-		binaryPath := filepath.Join(temporary, "overtok-"+target.goArch)
+		binaryPath := filepath.Join(temporary, "tokenholic-"+target.goArch)
 		if err := build(binaryPath, *version, target.goArch); err != nil {
 			return err
 		}
@@ -103,7 +103,7 @@ func run(args []string, output io.Writer) error {
 		if err != nil {
 			return fmt.Errorf("read %s binary: %w", target.archiveArch, err)
 		}
-		archiveName := fmt.Sprintf("overtok_%s_darwin_%s.tar.gz", *version, target.archiveArch)
+		archiveName := fmt.Sprintf("tokenholic_%s_darwin_%s.tar.gz", *version, target.archiveArch)
 		archivePath := filepath.Join(*outputDir, archiveName)
 		entries := []archiveEntry{
 			{name: binaryName, mode: 0o755, data: binary},
@@ -127,7 +127,7 @@ func run(args []string, output io.Writer) error {
 }
 
 func build(destination, version, goarch string) error {
-	command := exec.Command("go", "build", "-trimpath", "-buildvcs=false", "-ldflags", "-s -w -X "+versionKey+"="+version, "-o", destination, "./cmd/overtok")
+	command := exec.Command("go", "build", "-trimpath", "-buildvcs=false", "-ldflags", "-s -w -X "+versionKey+"="+version, "-o", destination, "./cmd/tokenholic")
 	command.Env = replaceEnvironment(os.Environ(), map[string]string{
 		"CGO_ENABLED": "0",
 		"GOARCH":      goarch,
