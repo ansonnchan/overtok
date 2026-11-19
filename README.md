@@ -8,8 +8,9 @@ reading ordinary chat data.
 
 The hosted PostgreSQL data model, HTTP API, GitHub device login, idempotent
 absolute-bucket synchronization, and account-level multi-device aggregation
-complete the accounts/devices milestone. Groups and multiplayer leaderboards
-remain later roadmap stages and are not required by local mode.
+complete the accounts/devices milestone. Private groups and authenticated
+multiplayer leaderboard queries are implemented; their TUI views remain the
+next roadmap stage and local mode still works without a server.
 
 ## Privacy boundary
 
@@ -33,7 +34,8 @@ The native Go command currently provides:
 - GitHub device-flow `login` and revoking `logout` commands backed by the OS credential vault;
 - bounded `sync` and exact-payload `sync --dry-run` commands with durable acknowledgements;
 - one authenticated account usage row across active devices with independent revocation and freshness;
-- private groups with owner/member roles, expiring limited-use invites, and membership-authorized reads; and
+- private groups with owner/member roles, expiring limited-use invites, and membership-authorized reads;
+- timezone-aware group leaderboards for total tokens, output, and API estimates with explicit coverage and freshness; and
 - privacy-safe source and storage diagnostics through `overtok doctor`.
 
 Model names are not allowlisted. A previously unseen, non-empty observed identifier can retain its token counts while canonical resolution and pricing remain unavailable. Reported, resolved, inferred, and unknown attribution are separate states.

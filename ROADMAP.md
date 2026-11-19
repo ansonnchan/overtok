@@ -1,6 +1,6 @@
 # Overtok roadmap
 
-Status: private groups implemented; leaderboard queries next
+Status: leaderboard queries implemented; multiplayer TUI next
 Last updated: November 18, 2026
 
 ## Product definition
@@ -340,7 +340,7 @@ Goal: complete the social product loop.
   - Private groups only, owner/member roles, expiring invite codes, usage limits, and leave/revoke behavior.
   - Acceptance: authorization tests prevent non-members from reading or mutating a group.
 
-- [ ] **OVT-031: Implement period and metric leaderboard queries**
+- [x] **OVT-031: Implement period and metric leaderboard queries**
   - Today, current week, last 30 days, and all-time in a group timezone.
   - Total tokens, output tokens, and API-equivalent cost.
   - Acceptance: query tests cover timezone boundaries, multiple devices, unknown prices, and ties.

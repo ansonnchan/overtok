@@ -17,6 +17,7 @@ import (
 	serveraccount "github.com/ansonnchan/overtok/server/account"
 	serverauth "github.com/ansonnchan/overtok/server/auth"
 	servergroup "github.com/ansonnchan/overtok/server/group"
+	serverleaderboard "github.com/ansonnchan/overtok/server/leaderboard"
 )
 
 func TestAuthenticationRoutesAndStableErrors(t *testing.T) {
@@ -28,7 +29,7 @@ func TestAuthenticationRoutesAndStableErrors(t *testing.T) {
 		poll:    serverauth.PollResponse{Status: serverauth.FlowPending, RetryAfter: 7 * time.Second},
 		refresh: serverauth.Session{Credential: "replacement", DeviceID: "device", UserID: "user"},
 	}
-	handler, err := New(service, &fakeUsageSyncService{}, &fakeAccountUsageService{}, &fakeGroupService{})
+	handler, err := New(service, &fakeUsageSyncService{}, &fakeAccountUsageService{}, &fakeGroupService{}, &fakeLeaderboardService{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +68,7 @@ func TestAuthenticationRoutesAndStableErrors(t *testing.T) {
 
 func TestHandlerRedactsServiceFailures(t *testing.T) {
 	service := &fakeAuthService{startErr: errors.New("provider token and private/path")}
-	handler, err := New(service, &fakeUsageSyncService{}, &fakeAccountUsageService{}, &fakeGroupService{})
+	handler, err := New(service, &fakeUsageSyncService{}, &fakeAccountUsageService{}, &fakeGroupService{}, &fakeLeaderboardService{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +83,7 @@ func TestHandlerRedactsServiceFailures(t *testing.T) {
 func TestSyncRouteAuthenticatesAndReturnsExactAcknowledgement(t *testing.T) {
 	service := &fakeAuthService{}
 	syncService := &fakeUsageSyncService{}
-	handler, err := New(service, syncService, &fakeAccountUsageService{}, &fakeGroupService{})
+	handler, err := New(service, syncService, &fakeAccountUsageService{}, &fakeGroupService{}, &fakeLeaderboardService{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +105,7 @@ func TestAccountUsageRouteRequiresCredential(t *testing.T) {
 	accountService := &fakeAccountUsageService{usage: serveraccount.Usage{
 		UserID: "user", DisplayName: "synthetic-user", GeneratedAt: time.Now().UTC(),
 	}}
-	handler, err := New(&fakeAuthService{}, &fakeUsageSyncService{}, accountService, &fakeGroupService{})
+	handler, err := New(&fakeAuthService{}, &fakeUsageSyncService{}, accountService, &fakeGroupService{}, &fakeLeaderboardService{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +132,7 @@ func TestGroupRoutesPreserveAuthorizationAndStableErrors(t *testing.T) {
 		detail: servergroup.Detail{Group: servergroup.Group{ID: groupID, Name: "Private group"}},
 		invite: servergroup.Invite{Code: "ovt_synthetic", MaxUses: 2, ExpiresAt: time.Now().UTC().Add(time.Hour)},
 	}
-	handler, err := New(&fakeAuthService{}, &fakeUsageSyncService{}, &fakeAccountUsageService{}, groups)
+	handler, err := New(&fakeAuthService{}, &fakeUsageSyncService{}, &fakeAccountUsageService{}, groups, &fakeLeaderboardService{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,6 +174,28 @@ func TestGroupRoutesPreserveAuthorizationAndStableErrors(t *testing.T) {
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusForbidden || strings.Contains(response.Body.String(), groupID) {
 		t.Fatalf("forbidden response = %d %q", response.Code, response.Body.String())
+	}
+}
+
+func TestLeaderboardRouteUsesExplicitPeriodAndMetric(t *testing.T) {
+	groupID := "10000000-0000-4000-8000-000000000001"
+	leaderboards := &fakeLeaderboardService{board: serverleaderboard.Board{
+		GroupID: groupID, GroupName: "Private group", Timezone: "America/Vancouver",
+		Period: serverleaderboard.PeriodWeek, Metric: serverleaderboard.MetricOutput,
+	}}
+	handler, err := New(
+		&fakeAuthService{}, &fakeUsageSyncService{}, &fakeAccountUsageService{},
+		&fakeGroupService{}, leaderboards,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "/v1/groups/"+groupID+"/leaderboard?period=week&metric=output_tokens", nil)
+	request.Header.Set("Authorization", "Bearer device")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || leaderboards.period != serverleaderboard.PeriodWeek || leaderboards.metric != serverleaderboard.MetricOutput || !strings.Contains(response.Body.String(), `"timezone":"America/Vancouver"`) {
+		t.Fatalf("leaderboard response = %d %q/%#v", response.Code, response.Body.String(), leaderboards)
 	}
 }
 
@@ -235,6 +258,19 @@ type fakeGroupService struct {
 	detail servergroup.Detail
 	invite servergroup.Invite
 	err    error
+}
+
+type fakeLeaderboardService struct {
+	board  serverleaderboard.Board
+	period serverleaderboard.Period
+	metric serverleaderboard.Metric
+	err    error
+}
+
+func (f *fakeLeaderboardService) Get(_ context.Context, _, _ string, period serverleaderboard.Period, metric serverleaderboard.Metric) (serverleaderboard.Board, error) {
+	f.period = period
+	f.metric = metric
+	return f.board, f.err
 }
 
 func (f *fakeGroupService) Create(context.Context, string, string, string) (servergroup.Group, error) {

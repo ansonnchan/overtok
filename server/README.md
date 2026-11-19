@@ -19,6 +19,12 @@ fixed use limit, and are stored only as SHA-256 hashes. PostgreSQL locks invite
 and membership state in the same transaction so retries cannot over-consume a
 code or leave a group without its owner.
 
+`leaderboard` defines timezone-relative periods, ranking metrics, explicit
+coverage, and competition ties. Its PostgreSQL repository authorizes active
+membership and aggregates active devices in one repeatable-read snapshot.
+Partial values remain visible but unranked; freshness and model/price
+limitations travel with every row.
+
 The schema contains users, stable GitHub identities, independently revocable
 devices and hashed credentials, pricing revisions, privacy-limited absolute
 usage buckets, private groups, memberships, and hashed invites. Bucket identity
