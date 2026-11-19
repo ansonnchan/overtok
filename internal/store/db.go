@@ -15,11 +15,11 @@ import (
 )
 
 const (
-	databaseFileName = "overtok.db"
+	databaseFileName = "tokenholic.db"
 	busyTimeoutMS    = 5000
 )
 
-// DB is Overtok's local SQLite database.
+// DB is Tokenholic's local SQLite database.
 type DB struct {
 	sql       *sql.DB
 	closeOnce sync.Once
@@ -33,7 +33,7 @@ func DefaultPath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolve user config directory: %w", err)
 	}
-	return filepath.Join(configDir, "Overtok", databaseFileName), nil
+	return filepath.Join(configDir, "Tokenholic", databaseFileName), nil
 }
 
 // Open prepares a private database file, configures SQLite, and applies all

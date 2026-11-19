@@ -3,7 +3,7 @@
 The hosted PostgreSQL persistence foundation is implemented in `postgres`. It
 opens a pgx connection pool and applies the embedded, checksummed migrations in
 one advisory-locked transaction. `auth` and `httpapi` implement GitHub device
-authorization, Overtok credential rotation/revocation, and bounded JSON routes.
+authorization, Tokenholic credential rotation/revocation, and bounded JSON routes.
 `sync` authenticates privacy-limited uploads and `postgres` applies absolute
 revisions transactionally.
 
@@ -38,7 +38,7 @@ source records. Local discovery, provider parsing, cumulative-counter
 reduction, and raw-record deduplication remain native-client responsibilities.
 
 The API requires `DATABASE_URL`, `GITHUB_CLIENT_ID`, and a dedicated 32-byte
-base64 `OVERTOK_AUTH_STATE_KEY`. `OVERTOK_LISTEN_ADDR` defaults to loopback.
+base64 `TOKENHOLIC_AUTH_STATE_KEY`. `TOKENHOLIC_LISTEN_ADDR` defaults to loopback.
 Register the GitHub OAuth app with Device Flow enabled and no repository scopes.
 GitHub access tokens are used only in memory for the authenticated-user request
 and are never stored or returned to the native client.
@@ -50,6 +50,6 @@ rolls back the whole batch. The API registers the bundled pricing snapshot and
 does not trust clients to define pricing catalogs.
 
 Run the disposable-schema integration suite with `make test-postgres` and an
-`OVERTOK_TEST_DATABASE_URL`. Do not target production. Do not add distributed
+`TOKENHOLIC_TEST_DATABASE_URL`. Do not target production. Do not add distributed
 infrastructure, background queues, caches, or deployment configuration before
 a measured requirement and the corresponding roadmap stage.

@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const stateAdditionalData = "overtok-device-flow-v1"
+const stateAdditionalData = "tokenholic-device-flow-v1"
 
 type flowClaims struct {
 	DeviceCode          string `json:"device_code"`

@@ -8,14 +8,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/account"
-	"github.com/ansonnchan/overtok/internal/adapters"
-	"github.com/ansonnchan/overtok/internal/application"
-	"github.com/ansonnchan/overtok/internal/collect"
-	"github.com/ansonnchan/overtok/internal/modelcatalog"
-	"github.com/ansonnchan/overtok/internal/multiplayer"
-	"github.com/ansonnchan/overtok/internal/store"
-	"github.com/ansonnchan/overtok/internal/tui"
+	"github.com/ansonnchan/tokenholic/internal/account"
+	"github.com/ansonnchan/tokenholic/internal/adapters"
+	"github.com/ansonnchan/tokenholic/internal/application"
+	"github.com/ansonnchan/tokenholic/internal/collect"
+	"github.com/ansonnchan/tokenholic/internal/modelcatalog"
+	"github.com/ansonnchan/tokenholic/internal/multiplayer"
+	"github.com/ansonnchan/tokenholic/internal/store"
+	"github.com/ansonnchan/tokenholic/internal/tui"
 )
 
 const localCloseTimeout = 5 * time.Second

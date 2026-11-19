@@ -33,10 +33,10 @@ export async function prepareNpmRelease(version, artifactDirectory, workspaceRoo
   if (checksums.size !== targets.length) {
     throw new Error("SHA256SUMS must contain exactly the supported platform archives");
   }
-  const temporary = await mkdtemp(path.join(tmpdir(), "overtok-npm-"));
+  const temporary = await mkdtemp(path.join(tmpdir(), "tokenholic-npm-"));
   try {
     for (const target of targets) {
-      const archiveName = `overtok_${version}_darwin_${target.archiveArch}.tar.gz`;
+      const archiveName = `tokenholic_${version}_darwin_${target.archiveArch}.tar.gz`;
       const archivePath = path.join(artifactRoot, archiveName);
       const expected = checksums.get(archiveName);
       if (!expected) {
@@ -57,15 +57,15 @@ export async function prepareNpmRelease(version, artifactDirectory, workspaceRoo
         throw new Error(`could not extract ${archiveName}: ${(result.stderr ?? "").trim()}`);
       }
       const names = (await readdir(extracted)).sort();
-      if (names.join("\n") !== "ccusage.lock.json\novertok") {
+      if (names.join("\n") !== "ccusage.lock.json\ntokenholic") {
         throw new Error(`${archiveName} contains unexpected files`);
       }
 
       const packageRoot = path.join(workspace, "packages", target.packageName);
       const binaryDirectory = path.join(packageRoot, "bin");
       await mkdir(binaryDirectory, { recursive: true });
-      await copyFile(path.join(extracted, "overtok"), path.join(binaryDirectory, "overtok"));
-      await chmod(path.join(binaryDirectory, "overtok"), 0o755);
+      await copyFile(path.join(extracted, "tokenholic"), path.join(binaryDirectory, "tokenholic"));
+      await chmod(path.join(binaryDirectory, "tokenholic"), 0o755);
       await copyFile(path.join(extracted, "ccusage.lock.json"), path.join(packageRoot, "ccusage.lock.json"));
       await setPackageVersion(path.join(packageRoot, "package.json"), version);
     }

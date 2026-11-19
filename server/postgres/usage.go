@@ -8,9 +8,9 @@ import (
 	"sort"
 	"strconv"
 
-	protocol "github.com/ansonnchan/overtok/internal/sync"
-	serverauth "github.com/ansonnchan/overtok/server/auth"
-	serversync "github.com/ansonnchan/overtok/server/sync"
+	protocol "github.com/ansonnchan/tokenholic/internal/sync"
+	serverauth "github.com/ansonnchan/tokenholic/server/auth"
+	serversync "github.com/ansonnchan/tokenholic/server/sync"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ansonnchan/overtok/internal/normalize"
+	"github.com/ansonnchan/tokenholic/internal/normalize"
 )
 
 // ModelSummary aggregates one source, observed model, and resolution quality.

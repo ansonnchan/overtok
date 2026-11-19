@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/store"
+	"github.com/ansonnchan/tokenholic/internal/store"
 )
 
 func TestClientRetriesBatchesAndAcknowledgesExactRevisions(t *testing.T) {

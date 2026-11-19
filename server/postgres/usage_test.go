@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/modelcatalog"
-	"github.com/ansonnchan/overtok/internal/normalize"
-	"github.com/ansonnchan/overtok/internal/store"
-	protocol "github.com/ansonnchan/overtok/internal/sync"
-	serverauth "github.com/ansonnchan/overtok/server/auth"
-	serversync "github.com/ansonnchan/overtok/server/sync"
+	"github.com/ansonnchan/tokenholic/internal/modelcatalog"
+	"github.com/ansonnchan/tokenholic/internal/normalize"
+	"github.com/ansonnchan/tokenholic/internal/store"
+	protocol "github.com/ansonnchan/tokenholic/internal/sync"
+	serverauth "github.com/ansonnchan/tokenholic/server/auth"
+	serversync "github.com/ansonnchan/tokenholic/server/sync"
 )
 
 func TestPostgresUsageRevisionLifecycle(t *testing.T) {

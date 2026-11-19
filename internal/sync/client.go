@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/store"
+	"github.com/ansonnchan/tokenholic/internal/store"
 )
 
 const (
@@ -49,10 +49,10 @@ type Client struct {
 func NewClient(baseURL string, httpClient *http.Client) (*Client, error) {
 	parsed, err := url.Parse(strings.TrimSpace(baseURL))
 	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
-		return nil, errors.New("invalid Overtok API URL")
+		return nil, errors.New("invalid Tokenholic API URL")
 	}
 	if parsed.Scheme != "https" && !(parsed.Scheme == "http" && syncLoopbackHost(parsed.Hostname())) {
-		return nil, errors.New("Overtok API URL must use HTTPS or loopback HTTP")
+		return nil, errors.New("Tokenholic API URL must use HTTPS or loopback HTTP")
 	}
 	parsed.Path = strings.TrimRight(parsed.Path, "/")
 	if httpClient == nil {

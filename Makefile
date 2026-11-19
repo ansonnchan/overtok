@@ -2,8 +2,8 @@
 
 # Keep build artifacts out of user-global caches so clean-checkout verification
 # behaves consistently in local sandboxes and CI.
-GOCACHE ?= /tmp/overtok-go-cache
-GOPATH ?= /tmp/overtok-gopath
+GOCACHE ?= /tmp/tokenholic-go-cache
+GOPATH ?= /tmp/tokenholic-gopath
 export GOCACHE
 export GOPATH
 
@@ -24,7 +24,7 @@ test:
 	go test ./...
 
 test-postgres:
-	test -n "$$OVERTOK_TEST_DATABASE_URL"
+	test -n "$$TOKENHOLIC_TEST_DATABASE_URL"
 	go test ./server/postgres -run Postgres -count=1
 
 test-race:

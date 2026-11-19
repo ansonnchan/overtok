@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/store"
+	"github.com/ansonnchan/tokenholic/internal/store"
 )
 
 const (

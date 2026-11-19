@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ansonnchan/overtok/internal/modelcatalog"
+	"github.com/ansonnchan/tokenholic/internal/modelcatalog"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

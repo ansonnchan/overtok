@@ -5,12 +5,12 @@ Last updated: November 18, 2026
 
 ## Intent
 
-The Overtok TUI should feel calm, compact, and deliberate. It is a metrics application, not a simulated hacker console.
+The Tokenholic TUI should feel calm, compact, and deliberate. It is a metrics application, not a simulated hacker console.
 
-The supplied Tokenboard reference is useful for its hierarchy, warm accent, restrained dark surfaces, clear table rows, selected-user emphasis, and compact summary cards. Overtok should adapt those principles to terminal constraints without reproducing the web layout or branding.
+The supplied Tokenboard reference is useful for its hierarchy, warm accent, restrained dark surfaces, clear table rows, selected-user emphasis, and compact summary cards. Tokenholic should adapt those principles to terminal constraints without reproducing the web layout or branding.
 
 The presentation layer begins after local persistence and model resolution.
-`overtok doctor` remains plain diagnostic output. The TUI consumes
+`tokenholic doctor` remains plain diagnostic output. The TUI consumes
 presentation-ready application snapshots and must not absorb discovery,
 collection, persistence, or future synchronization responsibilities.
 
@@ -65,7 +65,7 @@ configured, the first four views remain fully functional.
 At 88 columns or more:
 
 ```text
-Overtok · local usage
+Tokenholic · local usage
 [1 Overview]    2 Sources    3 Models    4 Settings    5 Groups
 
 Overview
@@ -131,7 +131,7 @@ Warnings are concise and actionable:
 
 ```text
 Codex model unavailable for 2 legacy sessions
-Claude Desktop source changed; run `overtok doctor`
+Claude Desktop source changed; run `tokenholic doctor`
 3 buckets pending locally
 ```
 

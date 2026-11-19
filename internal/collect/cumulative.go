@@ -1,6 +1,6 @@
 package collect
 
-import "github.com/ansonnchan/overtok/internal/normalize"
+import "github.com/ansonnchan/tokenholic/internal/normalize"
 
 // Incrementalize converts cumulative snapshots to per-record deltas while
 // keeping state isolated by source and local session identity.

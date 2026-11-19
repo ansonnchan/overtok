@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/adapters"
-	"github.com/ansonnchan/overtok/internal/autosync"
-	"github.com/ansonnchan/overtok/internal/doctor"
-	"github.com/ansonnchan/overtok/internal/multiplayer"
-	"github.com/ansonnchan/overtok/internal/normalize"
+	"github.com/ansonnchan/tokenholic/internal/adapters"
+	"github.com/ansonnchan/tokenholic/internal/autosync"
+	"github.com/ansonnchan/tokenholic/internal/doctor"
+	"github.com/ansonnchan/tokenholic/internal/multiplayer"
+	"github.com/ansonnchan/tokenholic/internal/normalize"
 )
 
 func TestRun(t *testing.T) {
@@ -92,7 +92,7 @@ func TestRootCommandRedactsStartupFailure(t *testing.T) {
 	}
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	if code := run(nil, &stdout, &stderr, deps); code != 1 || !strings.Contains(stderr.String(), "overtok doctor") || strings.Contains(stderr.String(), "private/path") {
+	if code := run(nil, &stdout, &stderr, deps); code != 1 || !strings.Contains(stderr.String(), "tokenholic doctor") || strings.Contains(stderr.String(), "private/path") {
 		t.Fatalf("root code/stderr = %d/%q", code, stderr.String())
 	}
 }
@@ -175,7 +175,7 @@ func TestAccountCommandsUseConfiguredAPIAndRedactFailures(t *testing.T) {
 	manager := &fakeAccountManager{}
 	deps := dependencies{
 		getenv: func(name string) string {
-			if name == "OVERTOK_API_URL" {
+			if name == "TOKENHOLIC_API_URL" {
 				return "https://api.example.test"
 			}
 			return ""
@@ -210,7 +210,7 @@ func TestAccountCommandRequiresAPIURL(t *testing.T) {
 	deps := dependencies{getenv: func(string) string { return "" }}
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	if code := run([]string{"login"}, &stdout, &stderr, deps); code != 1 || !strings.Contains(stderr.String(), "OVERTOK_API_URL") {
+	if code := run([]string{"login"}, &stdout, &stderr, deps); code != 1 || !strings.Contains(stderr.String(), "TOKENHOLIC_API_URL") {
 		t.Fatalf("login = %d/%q/%q", code, stdout.String(), stderr.String())
 	}
 }
@@ -221,7 +221,7 @@ func TestSyncCommandParsesDryRunAndRedactsFailure(t *testing.T) {
 	deps := dependencies{
 		homeDir: func() (string, error) { return "/synthetic/home", nil },
 		getenv: func(name string) string {
-			if name == "OVERTOK_API_URL" {
+			if name == "TOKENHOLIC_API_URL" {
 				return "https://api.example.test"
 			}
 			return ""
@@ -262,10 +262,10 @@ func TestAutosyncCommandsUseExplicitManagerBoundary(t *testing.T) {
 	managerCalls := 0
 	deps := dependencies{
 		homeDir:    func() (string, error) { return "/synthetic/home", nil },
-		executable: func() (string, error) { return "/synthetic/bin/overtok", nil },
+		executable: func() (string, error) { return "/synthetic/bin/tokenholic", nil },
 		getenv: func(name string) string {
 			switch name {
-			case "OVERTOK_API_URL":
+			case "TOKENHOLIC_API_URL":
 				return "https://api.example.test"
 			case "CODEX_HOME":
 				return "/synthetic/codex"
@@ -275,7 +275,7 @@ func TestAutosyncCommandsUseExplicitManagerBoundary(t *testing.T) {
 		},
 		autosync: func(home, executable, apiURL, codexHome string) (autosyncManager, error) {
 			managerCalls++
-			if home != "/synthetic/home" || executable != "/synthetic/bin/overtok" {
+			if home != "/synthetic/home" || executable != "/synthetic/bin/tokenholic" {
 				t.Fatalf("autosync inputs = %q/%q/%q/%q", home, executable, apiURL, codexHome)
 			}
 			if managerCalls == 1 && (apiURL != "https://api.example.test" || codexHome != "/synthetic/codex") {
@@ -309,7 +309,7 @@ func TestAutosyncCommandsUseExplicitManagerBoundary(t *testing.T) {
 func TestAutosyncEnableRequiresAPIAndRedactsFailure(t *testing.T) {
 	base := dependencies{
 		homeDir:    func() (string, error) { return "/synthetic/home", nil },
-		executable: func() (string, error) { return "/synthetic/bin/overtok", nil },
+		executable: func() (string, error) { return "/synthetic/bin/tokenholic", nil },
 		getenv:     func(string) string { return "" },
 		autosync: func(string, string, string, string) (autosyncManager, error) {
 			return &fakeAutosyncManager{}, nil
@@ -317,7 +317,7 @@ func TestAutosyncEnableRequiresAPIAndRedactsFailure(t *testing.T) {
 	}
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	if code := run([]string{"autosync", "enable"}, &stdout, &stderr, base); code != 1 || !strings.Contains(stderr.String(), "OVERTOK_API_URL") {
+	if code := run([]string{"autosync", "enable"}, &stdout, &stderr, base); code != 1 || !strings.Contains(stderr.String(), "TOKENHOLIC_API_URL") {
 		t.Fatalf("missing API = %d/%q", code, stderr.String())
 	}
 	base.getenv = func(string) string { return "https://api.example.test" }
@@ -334,7 +334,7 @@ func TestGroupCommandsUseConfiguredMultiplayerBoundary(t *testing.T) {
 	manager := &fakeGroupManager{groups: []multiplayer.Group{{ID: "group-id", Name: "Quiet group", Role: "owner", Timezone: "UTC"}}}
 	deps := dependencies{
 		getenv: func(name string) string {
-			if name == "OVERTOK_API_URL" {
+			if name == "TOKENHOLIC_API_URL" {
 				return "https://api.example.test"
 			}
 			return ""
@@ -371,7 +371,7 @@ func TestGroupCommandsUseConfiguredMultiplayerBoundary(t *testing.T) {
 func TestGroupCommandRequiresAPIAndRedactsFailure(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	if code := run([]string{"group", "list"}, &stdout, &stderr, dependencies{getenv: func(string) string { return "" }}); code != 1 || !strings.Contains(stderr.String(), "OVERTOK_API_URL") {
+	if code := run([]string{"group", "list"}, &stdout, &stderr, dependencies{getenv: func(string) string { return "" }}); code != 1 || !strings.Contains(stderr.String(), "TOKENHOLIC_API_URL") {
 		t.Fatalf("missing API = %d/%q", code, stderr.String())
 	}
 	manager := &fakeGroupManager{err: errors.New("credential at /private/path")}
@@ -389,7 +389,7 @@ func TestAccountDeleteRequiresExactConfirmation(t *testing.T) {
 	manager := &fakeAccountManager{}
 	deps := dependencies{
 		getenv: func(name string) string {
-			if name == "OVERTOK_API_URL" {
+			if name == "TOKENHOLIC_API_URL" {
 				return "https://api.example.test"
 			}
 			return ""

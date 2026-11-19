@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/store"
+	"github.com/ansonnchan/tokenholic/internal/store"
 )
 
 func TestBuildBatchUsesExplicitPrivacyAllowlist(t *testing.T) {

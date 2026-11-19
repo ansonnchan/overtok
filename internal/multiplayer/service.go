@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/account"
+	"github.com/ansonnchan/tokenholic/internal/account"
 )
 
 // ErrSignedOut means multiplayer requires a fresh local login.

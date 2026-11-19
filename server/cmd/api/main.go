@@ -12,19 +12,19 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/modelcatalog"
-	serveraccount "github.com/ansonnchan/overtok/server/account"
-	serverauth "github.com/ansonnchan/overtok/server/auth"
-	servergroup "github.com/ansonnchan/overtok/server/group"
-	"github.com/ansonnchan/overtok/server/httpapi"
-	serverleaderboard "github.com/ansonnchan/overtok/server/leaderboard"
-	"github.com/ansonnchan/overtok/server/postgres"
-	serversync "github.com/ansonnchan/overtok/server/sync"
+	"github.com/ansonnchan/tokenholic/internal/modelcatalog"
+	serveraccount "github.com/ansonnchan/tokenholic/server/account"
+	serverauth "github.com/ansonnchan/tokenholic/server/auth"
+	servergroup "github.com/ansonnchan/tokenholic/server/group"
+	"github.com/ansonnchan/tokenholic/server/httpapi"
+	serverleaderboard "github.com/ansonnchan/tokenholic/server/leaderboard"
+	"github.com/ansonnchan/tokenholic/server/postgres"
+	serversync "github.com/ansonnchan/tokenholic/server/sync"
 )
 
 func main() {
 	if err := run(); err != nil {
-		fmt.Fprintln(os.Stderr, "overtok api:", err)
+		fmt.Fprintln(os.Stderr, "tokenholic api:", err)
 		os.Exit(1)
 	}
 }
@@ -32,7 +32,7 @@ func main() {
 func run() error {
 	databaseURL := strings.TrimSpace(os.Getenv("DATABASE_URL"))
 	githubClientID := strings.TrimSpace(os.Getenv("GITHUB_CLIENT_ID"))
-	stateKey, err := decodeStateKey(os.Getenv("OVERTOK_AUTH_STATE_KEY"))
+	stateKey, err := decodeStateKey(os.Getenv("TOKENHOLIC_AUTH_STATE_KEY"))
 	if err != nil {
 		return err
 	}
@@ -104,7 +104,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	address := strings.TrimSpace(os.Getenv("OVERTOK_LISTEN_ADDR"))
+	address := strings.TrimSpace(os.Getenv("TOKENHOLIC_LISTEN_ADDR"))
 	if address == "" {
 		address = "127.0.0.1:8080"
 	}
@@ -140,7 +140,7 @@ func decodeStateKey(encoded string) ([]byte, error) {
 		key, err = base64.RawStdEncoding.DecodeString(value)
 	}
 	if err != nil || len(key) != 32 {
-		return nil, errors.New("OVERTOK_AUTH_STATE_KEY must be base64 for exactly 32 bytes")
+		return nil, errors.New("TOKENHOLIC_AUTH_STATE_KEY must be base64 for exactly 32 bytes")
 	}
 	return key, nil
 }

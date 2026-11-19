@@ -13,7 +13,7 @@ func runAccountCommand(args []string, stdout, stderr io.Writer, deps dependencie
 		fmt.Fprintln(stderr, "account requires delete")
 		return 2
 	}
-	flags := flag.NewFlagSet("overtok account delete", flag.ContinueOnError)
+	flags := flag.NewFlagSet("tokenholic account delete", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	confirmation := flags.String("confirm", "", "type DELETE to confirm permanent hosted-data deletion")
 	if err := flags.Parse(args[1:]); err != nil {

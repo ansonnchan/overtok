@@ -20,7 +20,7 @@ test("rejects invalid release versions before filesystem changes", async () => {
 });
 
 test("prepares exact platform and umbrella packages", async (t) => {
-  const root = await mkdtemp(path.join(tmpdir(), "overtok-npm-test-"));
+  const root = await mkdtemp(path.join(tmpdir(), "tokenholic-npm-test-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const artifacts = path.join(root, "artifacts");
   const workspace = path.join(root, "workspace");
@@ -29,12 +29,12 @@ test("prepares exact platform and umbrella packages", async (t) => {
   for (const arch of ["arm64", "x64"]) {
     const input = path.join(root, `input-${arch}`);
     await mkdir(input);
-    await writeFile(path.join(input, "overtok"), `synthetic-${arch}`);
-    await chmod(path.join(input, "overtok"), 0o755);
+    await writeFile(path.join(input, "tokenholic"), `synthetic-${arch}`);
+    await chmod(path.join(input, "tokenholic"), 0o755);
     await writeFile(path.join(input, "ccusage.lock.json"), "synthetic-lock");
-    const name = `overtok_1.2.3_darwin_${arch}.tar.gz`;
+    const name = `tokenholic_1.2.3_darwin_${arch}.tar.gz`;
     const archive = path.join(artifacts, name);
-    const packed = spawnSync("tar", ["-czf", archive, "-C", input, "overtok", "ccusage.lock.json"], { shell: false });
+    const packed = spawnSync("tar", ["-czf", archive, "-C", input, "tokenholic", "ccusage.lock.json"], { shell: false });
     assert.equal(packed.status, 0);
     const hash = createHash("sha256").update(await readFile(archive)).digest("hex");
     sums.push(`${hash}  ${name}`);
@@ -44,24 +44,24 @@ test("prepares exact platform and umbrella packages", async (t) => {
   for (const packageName of ["darwin-arm64", "darwin-x64"]) {
     const directory = path.join(workspace, "packages", packageName);
     await mkdir(directory, { recursive: true });
-    await writeFile(path.join(directory, "package.json"), JSON.stringify({ name: `@overtok/${packageName}`, version: "development" }));
+    await writeFile(path.join(directory, "package.json"), JSON.stringify({ name: `@tokenholic/${packageName}`, version: "development" }));
   }
   const cliDirectory = path.join(workspace, "packages", "cli");
   await mkdir(cliDirectory, { recursive: true });
   await writeFile(path.join(cliDirectory, "package.json"), JSON.stringify({
-    name: "@overtok/cli",
+    name: "@tokenholic/cli",
     version: "development",
-    optionalDependencies: { "@overtok/darwin-x64": "workspace:*", "@overtok/darwin-arm64": "workspace:*" },
+    optionalDependencies: { "@tokenholic/darwin-x64": "workspace:*", "@tokenholic/darwin-arm64": "workspace:*" },
   }));
 
   await prepareNpmRelease("1.2.3", artifacts, workspace);
   const umbrella = JSON.parse(await readFile(path.join(cliDirectory, "package.json"), "utf8"));
   assert.equal(umbrella.version, "1.2.3");
   assert.deepEqual(umbrella.optionalDependencies, {
-    "@overtok/darwin-arm64": "1.2.3",
-    "@overtok/darwin-x64": "1.2.3",
+    "@tokenholic/darwin-arm64": "1.2.3",
+    "@tokenholic/darwin-x64": "1.2.3",
   });
-  const binary = path.join(workspace, "packages", "darwin-arm64", "bin", "overtok");
+  const binary = path.join(workspace, "packages", "darwin-arm64", "bin", "tokenholic");
   assert.equal(await readFile(binary, "utf8"), "synthetic-arm64");
   assert.notEqual((await stat(binary)).mode & 0o111, 0);
 });

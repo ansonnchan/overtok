@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/store"
+	"github.com/ansonnchan/tokenholic/internal/store"
 	"github.com/ncruces/go-sqlite3"
 )
 

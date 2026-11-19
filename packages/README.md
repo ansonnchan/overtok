@@ -1,6 +1,6 @@
 # npm distribution workspace
 
-`@overtok/cli` is a small CommonJS launcher that selects one optional native
+`@tokenholic/cli` is a small CommonJS launcher that selects one optional native
 package from the current operating system and CPU. It forwards arguments
 directly without invoking a shell. Unsupported platforms and incomplete native
 packages fail with an actionable message instead of falling back to a different

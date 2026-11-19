@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/application"
-	"github.com/ansonnchan/overtok/internal/multiplayer"
-	"github.com/ansonnchan/overtok/internal/normalize"
-	"github.com/ansonnchan/overtok/internal/store"
+	"github.com/ansonnchan/tokenholic/internal/application"
+	"github.com/ansonnchan/tokenholic/internal/multiplayer"
+	"github.com/ansonnchan/tokenholic/internal/normalize"
+	"github.com/ansonnchan/tokenholic/internal/store"
 )
 
 func TestOverviewPageLabelsPartialUnknownAndEstimates(t *testing.T) {
@@ -76,7 +76,7 @@ func TestSourcesAndSettingsRemainLocalAndExplicit(t *testing.T) {
 		t.Fatalf("sources page = %#v", sources)
 	}
 	settings := strings.Join(settingsPage(dashboard).Lines, "\n")
-	for _, want := range []string{"No account, server, group, or synchronization", "prompts, responses, source code", "r collect and refresh", "overtok doctor"} {
+	for _, want := range []string{"No account, server, group, or synchronization", "prompts, responses, source code", "r collect and refresh", "tokenholic doctor"} {
 		if !strings.Contains(settings, want) {
 			t.Fatalf("settings page = %q, want %q", settings, want)
 		}

@@ -6,9 +6,9 @@ import (
 	"io"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/account"
-	"github.com/ansonnchan/overtok/internal/autosync"
-	usageSync "github.com/ansonnchan/overtok/internal/sync"
+	"github.com/ansonnchan/tokenholic/internal/account"
+	"github.com/ansonnchan/tokenholic/internal/autosync"
+	usageSync "github.com/ansonnchan/tokenholic/internal/sync"
 )
 
 const credentialRefreshWindow = 7 * 24 * time.Hour

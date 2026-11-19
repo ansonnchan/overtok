@@ -25,7 +25,7 @@ func AcquireDefault() (*Lock, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolve autosync lock directory: %w", err)
 	}
-	return Acquire(filepath.Join(root, "Overtok", "sync.lock"))
+	return Acquire(filepath.Join(root, "Tokenholic", "sync.lock"))
 }
 
 // Acquire takes a non-blocking exclusive lock at an explicit path.

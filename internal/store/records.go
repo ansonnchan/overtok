@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/normalize"
+	"github.com/ansonnchan/tokenholic/internal/normalize"
 )
 
 // SourceIdentity is a privacy-safe identity for one discovered evidence root.

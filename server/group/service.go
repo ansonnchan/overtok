@@ -12,7 +12,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	serverauth "github.com/ansonnchan/overtok/server/auth"
+	serverauth "github.com/ansonnchan/tokenholic/server/auth"
 )
 
 const (
@@ -92,7 +92,7 @@ type NewInvite struct {
 	MaxUses   int
 }
 
-// Authenticator verifies an Overtok device credential.
+// Authenticator verifies a Tokenholic device credential.
 type Authenticator interface {
 	Authenticate(context.Context, string) (serverauth.Principal, error)
 }

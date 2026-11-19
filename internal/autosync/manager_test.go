@@ -14,7 +14,7 @@ import (
 
 func TestManagerInstallsInspectsAndRemovesLaunchAgent(t *testing.T) {
 	home := t.TempDir()
-	source := filepath.Join(t.TempDir(), "overtok")
+	source := filepath.Join(t.TempDir(), "tokenholic")
 	if err := os.WriteFile(source, []byte("synthetic executable"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func TestManagerInstallsInspectsAndRemovesLaunchAgent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{launchLabel, paths.binary, "<integer>3600</integer>", "OVERTOK_API_URL", "CODEX_HOME", "NO_COLOR"} {
+	for _, expected := range []string{launchLabel, paths.binary, "<integer>3600</integer>", "TOKENHOLIC_API_URL", "CODEX_HOME", "NO_COLOR"} {
 		if !strings.Contains(string(plist), expected) {
 			t.Fatalf("plist does not contain %q: %s", expected, plist)
 		}
@@ -85,7 +85,7 @@ func TestManagerInstallsInspectsAndRemovesLaunchAgent(t *testing.T) {
 }
 
 func TestManagerRequiresMacOSAndValidAPI(t *testing.T) {
-	executable := filepath.Join(t.TempDir(), "overtok")
+	executable := filepath.Join(t.TempDir(), "tokenholic")
 	if err := os.WriteFile(executable, []byte("fixture"), 0o755); err != nil {
 		t.Fatal(err)
 	}

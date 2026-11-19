@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/adapters"
-	"github.com/ansonnchan/overtok/internal/normalize"
+	"github.com/ansonnchan/tokenholic/internal/adapters"
+	"github.com/ansonnchan/tokenholic/internal/normalize"
 )
 
 func TestCollectIsDeterministicAndDeduplicatesSurfaces(t *testing.T) {

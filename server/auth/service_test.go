@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func TestServiceDeviceFlowRegistersOnlyOvertokCredential(t *testing.T) {
+func TestServiceDeviceFlowRegistersOnlyTokenholicCredential(t *testing.T) {
 	now := time.Date(2026, 11, 18, 12, 0, 0, 0, time.UTC)
 	github := &fakeGitHub{
 		authorization: DeviceAuthorization{

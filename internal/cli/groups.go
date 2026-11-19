@@ -67,7 +67,7 @@ func runGroupCommand(args []string, stdout, stderr io.Writer, deps dependencies)
 		fmt.Fprintf(stdout, "Joined private group %s.\n", group.Name)
 		return 0
 	case "invite":
-		flags := flag.NewFlagSet("overtok group invite", flag.ContinueOnError)
+		flags := flag.NewFlagSet("tokenholic group invite", flag.ContinueOnError)
 		flags.SetOutput(stderr)
 		lifetime := flags.Duration("expires", 24*time.Hour, "invite lifetime")
 		uses := flags.Int("uses", 10, "maximum invite uses")
@@ -99,9 +99,9 @@ func runGroupCommand(args []string, stdout, stderr io.Writer, deps dependencies)
 }
 
 func configuredGroupManager(stderr io.Writer, deps dependencies) (groupManager, bool) {
-	apiURL := strings.TrimSpace(deps.getenv("OVERTOK_API_URL"))
+	apiURL := strings.TrimSpace(deps.getenv("TOKENHOLIC_API_URL"))
 	if apiURL == "" {
-		fmt.Fprintln(stderr, "OVERTOK_API_URL is required for group commands")
+		fmt.Fprintln(stderr, "TOKENHOLIC_API_URL is required for group commands")
 		return nil, false
 	}
 	if deps.groups == nil {
@@ -110,7 +110,7 @@ func configuredGroupManager(stderr io.Writer, deps dependencies) (groupManager, 
 	}
 	manager, err := deps.groups(apiURL)
 	if err != nil {
-		fmt.Fprintln(stderr, "OVERTOK_API_URL is invalid")
+		fmt.Fprintln(stderr, "TOKENHOLIC_API_URL is invalid")
 		return nil, false
 	}
 	return manager, true

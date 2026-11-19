@@ -1,3 +1,3 @@
 // Package migrations embeds immutable PostgreSQL schema migrations for the
-// hosted Overtok API.
+// hosted Tokenholic API.
 package migrations

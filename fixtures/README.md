@@ -16,7 +16,7 @@ Only synthetic or explicitly approved sanitized source records belong here. Fixt
 | `codex-desktop` | Codex Desktop/shared records and full or midstream overlap |
 | `ccusage` | Pinned Claude and Codex daily JSON schemas |
 
-Model names, session IDs, dates, and token counts are synthetic test values. They are examples of record shape and semantics, not a list of models supported by Overtok.
+Model names, session IDs, dates, and token counts are synthetic test values. They are examples of record shape and semantics, not a list of models supported by Tokenholic.
 
 ## Privacy validation
 

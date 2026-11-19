@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/normalize"
-	"github.com/ansonnchan/overtok/internal/store"
+	"github.com/ansonnchan/tokenholic/internal/normalize"
+	"github.com/ansonnchan/tokenholic/internal/store"
 	"github.com/ncruces/go-sqlite3"
 )
 
@@ -66,9 +66,9 @@ func TestDatabaseFailureStatesAreActionable(t *testing.T) {
 		want   string
 		code   int
 	}{
-		{name: "locked", status: DatabaseStatus{Location: "custom application data", State: DatabaseLocked}, want: "close other Overtok processes", code: 2},
-		{name: "incompatible", status: DatabaseStatus{Location: "default application data", State: DatabaseIncompatible, SupportedVersion: 3}, want: "update Overtok", code: 2},
-		{name: "not initialized", status: DatabaseStatus{Location: "default application data", State: DatabaseNotInitialized}, want: "run `overtok`", code: 1},
+		{name: "locked", status: DatabaseStatus{Location: "custom application data", State: DatabaseLocked}, want: "close other Tokenholic processes", code: 2},
+		{name: "incompatible", status: DatabaseStatus{Location: "default application data", State: DatabaseIncompatible, SupportedVersion: 3}, want: "update Tokenholic", code: 2},
+		{name: "not initialized", status: DatabaseStatus{Location: "default application data", State: DatabaseNotInitialized}, want: "run `tokenholic`", code: 1},
 		{name: "stale", status: DatabaseStatus{Location: "default application data", State: DatabaseReady, IntegrityOK: true, LastSuccessfulCollection: &last, Stale: true}, want: "stale; run a local refresh", code: 1},
 		{name: "failed adapter", status: DatabaseStatus{Location: "default application data", State: DatabaseReady, IntegrityOK: true, LastSuccessfulCollection: &now, AdapterHealth: []store.StoredAdapterHealth{{Health: normalize.SourceHealth{Source: normalize.SourceCodex, Surface: normalize.SurfaceCLI, Status: normalize.HealthError}}}}, want: "Adapter codex/cli: error", code: 1},
 	}

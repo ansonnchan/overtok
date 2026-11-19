@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// ErrUnauthorized means an Overtok device credential is absent, invalid,
+// ErrUnauthorized means a Tokenholic device credential is absent, invalid,
 // expired, or revoked.
 var ErrUnauthorized = errors.New("device credential is unauthorized")
 
@@ -38,7 +38,7 @@ type GitHubPollResult struct {
 	RetryAfter  time.Duration
 }
 
-// GitHubUser is the minimal stable identity Overtok retains from GitHub.
+// GitHubUser is the minimal stable identity Tokenholic retains from GitHub.
 type GitHubUser struct {
 	ID    int64
 	Login string
@@ -53,13 +53,13 @@ type GitHub interface {
 }
 
 // CredentialProof is the parsed identity and one-way hash of a presented
-// Overtok device credential.
+// Tokenholic device credential.
 type CredentialProof struct {
 	CredentialID string
 	SecretHash   [32]byte
 }
 
-// NewCredential is a newly generated Overtok credential ready for persistence.
+// NewCredential is a newly generated Tokenholic credential ready for persistence.
 type NewCredential struct {
 	CredentialID string
 	SecretHash   [32]byte
@@ -81,7 +81,7 @@ type Identity struct {
 	Login    string
 }
 
-// Principal is an authenticated Overtok device.
+// Principal is an authenticated Tokenholic device.
 type Principal struct {
 	UserID       string
 	DeviceID     string

@@ -1,18 +1,18 @@
-# Overtok roadmap
+# Tokenholic roadmap
 
 Status: pre-deployment implementation complete; clean-machine release validation pending
 Last updated: November 18, 2026
 
 ## Product definition
 
-Overtok is a terminal-native, multiplayer leaderboard for coding-agent usage. It reads locally available usage records, normalizes model and token metadata, and synchronizes privacy-limited aggregates to private groups.
+Tokenholic is a terminal-native, multiplayer leaderboard for coding-agent usage. It reads locally available usage records, normalizes model and token metadata, and synchronizes privacy-limited aggregates to private groups.
 
 The product tracks coding-agent activity only. Ordinary Claude Desktop chat, claude.ai, general chat applications, prompts, responses, source code, file paths, and project names are outside the MVP.
 
 ### MVP user journey
 
 ```text
-npx @overtok/cli
+npx @tokenholic/cli
   -> detect local Claude Code and Codex usage
   -> show personal totals in a TUI
   -> authenticate with GitHub device flow
@@ -25,18 +25,18 @@ npx @overtok/cli
 ### MVP commands
 
 ```text
-overtok                         # Open the TUI
-overtok login                   # GitHub device authentication
-overtok logout
-overtok sync                    # Collect locally and upload pending aggregates
-overtok sync --dry-run          # Show what would be uploaded
-overtok group create <name>
-overtok group join <code>
-overtok group leave <name>
-overtok autosync enable         # Install an hourly OS scheduler
-overtok autosync disable
-overtok autosync status
-overtok doctor                  # Diagnose sources, auth, storage, and sync
+tokenholic                         # Open the TUI
+tokenholic login                   # GitHub device authentication
+tokenholic logout
+tokenholic sync                    # Collect locally and upload pending aggregates
+tokenholic sync --dry-run          # Show what would be uploaded
+tokenholic group create <name>
+tokenholic group join <code>
+tokenholic group leave <name>
+tokenholic autosync enable         # Install an hourly OS scheduler
+tokenholic autosync disable
+tokenholic autosync status
+tokenholic doctor                  # Diagnose sources, auth, storage, and sync
 ```
 
 ## Scope decisions
@@ -75,7 +75,7 @@ Models and sources are different extension points:
 - A **source adapter** knows where a coding client stores usage and how its records behave.
 - A **model resolver** maps the model identifier emitted by a source to a canonical model and pricing entry.
 
-A newly released model should continue to count tokens without an Overtok release when an existing source reports its identifier. Until pricing metadata is available, Overtok displays the observed model and token counts with cost marked as unavailable.
+A newly released model should continue to count tokens without a Tokenholic release when an existing source reports its identifier. Until pricing metadata is available, Tokenholic displays the observed model and token counts with cost marked as unavailable.
 
 A newly supported coding client requires a source adapter or a validated ccusage integration.
 
@@ -144,7 +144,7 @@ Leaderboard responses
 
 ### Distribution
 
-- `@overtok/cli` is the umbrella npm package and exposes the `overtok` executable.
+- `@tokenholic/cli` is the umbrella npm package and exposes the `tokenholic` executable.
 - Platform-specific packages contain native Go binaries for supported OS/CPU combinations.
 - A small launcher chooses the installed platform binary; users still run one command.
 - GitHub Actions or GoReleaser builds, checksums, signs, and publishes releases.
@@ -212,7 +212,7 @@ It must not include:
 - provider credentials;
 - raw session transcripts.
 
-`overtok sync --dry-run` must use the real serialization path and show exactly what would be uploaded.
+`tokenholic sync --dry-run` must use the real serialization path and show exactly what would be uploaded.
 
 ## Milestones and PR-sized workstreams
 
@@ -222,39 +222,39 @@ The identifiers below exist only for internal roadmap cross-references. Do not c
 
 Goal: prove that the required local evidence exists and freeze the internal contract before building cloud infrastructure.
 
-- [x] **OVT-001: Initialize the Go workspace and repository layout**
+- [x] **TKH-001: Initialize the Go workspace and repository layout**
   - Create CLI, internal packages, API placeholder, migrations, fixtures, and documentation directories.
   - Add formatting, linting, unit-test, and race-test commands.
   - Acceptance: a clean checkout builds and tests with one documented command.
 
-- [x] **OVT-002: Define normalized observation and capability contracts**
+- [x] **TKH-002: Define normalized observation and capability contracts**
   - Represent count semantics, model-resolution quality, nullable categories, adapter health, and warnings.
   - Acceptance: schema tests cover reported, inferred, unknown, cumulative, and incremental records.
-  - Depends on: OVT-001.
+  - Depends on: TKH-001.
 
-- [x] **OVT-003: Create sanitized compatibility fixtures**
+- [x] **TKH-003: Create sanitized compatibility fixtures**
   - Capture representative Claude Code CLI, Claude Desktop local-agent, Codex CLI, and Codex Desktop records.
   - Remove prompts, responses, paths, identities, repository metadata, and credentials.
   - Acceptance: fixtures preserve token/model/counter behavior without private content.
-  - Depends on: OVT-001.
+  - Depends on: TKH-001.
 
-- [x] **OVT-004: Spike pinned ccusage execution and JSON validation**
+- [x] **TKH-004: Spike pinned ccusage execution and JSON validation**
   - Resolve and execute a pinned ccusage binary.
   - Reject unsupported versions and malformed output safely.
   - Determine which required per-model and per-period fields are available.
   - Acceptance: Claude Code and Codex fixtures produce validated structured output in tests.
-  - Depends on: OVT-002, OVT-003.
+  - Depends on: TKH-002, TKH-003.
 
-- [x] **OVT-005: Discover Claude Desktop local coding sessions**
+- [x] **TKH-005: Discover Claude Desktop local coding sessions**
   - Implement macOS path discovery for local Code/Agent/Cowork sessions.
   - Determine whether ccusage can parse explicit discovered roots or a small Go adapter is required.
   - Acceptance: a desktop fixture is discovered, classified as a desktop surface, and parsed without reading ordinary chat data.
-  - Depends on: OVT-003, OVT-004.
+  - Depends on: TKH-003, TKH-004.
 
-- [x] **OVT-006: Verify cumulative and duplicate semantics**
+- [x] **TKH-006: Verify cumulative and duplicate semantics**
   - Test rescans, partially written JSONL, cumulative Codex counters, repeated Claude request rows, and desktop/CLI overlap.
   - Acceptance: rescanning unchanged fixtures never increases normalized totals.
-  - Depends on: OVT-004, OVT-005.
+  - Depends on: TKH-004, TKH-005.
 
 M0 exit criteria:
 
@@ -267,33 +267,33 @@ M0 exit criteria:
 
 Goal: deliver a useful local application before authentication or multiplayer work.
 
-- [x] **OVT-010: Implement local SQLite storage and migrations**
+- [x] **TKH-010: Implement local SQLite storage and migrations**
   - Add checkpoints, observations, buckets, outbox, and adapter-health tables.
   - Use transactions and WAL mode.
   - Acceptance: interruption and restart tests preserve committed observations and checkpoints.
   - Depends on: M0.
 
-- [x] **OVT-011: Implement source collection orchestration**
+- [x] **TKH-011: Implement source collection orchestration**
   - Detect sources, collect incrementally, normalize, persist, and report adapter warnings.
   - Acceptance: one scan combines CLI and desktop sources without duplicates.
-  - Depends on: OVT-010.
+  - Depends on: TKH-010.
 
-- [x] **OVT-012: Implement model resolution and pricing registry**
+- [x] **TKH-012: Implement model resolution and pricing registry**
   - Store observed, canonical, provider, pricing key, quality, source, and revision separately.
   - Unknown models retain tokens while cost remains unavailable.
   - Acceptance: reported, aliased, routed, and unknown fixtures display correctly.
-  - Depends on: OVT-002, OVT-010.
+  - Depends on: TKH-002, TKH-010.
 
-- [x] **OVT-013: Build the initial Bubble Tea TUI**
+- [x] **TKH-013: Build the initial Bubble Tea TUI**
   - Overview, sources/health, models, recent periods, and settings/help views.
   - Support narrow terminals and graceful no-color output.
   - Acceptance: a new user can identify detected sources, totals, model mix, and collection warnings without reading documentation.
-  - Depends on: OVT-011, OVT-012.
+  - Depends on: TKH-011, TKH-012.
 
-- [x] **OVT-014: Implement `overtok doctor`**
+- [x] **TKH-014: Implement `tokenholic doctor`**
   - Report platform, source paths without sensitive details, parser version, database health, and collection errors.
   - Acceptance: missing sources, permissions, unsupported formats, and corrupt local state have actionable diagnostics.
-  - Depends on: OVT-011.
+  - Depends on: TKH-011.
 
 M1 exit criteria:
 
@@ -306,25 +306,25 @@ M1 exit criteria:
 
 Goal: establish one account across multiple independently managed devices.
 
-- [x] **OVT-020: Define and migrate the server data model**
+- [x] **TKH-020: Define and migrate the server data model**
   - Users, GitHub identities, devices, device credentials, pricing revisions, and usage buckets.
   - Acceptance: database constraints enforce ownership and bucket idempotency.
 
-- [x] **OVT-021: Implement GitHub device-flow login**
+- [x] **TKH-021: Implement GitHub device-flow login**
   - Complete CLI-friendly authorization without accepting a GitHub password.
-  - Exchange GitHub identity for an Overtok account and device credential.
+  - Exchange GitHub identity for a Tokenholic account and device credential.
   - Acceptance: login, logout, credential refresh/failure, and device revocation are tested.
-  - Depends on: OVT-020.
+  - Depends on: TKH-020.
 
-- [x] **OVT-022: Implement local outbox and sync protocol**
+- [x] **TKH-022: Implement local outbox and sync protocol**
   - Build absolute versioned buckets, bounded batches, retry behavior, acknowledgements, and dry-run serialization.
   - Acceptance: retries, duplicate submissions, out-of-order revisions, and network interruption do not inflate totals.
-  - Depends on: OVT-010, OVT-020, OVT-021.
+  - Depends on: TKH-010, TKH-020, TKH-021.
 
-- [x] **OVT-023: Implement account-level multi-device aggregation**
+- [x] **TKH-023: Implement account-level multi-device aggregation**
   - Aggregate devices under one user while retaining device revocation and freshness.
   - Acceptance: two devices contribute to one account row; revoking one prevents future writes without deleting the other.
-  - Depends on: OVT-022.
+  - Depends on: TKH-022.
 
 M2 exit criteria:
 
@@ -336,25 +336,25 @@ M2 exit criteria:
 
 Goal: complete the social product loop.
 
-- [x] **OVT-030: Implement groups, memberships, roles, and invites**
+- [x] **TKH-030: Implement groups, memberships, roles, and invites**
   - Private groups only, owner/member roles, expiring invite codes, usage limits, and leave/revoke behavior.
   - Acceptance: authorization tests prevent non-members from reading or mutating a group.
 
-- [x] **OVT-031: Implement period and metric leaderboard queries**
+- [x] **TKH-031: Implement period and metric leaderboard queries**
   - Today, current week, last 30 days, and all-time in a group timezone.
   - Total tokens, output tokens, and API-equivalent cost.
   - Acceptance: query tests cover timezone boundaries, multiple devices, unknown prices, and ties.
-  - Depends on: OVT-023, OVT-030.
+  - Depends on: TKH-023, TKH-030.
 
-- [x] **OVT-032: Add group and leaderboard views to the TUI**
+- [x] **TKH-032: Add group and leaderboard views to the TUI**
   - Join/create/switch group, ranking, personal standing, source mix, most-used model, and freshness.
   - Acceptance: two users can join a group, sync independently, and see matching rankings.
-  - Depends on: OVT-031.
+  - Depends on: TKH-031.
 
-- [x] **OVT-033: Implement account and uploaded-data deletion**
+- [x] **TKH-033: Implement account and uploaded-data deletion**
   - Revoke devices, leave groups, erase synchronized usage, and delete the account.
   - Acceptance: deletion is authorization-checked, complete, and tested.
-  - Depends on: OVT-020, OVT-030.
+  - Depends on: TKH-020, TKH-030.
 
 M3 exit criteria:
 
@@ -364,25 +364,25 @@ M3 exit criteria:
 
 ### M4 — Packaging, autosync, and deployment
 
-Goal: make Overtok installable and reliable without developer assistance.
+Goal: make Tokenholic installable and reliable without developer assistance.
 
-- [x] **OVT-040: Build cross-platform release artifacts**
+- [x] **TKH-040: Build cross-platform release artifacts**
   - Produce checksummed macOS arm64/x64 binaries and pinned parser assets.
   - Acceptance: artifacts run on clean supported machines.
 
-- [x] **OVT-041: Publish the npm umbrella and platform packages**
-  - Expose one `overtok` executable through `npx @overtok/cli`.
+- [x] **TKH-041: Publish the npm umbrella and platform packages**
+  - Expose one `tokenholic` executable through `npx @tokenholic/cli`.
   - Fail with an actionable message on unsupported platforms.
   - Acceptance: a clean macOS machine reaches the TUI with the documented one-liner.
-  - Depends on: OVT-040.
+  - Depends on: TKH-040.
 
-- [x] **OVT-042: Implement macOS autosync**
+- [x] **TKH-042: Implement macOS autosync**
   - Install, inspect, and remove a user-level `launchd` schedule.
   - Use a stable executable path, a single-instance lock, and local logs without sensitive payloads.
   - Acceptance: hourly sync survives logout/restart, does not overlap manual sync, and is fully removable.
-  - Depends on: OVT-022, OVT-040.
+  - Depends on: TKH-022, TKH-040.
 
-- [ ] **OVT-043: Provision the beta environment with Terraform**
+- [ ] **TKH-043: Provision the beta environment with Terraform**
   - Deploy the Go API, PostgreSQL, TLS, secrets, backups, logs, budgets, and alerts.
   - Acceptance: the environment can be created from documented inputs and restored from a tested backup.
   - Depends on: M3.
@@ -397,19 +397,19 @@ M4 exit criteria:
 
 Goal: validate reliability with real installations rather than chase scale.
 
-- [ ] **OVT-050: Run a 5-user compatibility pilot**
+- [ ] **TKH-050: Run a 5-user compatibility pilot**
   - Capture installation, provider detection, sync, and retention failures.
   - Fix blockers before expanding the cohort.
 
-- [ ] **OVT-051: Expand to a 10–20 developer beta**
+- [ ] **TKH-051: Expand to a 10–20 developer beta**
   - Prefer sustained weekly use over one-time installs.
   - Collect only operational product metrics; do not collect prompts or source metadata.
-  - Depends on: OVT-050.
+  - Depends on: TKH-050.
 
-- [ ] **OVT-052: Publish compatibility and privacy documentation**
+- [ ] **TKH-052: Publish compatibility and privacy documentation**
   - Document supported client versions, coverage limitations, upload fields, deletion, and the self-reported-data caveat.
 
-- [ ] **OVT-053: Measure and harden the critical path**
+- [ ] **TKH-053: Measure and harden the critical path**
   - Track parser failures, sync success, duplicate rejections, API latency, and stale devices.
   - Add regression fixtures for every real compatibility bug.
 

@@ -14,11 +14,11 @@ import (
 	"strconv"
 	"strings"
 
-	usageSync "github.com/ansonnchan/overtok/internal/sync"
+	usageSync "github.com/ansonnchan/tokenholic/internal/sync"
 )
 
 const (
-	launchLabel = "io.overtok.autosync"
+	launchLabel = "io.tokenholic.autosync"
 	interval    = 60 * 60
 )
 
@@ -205,10 +205,10 @@ type managerPaths struct {
 }
 
 func (m *Manager) paths() managerPaths {
-	logs := filepath.Join(m.home, "Library", "Logs", "Overtok")
+	logs := filepath.Join(m.home, "Library", "Logs", "Tokenholic")
 	return managerPaths{
 		plist:  filepath.Join(m.home, "Library", "LaunchAgents", launchLabel+".plist"),
-		binary: filepath.Join(m.home, "Library", "Application Support", "Overtok", "bin", "overtok"),
+		binary: filepath.Join(m.home, "Library", "Application Support", "Tokenholic", "bin", "tokenholic"),
 		logs:   logs, stdout: filepath.Join(logs, "autosync.log"), stderr: filepath.Join(logs, "autosync-error.log"),
 	}
 }
@@ -219,7 +219,7 @@ func (m *Manager) domain() string {
 
 func (m *Manager) plist(paths managerPaths) []byte {
 	environment := "\t<key>EnvironmentVariables</key>\n\t<dict>\n" +
-		"\t\t<key>OVERTOK_API_URL</key>\n\t\t<string>" + escapeXML(m.apiURL) + "</string>\n"
+		"\t\t<key>TOKENHOLIC_API_URL</key>\n\t\t<string>" + escapeXML(m.apiURL) + "</string>\n"
 	if m.codexHome != "" {
 		environment += "\t\t<key>CODEX_HOME</key>\n\t\t<string>" + escapeXML(m.codexHome) + "</string>\n"
 	}
@@ -277,7 +277,7 @@ func copyExecutable(source, destination string) error {
 	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
 		return errors.New("current executable is not a regular executable file")
 	}
-	temporary, err := os.CreateTemp(filepath.Dir(destination), ".overtok-*")
+	temporary, err := os.CreateTemp(filepath.Dir(destination), ".tokenholic-*")
 	if err != nil {
 		return fmt.Errorf("create stable executable: %w", err)
 	}

@@ -5,7 +5,7 @@ Last updated: November 18, 2026
 
 ## System goals
 
-Overtok must:
+Tokenholic must:
 
 - collect supported coding-agent usage without intercepting model traffic;
 - preserve the difference between observed and inferred metadata;
@@ -21,7 +21,7 @@ The repository uses the following current and planned boundaries:
 
 ```text
 cmd/
-  overtok/                 Native CLI entry point
+  tokenholic/                 Native CLI entry point
 internal/
   account/                 Native login and OS credential-vault storage
   adapters/                Source-specific discovery and parsing
@@ -36,7 +36,7 @@ internal/
   tui/                     Bubble Tea application shell and local views
 server/
   account/                 Authorized multi-device account aggregation
-  auth/                    GitHub device flow and Overtok device credentials
+  auth/                    GitHub device flow and Tokenholic device credentials
   cmd/api/                 Hosted HTTP API entry point
   httpapi/                 Bounded JSON routing and protocol errors
   postgres/                Hosted connection and migration boundary
@@ -92,7 +92,7 @@ Dashboard loads query Today, This week, 30 days, and All time using the local
 timezone, then attach the privacy-safe database diagnostic snapshot. The TUI
 receives no source paths, record identities, observation rows, or raw provider
 content. Startup and refresh failures are reduced to stable messages and refer
-users to `overtok doctor` for path-redacted detail.
+users to `tokenholic doctor` for path-redacted detail.
 
 ### Source adapters
 
@@ -110,7 +110,7 @@ Adapters emit observations; they do not calculate leaderboard ranks or perform u
 
 The implemented adapters parse supported Claude and Codex JSONL natively. They recover from malformed complete records, defer actively written final lines, preserve nullable categories, and emit stable local identities.
 
-The optional ccusage integration invokes version 20.0.51 with pinned offline daily JSON commands. Overtok rejects any other version, unknown or duplicate fields, invalid counter relationships, and inconsistent totals before normalization. It never downloads the binary at runtime.
+The optional ccusage integration invokes version 20.0.51 with pinned offline daily JSON commands. Tokenholic rejects any other version, unknown or duplicate fields, invalid counter relationships, and inconsistent totals before normalization. It never downloads the binary at runtime.
 
 Claude Desktop discovery is limited to Code sessions and local Agent/Cowork evidence. Ordinary Claude Desktop chat storage is never scanned. Default Codex storage is classified as shared local evidence when CLI and Desktop attribution cannot be proven.
 
@@ -228,7 +228,7 @@ local SQLite usage remains on each machine.
 
 ```text
 GitHub device authorization
-    -> Overtok user
+    -> Tokenholic user
     -> revocable device credential
 
 Signed-in client
@@ -253,19 +253,19 @@ the local TUI remains fully usable and the Groups area explains how to opt in.
 
 The leaderboard identity is the user account. Devices only collect and upload.
 
-- One GitHub identity maps to one Overtok user.
+- One GitHub identity maps to one Tokenholic user.
 - One user can register multiple devices.
 - Each device has a separate revocable credential.
 - Memberships and invites reference users, not devices.
 - Revoking a device prevents future writes without deleting other device data.
 
-The CLI begins authorization through the Overtok API and displays GitHub's
+The CLI begins authorization through the Tokenholic API and displays GitHub's
 verification URL and user code. Short-lived GitHub device state is encrypted
 and authenticated inside an opaque flow token. After approval, the API uses the
 GitHub access token only in memory to read the stable numeric ID and login, then
 discards it. Neither PostgreSQL nor the native client stores that token.
 
-Overtok device credentials contain a public credential ID and 256-bit random
+Tokenholic device credentials contain a public credential ID and 256-bit random
 secret. PostgreSQL stores only the SHA-256 secret hash. Rotation revokes the old
 credential atomically, logout revokes the entire device, and other devices on
 the same account remain independent. The native client stores its session in
@@ -331,14 +331,14 @@ Polling on TUI entry and explicit refresh is sufficient. Add infrastructure only
 The core application is a native Go binary. pnpm manages npm package metadata and publishing:
 
 ```text
-@overtok/cli
+@tokenholic/cli
     -> small platform selector
-    -> @overtok/darwin-arm64
-       @overtok/darwin-x64
+    -> @tokenholic/darwin-arm64
+       @tokenholic/darwin-x64
        future Linux/Windows packages
 ```
 
-The user still runs `npx @overtok/cli`. Release automation cross-compiles the
+The user still runs `npx @tokenholic/cli`. Release automation cross-compiles the
 Go binary without CGO, verifies its Mach-O architecture and embedded version,
 normalizes archive metadata, and publishes checksummed native artifacts. Each
 native archive includes the pinned ccusage contract but never downloads or

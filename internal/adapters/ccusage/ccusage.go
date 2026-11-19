@@ -17,13 +17,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/normalize"
+	"github.com/ansonnchan/tokenholic/internal/normalize"
 )
 
 const (
 	// PinnedVersion is the only accepted external executable version.
 	PinnedVersion = "20.0.51"
-	// SchemaID versions Overtok's expectations for the pinned JSON shape.
+	// SchemaID versions Tokenholic's expectations for the pinned JSON shape.
 	SchemaID = "daily-agent-contract-v1"
 	// AdapterVersion identifies conversion from the external schema to observations.
 	AdapterVersion = "1"
@@ -114,7 +114,7 @@ func ValidateVersion(data []byte) error {
 }
 
 // ValidateLock checks that a release parser manifest exactly matches the
-// executable version, schema, and offline commands compiled into Overtok.
+// executable version, schema, and offline commands compiled into Tokenholic.
 func ValidateLock(data []byte) error {
 	var lock struct {
 		Tool     string              `json:"tool"`
@@ -550,7 +550,7 @@ func (r codexReport) observations(surface normalize.Surface) ([]normalize.Observ
 				ReasoningOutput: cloneUint(model.ReasoningOutputTokens),
 			}
 			// ccusage has already associated snapshots with this map key outside
-			// Overtok's native record context, so preserve it as inferred.
+			// Tokenholic's native record context, so preserve it as inferred.
 			warnings := append([]normalize.Warning{{Code: "model_inferred"}}, pricingWarnings(model.MissingPricing)...)
 			observation := baseObservation(normalize.SourceCodex, surface, day.Date, occurredAt, name, normalize.ModelInferred, tokens, warnings)
 			if err := observation.Validate(); err != nil {

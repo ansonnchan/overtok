@@ -1,4 +1,4 @@
-module github.com/ansonnchan/overtok
+module github.com/ansonnchan/tokenholic
 
 go 1.25.0
 

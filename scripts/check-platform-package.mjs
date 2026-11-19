@@ -11,12 +11,12 @@ const manifest = JSON.parse(await readFile(path.join(directory, "package.json"),
 if (
   manifest.os?.length !== 1 || manifest.os[0] !== expectedOS ||
   manifest.cpu?.length !== 1 || manifest.cpu[0] !== expectedCPU ||
-  !manifest.files?.includes("bin/overtok") || !manifest.files?.includes("ccusage.lock.json")
+  !manifest.files?.includes("bin/tokenholic") || !manifest.files?.includes("ccusage.lock.json")
 ) {
   throw new Error(`platform package metadata does not match ${expectedOS}/${expectedCPU}`);
 }
 
-const binary = path.join(directory, "bin", "overtok");
+const binary = path.join(directory, "bin", "tokenholic");
 try {
   await access(binary, constants.X_OK);
 } catch (error) {

@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/collect"
-	"github.com/ansonnchan/overtok/internal/normalize"
-	"github.com/ansonnchan/overtok/internal/store"
+	"github.com/ansonnchan/tokenholic/internal/collect"
+	"github.com/ansonnchan/tokenholic/internal/normalize"
+	"github.com/ansonnchan/tokenholic/internal/store"
 )
 
 type fakeStorage struct {

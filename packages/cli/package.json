@@ -1,29 +1,29 @@
 {
-  "name": "@overtok/cli",
+  "name": "@tokenholic/cli",
   "version": "0.0.0-development",
-  "description": "Native Overtok coding-agent usage tracker launcher",
+  "description": "Native Tokenholic coding-agent usage tracker launcher",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ansonnchan/overtok.git"
+    "url": "git+https://github.com/ansonnchan/tokenholic.git"
   },
   "bin": {
-    "overtok": "bin/overtok.js"
+    "tokenholic": "bin/tokenholic.js"
   },
   "files": [
-    "bin/overtok.js"
+    "bin/tokenholic.js"
   ],
   "engines": {
     "node": ">=20"
   },
   "optionalDependencies": {
-    "@overtok/darwin-arm64": "workspace:*",
-    "@overtok/darwin-x64": "workspace:*"
+    "@tokenholic/darwin-arm64": "workspace:*",
+    "@tokenholic/darwin-x64": "workspace:*"
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "check": "node --check bin/overtok.js",
+    "check": "node --check bin/tokenholic.js",
     "test": "node --test"
   }
 }

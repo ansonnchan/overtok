@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	serverauth "github.com/ansonnchan/overtok/server/auth"
-	servergroup "github.com/ansonnchan/overtok/server/group"
+	serverauth "github.com/ansonnchan/tokenholic/server/auth"
+	servergroup "github.com/ansonnchan/tokenholic/server/group"
 )
 
 func TestPostgresPrivateGroupAuthorizationAndInviteLifecycle(t *testing.T) {

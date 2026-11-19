@@ -5,7 +5,7 @@ import (
 	"errors"
 	"os/exec"
 
-	"github.com/ansonnchan/overtok/internal/adapters/ccusage"
+	"github.com/ansonnchan/tokenholic/internal/adapters/ccusage"
 )
 
 // CCUsageProbe checks whether the pinned optional parser can execute locally.

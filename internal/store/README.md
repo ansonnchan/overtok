@@ -6,14 +6,14 @@ privacy-safe fields only.
 
 ## SQLite driver
 
-Overtok pins `github.com/ncruces/go-sqlite3` v0.32.0. The project is actively
+Tokenholic pins `github.com/ncruces/go-sqlite3` v0.32.0. The project is actively
 maintained, supports `database/sql`, tests macOS on both supported
 architectures, and does not require CGO because it runs SQLite through wazero.
-Version 0.32.0 is the newest release compatible with Overtok's Go 1.24 minimum;
+Version 0.32.0 is the newest release compatible with Tokenholic's Go 1.24 minimum;
 newer driver releases require a newer Go language version. Re-evaluate both
 pins together rather than upgrading the driver implicitly.
 
-The application database lives at `Overtok/overtok.db` under the operating
+The application database lives at `Tokenholic/tokenholic.db` under the operating
 system's user configuration directory. Callers may supply another absolute
 path for tests or explicit configuration. Source paths are never stored in the
 database location or migration history.
@@ -30,9 +30,9 @@ Migration versions are contiguous and immutable. Their names and SHA-256
 checksums are recorded in `schema_migrations`. All pending migrations run in
 one immediate transaction, so a failed upgrade cannot leave a checkpoint ahead
 of its schema. A newer, reordered, renamed, or edited applied migration is an
-incompatible database rather than something Overtok repairs silently.
+incompatible database rather than something Tokenholic repairs silently.
 
-`Diagnostics` reads a privacy-safe operational snapshot for `overtok doctor`:
+`Diagnostics` reads a privacy-safe operational snapshot for `tokenholic doctor`:
 integrity and schema compatibility, checkpoint and pending-outbox counts, the
 last successful collection time, and adapter health. It never exposes database
 rows, source identifiers, or filesystem paths.

@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ansonnchan/overtok/internal/adapters"
-	"github.com/ansonnchan/overtok/internal/modelcatalog"
-	"github.com/ansonnchan/overtok/internal/normalize"
-	"github.com/ansonnchan/overtok/internal/store"
+	"github.com/ansonnchan/tokenholic/internal/adapters"
+	"github.com/ansonnchan/tokenholic/internal/modelcatalog"
+	"github.com/ansonnchan/tokenholic/internal/normalize"
+	"github.com/ansonnchan/tokenholic/internal/store"
 )
 
 func TestOrchestratorRepeatedAndReversedScansAreIdentical(t *testing.T) {
@@ -227,7 +227,7 @@ func reverseFindings(findings []adapters.Finding) []adapters.Finding {
 
 func openCollectionStore(t *testing.T) *store.DB {
 	t.Helper()
-	db, err := store.Open(t.Context(), filepath.Join(t.TempDir(), "overtok.db"))
+	db, err := store.Open(t.Context(), filepath.Join(t.TempDir(), "tokenholic.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

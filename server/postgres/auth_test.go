@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	serverauth "github.com/ansonnchan/overtok/server/auth"
+	serverauth "github.com/ansonnchan/tokenholic/server/auth"
 )
 
 func TestPostgresAuthenticationLifecycle(t *testing.T) {

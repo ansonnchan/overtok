@@ -4,11 +4,11 @@ const assert = require("node:assert/strict");
 const path = require("node:path");
 const test = require("node:test");
 
-const { resolveExecutable, run, targetPackage } = require("./overtok.js");
+const { resolveExecutable, run, targetPackage } = require("./tokenholic.js");
 
 test("selects each supported platform package", () => {
-  assert.equal(targetPackage("darwin", "arm64"), "@overtok/darwin-arm64");
-  assert.equal(targetPackage("darwin", "x64"), "@overtok/darwin-x64");
+  assert.equal(targetPackage("darwin", "arm64"), "@tokenholic/darwin-arm64");
+  assert.equal(targetPackage("darwin", "x64"), "@tokenholic/darwin-x64");
   assert.throws(() => targetPackage("linux", "x64"), /does not support linux\/x64/);
 });
 
@@ -16,7 +16,7 @@ test("resolves the binary beside the platform manifest", () => {
   const executable = resolveExecutable("darwin", "arm64", () =>
     path.join(__dirname, "fixture", "package.json"),
   );
-  assert.equal(executable, path.join(__dirname, "fixture", "bin", "overtok"));
+  assert.equal(executable, path.join(__dirname, "fixture", "bin", "tokenholic"));
 });
 
 test("forwards arguments without a shell", () => {
