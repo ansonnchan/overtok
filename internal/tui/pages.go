@@ -32,6 +32,9 @@ func buildPage(section Section, dashboard application.Dashboard) Page {
 }
 
 func overviewPage(dashboard application.Dashboard) Page {
+	if noSupportedSources(dashboard) {
+		return noSupportedSourcesPage()
+	}
 	if summaryEmpty(dashboard.AllTime) && len(dashboard.Diagnostics.AdapterHealth) == 0 {
 		return Page{}
 	}
@@ -96,6 +99,9 @@ func sourcesPage(dashboard application.Dashboard) Page {
 }
 
 func modelsPage(dashboard application.Dashboard) Page {
+	if noSupportedSources(dashboard) {
+		return noSupportedSourcesPage()
+	}
 	models := append([]store.ModelBreakdown(nil), dashboard.AllTime.Models...)
 	if len(models) == 0 {
 		return Page{}
@@ -121,6 +127,29 @@ func modelsPage(dashboard application.Dashboard) Page {
 		}
 	}
 	return page
+}
+
+func noSupportedSources(dashboard application.Dashboard) bool {
+	if !summaryEmpty(dashboard.AllTime) || len(dashboard.Diagnostics.AdapterHealth) == 0 {
+		return false
+	}
+	for _, record := range dashboard.Diagnostics.AdapterHealth {
+		if record.Health.Status != normalize.HealthNotFound {
+			return false
+		}
+	}
+	return true
+}
+
+func noSupportedSourcesPage() Page {
+	return Page{
+		EmptyMessage: "No supported coding-agent usage found.",
+		Lines: []string{
+			"Supported now: Claude Code/Desktop coding sessions and Codex CLI/Desktop.",
+			"Install or use a supported coding agent, then press r to scan again.",
+			"Run `tokenholic doctor` to check source detection.",
+		},
+	}
 }
 
 func settingsPage(dashboard application.Dashboard) Page {

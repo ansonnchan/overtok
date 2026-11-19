@@ -137,6 +137,12 @@ Claude Desktop source changed; run `tokenholic doctor`
 
 Do not turn missing coverage into a zero-value chart.
 
+After a completed scan finds no supported coding-agent data, Overview and
+Models use an empty state rather than a warning. The message names the current
+supported agents, asks the user to install or use one before refreshing, and
+points to `tokenholic doctor` for path-redacted source detection. A fresh local
+database still asks for the first manual refresh because no scan has run yet.
+
 ## Interaction
 
 Initial keyboard conventions:

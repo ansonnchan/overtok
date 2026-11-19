@@ -104,6 +104,23 @@ func TestReportMakesPermissionIssueActionable(t *testing.T) {
 	}
 }
 
+func TestReportExplainsWhenNoSupportedSourceIsAvailable(t *testing.T) {
+	t.Parallel()
+	report := Report{GOOS: "darwin", GOARCH: "arm64", Findings: []adapters.Finding{
+		{Kind: adapters.RootClaudeCLI, Status: normalize.HealthNotFound},
+		{Kind: adapters.RootCodexShared, Status: normalize.HealthNotFound},
+	}}
+	output := report.Render()
+	for _, want := range []string{"no supported coding-agent usage found", "install or use a supported coding agent", "missing optional sources are not errors"} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("report = %q, want %q", output, want)
+		}
+	}
+	if report.ExitCode() != 0 {
+		t.Fatalf("ExitCode() = %d, want 0", report.ExitCode())
+	}
+}
+
 func TestCCUsageProbeValidatesPinnedVersion(t *testing.T) {
 	t.Parallel()
 
