@@ -5,6 +5,7 @@ This guide covers the current native Go workspace. The pnpm workspace is reserve
 ## Prerequisites
 
 - Go 1.25 or newer.
+- Node.js 20 or newer plus the repository-pinned pnpm through Corepack, only for npm distribution work.
 - macOS to exercise the implemented default discovery roots.
 - Git for the repository hygiene check.
 - Docker or another PostgreSQL 18 installation only for hosted schema tests.
@@ -19,6 +20,8 @@ make test        # standard Go tests
 make test-race   # race-enabled Go tests
 make build       # build every Go package
 make release VERSION=1.2.3 # reproducible macOS arm64/x64 archives
+pnpm check                 # npm metadata and launcher validation
+pnpm test                  # npm preparation and launcher tests
 ```
 
 Run the hosted schema integration test against an isolated PostgreSQL database:

@@ -28,3 +28,31 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes
+
+  npm:
+    needs: artifacts
+    runs-on: macos-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: overtok-${{ github.ref_name }}
+          path: dist/
+      - name: Prepare and test npm packages
+        run: |
+          node scripts/prepare-npm-release.mjs "${GITHUB_REF_NAME#v}" dist .
+          pnpm check
+          pnpm test
+      - name: Publish native packages before the umbrella
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: node scripts/publish-npm-release.mjs .

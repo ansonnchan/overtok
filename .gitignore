@@ -1,3 +1,6 @@
 /bin/
 /dist/
+node_modules/
+/packages/darwin-*/bin/
+/packages/darwin-*/ccusage.lock.json
 coverage.out

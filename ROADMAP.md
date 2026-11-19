@@ -1,6 +1,6 @@
 # Overtok roadmap
 
-Status: native release artifacts implemented; npm distribution next
+Status: npm distribution implemented; macOS autosync next
 Last updated: November 18, 2026
 
 ## Product definition
@@ -370,7 +370,7 @@ Goal: make Overtok installable and reliable without developer assistance.
   - Produce checksummed macOS arm64/x64 binaries and pinned parser assets.
   - Acceptance: artifacts run on clean supported machines.
 
-- [ ] **OVT-041: Publish the npm umbrella and platform packages**
+- [x] **OVT-041: Publish the npm umbrella and platform packages**
   - Expose one `overtok` executable through `npx @overtok/cli`.
   - Fail with an actionable message on unsupported platforms.
   - Acceptance: a clean macOS machine reaches the TUI with the documented one-liner.
