@@ -198,13 +198,16 @@ func (e Envelope) Validate() error {
 	return nil
 }
 
-// CanonicalEnvelope returns the deterministic bytes hashed by the server for
-// equal-revision conflict detection.
+// CanonicalEnvelope returns deterministic client-evidence bytes for server
+// conflict detection. Server-derived pricing is excluded from the identity.
 func CanonicalEnvelope(envelope Envelope) ([]byte, [32]byte, error) {
 	if err := envelope.Validate(); err != nil {
 		return nil, [32]byte{}, err
 	}
-	encoded, err := json.Marshal(envelope)
+	canonical := envelope
+	canonical.Bucket.APIEstimate = Value{State: "unavailable"}
+	canonical.Bucket.PricingRevision = nil
+	encoded, err := json.Marshal(canonical)
 	if err != nil {
 		return nil, [32]byte{}, err
 	}

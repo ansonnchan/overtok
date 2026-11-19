@@ -6,9 +6,13 @@ import (
 	"time"
 )
 
-// ErrUnauthorized means a Tokenholic device credential is absent, invalid,
-// expired, or revoked.
-var ErrUnauthorized = errors.New("device credential is unauthorized")
+var (
+	// ErrInvalidInput means an authentication request contains invalid client data.
+	ErrInvalidInput = errors.New("authentication input is invalid")
+	// ErrUnauthorized means a Tokenholic device credential is absent, invalid,
+	// expired, or revoked.
+	ErrUnauthorized = errors.New("device credential is unauthorized")
+)
 
 // FlowStatus is the current GitHub device authorization state.
 type FlowStatus string

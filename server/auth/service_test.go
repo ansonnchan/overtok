@@ -100,6 +100,32 @@ func TestServiceRejectsTamperedExpiredAndDeniedFlows(t *testing.T) {
 	}
 }
 
+func TestServiceValidatesAndNormalizesClientVersion(t *testing.T) {
+	now := time.Date(2026, 11, 18, 12, 0, 0, 0, time.UTC)
+	github := &fakeGitHub{authorization: DeviceAuthorization{
+		DeviceCode: "code", UserCode: "CODE", VerificationURI: "https://github.com/login/device",
+		ExpiresAt: now.Add(time.Minute), Interval: time.Second,
+	}}
+	service, err := NewService(github, &fakeRepository{}, []byte("01234567890123456789012345678901"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.now = func() time.Time { return now }
+	for _, version := range []string{"", " \t", "invalid\nversion", strings.Repeat("v", 65)} {
+		if _, err := service.Start(t.Context(), version); !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("Start(%q) error = %v", version, err)
+		}
+	}
+	started, err := service.Start(t.Context(), "  test-version  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	claims, err := service.states.open(started.FlowToken, now)
+	if err != nil || claims.ClientVersion != "test-version" {
+		t.Fatalf("client version claims = %#v, %v", claims, err)
+	}
+}
+
 func TestServiceRefreshFailureAndRevocation(t *testing.T) {
 	repository := &fakeRepository{principal: Principal{
 		UserID:   "00000000-0000-4000-8000-000000000001",

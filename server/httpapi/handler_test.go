@@ -18,6 +18,7 @@ import (
 	serverauth "github.com/ansonnchan/tokenholic/server/auth"
 	servergroup "github.com/ansonnchan/tokenholic/server/group"
 	serverleaderboard "github.com/ansonnchan/tokenholic/server/leaderboard"
+	serversync "github.com/ansonnchan/tokenholic/server/sync"
 )
 
 func TestAuthenticationRoutesAndStableErrors(t *testing.T) {
@@ -98,6 +99,27 @@ func TestSyncRouteAuthenticatesAndReturnsExactAcknowledgement(t *testing.T) {
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusOK || syncService.credential != "device-credential" || !strings.Contains(response.Body.String(), batch.Buckets[0].BucketKey) {
 		t.Fatalf("sync response/service = %d %q/%#v", response.Code, response.Body.String(), syncService)
+	}
+}
+
+func TestSyncRouteRejectsServerValidationFailures(t *testing.T) {
+	handler, err := New(
+		&fakeAuthService{}, &fakeUsageSyncService{err: serversync.ErrInvalidBatch},
+		&fakeAccountUsageService{}, &fakeGroupService{}, &fakeLeaderboardService{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := json.Marshal(validSyncBatch())
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/v1/sync/buckets", bytes.NewReader(body))
+	request.Header.Set("Authorization", "Bearer device-credential")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "invalid_batch") {
+		t.Fatalf("response = %d %q", response.Code, response.Body.String())
 	}
 }
 
@@ -270,6 +292,7 @@ func (f *fakeAuthService) Logout(context.Context, string) error { return f.logou
 
 type fakeUsageSyncService struct {
 	credential string
+	err        error
 }
 
 type fakeAccountUsageService struct {
@@ -332,6 +355,9 @@ func (f *fakeAccountUsageService) Delete(_ context.Context, credential string) e
 
 func (f *fakeUsageSyncService) Apply(_ context.Context, credential string, batch protocol.Batch) (protocol.BatchResponse, error) {
 	f.credential = credential
+	if f.err != nil {
+		return protocol.BatchResponse{}, f.err
+	}
 	acknowledgements := make([]protocol.Acknowledgement, 0, len(batch.Buckets))
 	for _, bucket := range batch.Buckets {
 		acknowledgements = append(acknowledgements, protocol.Acknowledgement{

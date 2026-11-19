@@ -64,6 +64,37 @@ func TestBuildBatchRejectsIdentityAndAvailabilityContradictions(t *testing.T) {
 	}
 }
 
+func TestCanonicalEnvelopeExcludesServerDerivedPricing(t *testing.T) {
+	envelope := sampleEnvelope(1, 1)
+	_, originalHash, err := CanonicalEnvelope(envelope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	changedPricing := envelope
+	otherCost := uint64(999)
+	otherRevision := "trusted-r2"
+	changedPricing.Bucket.APIEstimate = Value{Value: &otherCost, State: "partial"}
+	changedPricing.Bucket.PricingRevision = &otherRevision
+	_, pricingHash, err := CanonicalEnvelope(changedPricing)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if originalHash != pricingHash {
+		t.Fatal("server-derived pricing changed client-evidence identity")
+	}
+
+	changedUsage := envelope
+	otherOutput := uint64(8)
+	changedUsage.Bucket.Tokens.Output.Value = &otherOutput
+	_, usageHash, err := CanonicalEnvelope(changedUsage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if originalHash == usageHash {
+		t.Fatal("usage change did not change client-evidence identity")
+	}
+}
+
 func sampleEnvelope(minute int, revision uint64) Envelope {
 	zero, input, output, cost := uint64(0), uint64(3), uint64(7), uint64(11)
 	canonical, provider, pricingKey, pricingRevision := "synthetic-model", "synthetic", "synthetic/model", "synthetic-r1"

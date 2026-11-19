@@ -53,6 +53,10 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	models, err := modelcatalog.NewResolver(modelcatalog.DefaultCatalog())
+	if err != nil {
+		return err
+	}
 	if err := postgres.EnsurePricingRevision(ctx, pool, pricing); err != nil {
 		return err
 	}
@@ -72,7 +76,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	synchronization, err := serversync.NewService(authentication, usageRepository)
+	synchronization, err := serversync.NewService(authentication, usageRepository, models, pricing)
 	if err != nil {
 		return err
 	}

@@ -306,6 +306,8 @@ func (h *Handler) syncBuckets(response http.ResponseWriter, request *http.Reques
 	switch {
 	case errors.Is(err, serverauth.ErrUnauthorized):
 		writeError(response, http.StatusUnauthorized, "unauthorized")
+	case errors.Is(err, serversync.ErrInvalidBatch):
+		writeError(response, http.StatusBadRequest, "invalid_batch")
 	case errors.Is(err, serversync.ErrRevisionConflict):
 		writeError(response, http.StatusConflict, "revision_conflict")
 	case err != nil:
@@ -336,7 +338,10 @@ func (h *Handler) startDevice(response http.ResponseWriter, request *http.Reques
 		return
 	}
 	started, err := h.auth.Start(request.Context(), input.ClientVersion)
-	if err != nil {
+	if errors.Is(err, serverauth.ErrInvalidInput) {
+		writeError(response, http.StatusBadRequest, "invalid_request")
+		return
+	} else if err != nil {
 		writeError(response, http.StatusBadGateway, "authorization_unavailable")
 		return
 	}

@@ -46,8 +46,10 @@ and are never stored or returned to the native client.
 The upload route accepts at most 100 buckets and one MiB of JSON. Equal
 revisions are no-ops only when their canonical payload hashes match; stale
 revisions cannot replace newer state, and a different equal-revision payload
-rolls back the whole batch. The API registers the bundled pricing snapshot and
-does not trust clients to define pricing catalogs.
+rolls back the whole batch. Token counts remain self-reported local evidence.
+The API validates model metadata against its bundled catalog and derives the
+API-equivalent estimate and pricing revision itself; it never stores the
+client-provided calculation as authoritative.
 
 Run the disposable-schema integration suite with `make test-postgres` and an
 `TOKENHOLIC_TEST_DATABASE_URL`. Do not target production. Do not add distributed
