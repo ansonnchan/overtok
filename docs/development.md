@@ -68,6 +68,9 @@ OVERTOK_API_URL='http://127.0.0.1:8080' go run ./cmd/overtok logout
 OVERTOK_API_URL='http://127.0.0.1:8080' go run ./cmd/overtok sync --dry-run
 OVERTOK_API_URL='http://127.0.0.1:8080' go run ./cmd/overtok sync
 OVERTOK_API_URL='http://127.0.0.1:8080' go run ./cmd/overtok account delete --confirm DELETE
+OVERTOK_API_URL='http://127.0.0.1:8080' go run ./cmd/overtok autosync enable
+go run ./cmd/overtok autosync status
+go run ./cmd/overtok autosync disable
 ```
 
 Plain HTTP is accepted only for loopback development. Non-loopback API origins
@@ -82,6 +85,12 @@ exact request body per line without contacting the API or changing outbox state.
 Account deletion is permanent for hosted data and removes the local device
 session only after the server confirms deletion. It does not erase local SQLite
 usage or provider evidence.
+
+Autosync is a macOS-only, opt-in user launch agent. Enabling it copies the
+current native executable to stable private application support, so use a built
+release binary rather than `go run` for a lasting schedule. Re-enable it after
+an upgrade to refresh that copy. Disabling removes the schedule, copy, and logs
+without deleting local usage or credentials.
 
 An authenticated client can inspect the account-level aggregation endpoint:
 

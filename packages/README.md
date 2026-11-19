@@ -6,6 +6,10 @@ directly without invoking a shell. Unsupported platforms and incomplete native
 packages fail with an actionable message instead of falling back to a different
 binary.
 
+When a user explicitly enables autosync, the native application copies itself
+out of the package-runner cache before installing the launch agent. npm package
+installation never enables background work automatically.
+
 The native package directories intentionally do not contain committed
 binaries. During a tagged release, `scripts/prepare-npm-release.mjs` verifies
 the GitHub artifact checksums, extracts the matching release archives, copies

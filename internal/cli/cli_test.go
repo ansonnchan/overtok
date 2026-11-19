@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ansonnchan/overtok/internal/adapters"
+	"github.com/ansonnchan/overtok/internal/autosync"
 	"github.com/ansonnchan/overtok/internal/doctor"
 	"github.com/ansonnchan/overtok/internal/multiplayer"
 	"github.com/ansonnchan/overtok/internal/normalize"
@@ -247,6 +248,86 @@ func TestSyncCommandParsesDryRunAndRedactsFailure(t *testing.T) {
 	if code := run([]string{"sync"}, &stdout, &stderr, deps); code != 1 || strings.Contains(stderr.String(), "private/path") || strings.Contains(stderr.String(), "credential") {
 		t.Fatalf("failed sync = %d/%q/%q", code, stdout.String(), stderr.String())
 	}
+	deps.sync = func(context.Context, string, string, string, bool, io.Writer) error {
+		return autosync.ErrAlreadyRunning
+	}
+	stderr.Reset()
+	if code := run([]string{"sync"}, &stdout, &stderr, deps); code != 1 || !strings.Contains(stderr.String(), "already running") {
+		t.Fatalf("overlapping sync = %d/%q", code, stderr.String())
+	}
+}
+
+func TestAutosyncCommandsUseExplicitManagerBoundary(t *testing.T) {
+	manager := &fakeAutosyncManager{status: autosync.Status{Installed: true, Loaded: true}}
+	managerCalls := 0
+	deps := dependencies{
+		homeDir:    func() (string, error) { return "/synthetic/home", nil },
+		executable: func() (string, error) { return "/synthetic/bin/overtok", nil },
+		getenv: func(name string) string {
+			switch name {
+			case "OVERTOK_API_URL":
+				return "https://api.example.test"
+			case "CODEX_HOME":
+				return "/synthetic/codex"
+			default:
+				return ""
+			}
+		},
+		autosync: func(home, executable, apiURL, codexHome string) (autosyncManager, error) {
+			managerCalls++
+			if home != "/synthetic/home" || executable != "/synthetic/bin/overtok" {
+				t.Fatalf("autosync inputs = %q/%q/%q/%q", home, executable, apiURL, codexHome)
+			}
+			if managerCalls == 1 && (apiURL != "https://api.example.test" || codexHome != "/synthetic/codex") {
+				t.Fatalf("enable autosync inputs = %q/%q", apiURL, codexHome)
+			}
+			if managerCalls > 1 && (apiURL != "" || codexHome != "") {
+				t.Fatalf("non-enable autosync inputs = %q/%q", apiURL, codexHome)
+			}
+			return manager, nil
+		},
+	}
+	for _, test := range []struct {
+		command string
+		want    string
+	}{
+		{command: "enable", want: "Enabled autosync"},
+		{command: "status", want: "installed and loaded"},
+		{command: "disable", want: "Local usage was not changed"},
+	} {
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		if code := run([]string{"autosync", test.command}, &stdout, &stderr, deps); code != 0 || !strings.Contains(stdout.String(), test.want) || stderr.Len() != 0 {
+			t.Fatalf("autosync %s = %d/%q/%q", test.command, code, stdout.String(), stderr.String())
+		}
+	}
+	if !manager.enabled || !manager.disabled {
+		t.Fatalf("autosync manager = %#v", manager)
+	}
+}
+
+func TestAutosyncEnableRequiresAPIAndRedactsFailure(t *testing.T) {
+	base := dependencies{
+		homeDir:    func() (string, error) { return "/synthetic/home", nil },
+		executable: func() (string, error) { return "/synthetic/bin/overtok", nil },
+		getenv:     func(string) string { return "" },
+		autosync: func(string, string, string, string) (autosyncManager, error) {
+			return &fakeAutosyncManager{}, nil
+		},
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if code := run([]string{"autosync", "enable"}, &stdout, &stderr, base); code != 1 || !strings.Contains(stderr.String(), "OVERTOK_API_URL") {
+		t.Fatalf("missing API = %d/%q", code, stderr.String())
+	}
+	base.getenv = func(string) string { return "https://api.example.test" }
+	base.autosync = func(string, string, string, string) (autosyncManager, error) {
+		return &fakeAutosyncManager{err: errors.New("private credential /private/path")}, nil
+	}
+	stderr.Reset()
+	if code := run([]string{"autosync", "enable"}, &stdout, &stderr, base); code != 1 || strings.Contains(stderr.String(), "private") || strings.Contains(stderr.String(), "credential") {
+		t.Fatalf("failed enable = %d/%q", code, stderr.String())
+	}
 }
 
 func TestGroupCommandsUseConfiguredMultiplayerBoundary(t *testing.T) {
@@ -360,6 +441,27 @@ type fakeGroupManager struct {
 	inviteUses int
 	left       string
 	err        error
+}
+
+type fakeAutosyncManager struct {
+	status   autosync.Status
+	err      error
+	enabled  bool
+	disabled bool
+}
+
+func (f *fakeAutosyncManager) Enable(context.Context) error {
+	f.enabled = true
+	return f.err
+}
+
+func (f *fakeAutosyncManager) Disable(context.Context) error {
+	f.disabled = true
+	return f.err
+}
+
+func (f *fakeAutosyncManager) Status(context.Context) (autosync.Status, error) {
+	return f.status, f.err
 }
 
 func (f *fakeGroupManager) List(context.Context) ([]multiplayer.Group, error) {
