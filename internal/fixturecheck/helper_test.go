@@ -54,8 +54,7 @@ var prohibitedPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`eyJ[a-zA-Z0-9_-]{8,}\.[a-zA-Z0-9_-]{8,}\.[a-zA-Z0-9_-]{8,}`),
 }
 
-// CheckDir validates every file under root before tests may consume fixtures.
-func CheckDir(root string) error {
+func checkDir(root string) error {
 	return filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr

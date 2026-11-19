@@ -24,9 +24,13 @@ The Codex parser follows `turn_context` records to attribute later token snapsho
 
 Both parsers recover after malformed complete lines and defer an unterminated final line as a partial write. They keep missing token categories nil rather than inventing zeroes.
 
-## ccusage integration
+## ccusage compatibility contract
 
-The `ccusage` package is a separate external-contract adapter. It executes only the version and offline daily JSON commands recorded in `ccusage.lock.json`; it never downloads a binary or requests pricing. See [ccusage/README.md](./ccusage/README.md) for schema and failure semantics.
+The `ccusage` package validates the release manifest and supports the optional
+version probe shown by `tokenholic doctor`. Native collection does not execute
+ccusage. Synthetic fixtures preserve the reviewed external JSON contract for a
+future adapter without shipping an unwired collection path. See
+[ccusage/README.md](./ccusage/README.md).
 
 ## Adding a source format
 

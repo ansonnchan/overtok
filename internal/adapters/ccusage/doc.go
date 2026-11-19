@@ -1,4 +1,3 @@
-// Package ccusage validates a pinned external ccusage JSON contract and converts
-// daily model aggregates into normalized observations. It never installs or
-// updates the external binary.
+// Package ccusage validates the external parser manifest used by releases and
+// the optional compatibility probe used by diagnostics.
 package ccusage

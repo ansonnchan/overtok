@@ -24,8 +24,7 @@ const (
 
 var errNotLoaded = errors.New("autosync launch agent is not loaded")
 
-// Launcher runs launchctl without exposing its output to user-facing logs.
-type Launcher interface {
+type launcher interface {
 	Run(context.Context, ...string) error
 }
 
@@ -35,9 +34,9 @@ type Config struct {
 	Executable string
 	APIURL     string
 	CodexHome  string
-	Platform   string
-	UID        int
-	Launcher   Launcher
+	platform   string
+	uid        int
+	launcher   launcher
 }
 
 // Status reports whether the persistent configuration exists and whether
@@ -52,7 +51,7 @@ type Manager struct {
 	home, executable, apiURL, codexHome string
 	platform                            string
 	uid                                 int
-	launcher                            Launcher
+	launcher                            launcher
 }
 
 // NewManager validates paths and constructs the macOS autosync boundary.
@@ -63,15 +62,15 @@ func NewManager(config Config) (*Manager, error) {
 	if config.CodexHome != "" && !filepath.IsAbs(config.CodexHome) {
 		return nil, errors.New("autosync Codex home must be absolute")
 	}
-	platform := config.Platform
+	platform := config.platform
 	if platform == "" {
 		platform = runtime.GOOS
 	}
-	uid := config.UID
+	uid := config.uid
 	if uid == 0 {
 		uid = os.Getuid()
 	}
-	launcher := config.Launcher
+	launcher := config.launcher
 	if launcher == nil {
 		launcher = commandLauncher{}
 	}
