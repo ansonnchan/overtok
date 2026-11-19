@@ -16,6 +16,7 @@ This directory owns decisions that cross package boundaries. Package-specific im
 - [Internal package map](../internal/README.md)
 - [Source adapters](../internal/adapters/README.md)
 - [Pinned ccusage contract](../internal/adapters/ccusage/README.md)
+- [macOS autosync](../internal/autosync/README.md)
 - [Normalized usage contract](../internal/normalize/README.md)
 - [Collection semantics](../internal/collect/README.md)
 - [Model catalog and pricing](../internal/modelcatalog/README.md)

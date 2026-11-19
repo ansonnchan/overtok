@@ -7,12 +7,22 @@ import (
 	"time"
 
 	"github.com/ansonnchan/overtok/internal/account"
+	"github.com/ansonnchan/overtok/internal/autosync"
 	usageSync "github.com/ansonnchan/overtok/internal/sync"
 )
 
 const credentialRefreshWindow = 7 * 24 * time.Hour
 
 func synchronizeLocal(ctx context.Context, home, codexHome, apiURL string, dryRun bool, output io.Writer) (err error) {
+	lock, err := autosync.AcquireDefault()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := lock.Close(); err == nil && closeErr != nil {
+			err = closeErr
+		}
+	}()
 	database, application, err := openLocalApplication(ctx, home, codexHome)
 	if err != nil {
 		return err

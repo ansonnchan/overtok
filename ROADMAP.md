@@ -1,6 +1,6 @@
 # Overtok roadmap
 
-Status: npm distribution implemented; macOS autosync next
+Status: pre-deployment implementation complete; clean-machine release validation pending
 Last updated: November 18, 2026
 
 ## Product definition
@@ -376,7 +376,7 @@ Goal: make Overtok installable and reliable without developer assistance.
   - Acceptance: a clean macOS machine reaches the TUI with the documented one-liner.
   - Depends on: OVT-040.
 
-- [ ] **OVT-042: Implement macOS autosync**
+- [x] **OVT-042: Implement macOS autosync**
   - Install, inspect, and remove a user-level `launchd` schedule.
   - Use a stable executable path, a single-instance lock, and local logs without sensitive payloads.
   - Acceptance: hourly sync survives logout/restart, does not overlap manual sync, and is fully removable.

@@ -349,7 +349,13 @@ The launcher resolves only the package matching the current operating system
 and CPU, then executes its binary directly without a shell. Unsupported targets
 and missing optional packages fail explicitly.
 
-Autosync points to a stable installed binary, not an ephemeral package-runner cache.
+Autosync copies the current native executable to a stable private
+application-support path only after explicit user consent. A per-user launch
+agent runs it at login and hourly, stores no credentials, and writes only the
+sync command's privacy-safe summary or stable failure message to private local
+logs. Manual and scheduled synchronization share a non-blocking advisory lock,
+so they cannot overlap. Disabling autosync unloads the agent and removes its
+binary, plist, and logs without touching SQLite usage or the OS-vault session.
 
 ## Security and privacy invariants
 

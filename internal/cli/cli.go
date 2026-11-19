@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/ansonnchan/overtok/internal/account"
 	"github.com/ansonnchan/overtok/internal/adapters"
+	"github.com/ansonnchan/overtok/internal/autosync"
 	"github.com/ansonnchan/overtok/internal/doctor"
 	"github.com/ansonnchan/overtok/internal/multiplayer"
 	"github.com/ansonnchan/overtok/internal/store"
@@ -26,15 +28,17 @@ func Run(args []string, stdout, stderr io.Writer) int {
 }
 
 type dependencies struct {
-	homeDir  func() (string, error)
-	getenv   func(string) string
-	diagnose func(context.Context, string, string) doctor.Report
-	input    io.Reader
-	launch   func(context.Context, string, string, string, io.Reader, io.Writer, bool) error
-	timeout  time.Duration
-	account  func(string) (accountManager, error)
-	groups   func(string) (groupManager, error)
-	sync     func(context.Context, string, string, string, bool, io.Writer) error
+	homeDir    func() (string, error)
+	getenv     func(string) string
+	diagnose   func(context.Context, string, string) doctor.Report
+	input      io.Reader
+	launch     func(context.Context, string, string, string, io.Reader, io.Writer, bool) error
+	timeout    time.Duration
+	account    func(string) (accountManager, error)
+	groups     func(string) (groupManager, error)
+	sync       func(context.Context, string, string, string, bool, io.Writer) error
+	executable func() (string, error)
+	autosync   func(string, string, string, string) (autosyncManager, error)
 }
 
 type accountManager interface {
@@ -51,13 +55,20 @@ type groupManager interface {
 	Leave(context.Context, string) error
 }
 
+type autosyncManager interface {
+	Enable(context.Context) error
+	Disable(context.Context) error
+	Status(context.Context) (autosync.Status, error)
+}
+
 func defaultDependencies() dependencies {
 	return dependencies{
-		homeDir: os.UserHomeDir,
-		getenv:  os.Getenv,
-		input:   os.Stdin,
-		launch:  launchLocalTUI,
-		timeout: 5 * time.Second,
+		homeDir:    os.UserHomeDir,
+		getenv:     os.Getenv,
+		input:      os.Stdin,
+		executable: os.Executable,
+		launch:     launchLocalTUI,
+		timeout:    5 * time.Second,
 		account: func(apiURL string) (accountManager, error) {
 			client, err := account.NewClient(apiURL, nil)
 			if err != nil {
@@ -73,6 +84,11 @@ func defaultDependencies() dependencies {
 			return multiplayer.NewService(client, account.NewKeyringStore(apiURL), localTimezone())
 		},
 		sync: synchronizeLocal,
+		autosync: func(home, executable, apiURL, codexHome string) (autosyncManager, error) {
+			return autosync.NewManager(autosync.Config{
+				Home: home, Executable: executable, APIURL: apiURL, CodexHome: codexHome,
+			})
+		},
 		diagnose: func(ctx context.Context, home, codexHome string) doctor.Report {
 			discovery := adapters.Discoverer{Roots: adapters.DefaultMacRoots(home, codexHome)}
 			path, err := store.DefaultPath()
@@ -95,6 +111,9 @@ func run(args []string, stdout, stderr io.Writer, deps dependencies) int {
 	}
 	if len(args) > 0 && args[0] == "account" {
 		return runAccountCommand(args[1:], stdout, stderr, deps)
+	}
+	if len(args) > 0 && args[0] == "autosync" {
+		return runAutosyncCommand(args[1:], stdout, stderr, deps)
 	}
 	flags := flag.NewFlagSet("overtok", flag.ContinueOnError)
 	flags.SetOutput(stderr)
@@ -157,6 +176,10 @@ func runSyncCommand(args []string, stdout, stderr io.Writer, deps dependencies) 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	if err := deps.sync(ctx, home, codexHome, apiURL, *dryRun, stdout); err != nil {
+		if errors.Is(err, autosync.ErrAlreadyRunning) {
+			fmt.Fprintln(stderr, "synchronization is already running")
+			return 1
+		}
 		fmt.Fprintln(stderr, "could not synchronize usage; local pending data was preserved")
 		return 1
 	}

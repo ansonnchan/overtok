@@ -26,6 +26,7 @@ multiplayer owns authenticated group and leaderboard HTTP calls
 | `normalize` | Provider-neutral records, capability vocabulary, and validation | Filesystem discovery or provider parsing |
 | `collect` | Application scan orchestration, deduplication, cumulative reduction, and summaries | SQL implementation or uploads |
 | `application` | Committed dashboard queries and manual refresh sequencing | Source parsing, SQL, or terminal rendering |
+| `autosync` | Opt-in macOS launch agent lifecycle and cross-command synchronization lock | Collection, uploads, credentials, or deployment |
 | `doctor` | Redacted source, parser, and storage diagnostics | Usage collection or repair |
 | `fixturecheck` | Privacy validation for committed fixtures | Runtime validation of user data |
 | `modelcatalog` | Versioned canonical model and API-equivalent pricing resolution | Source parsing |

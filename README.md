@@ -34,6 +34,7 @@ The native Go command currently provides:
 - a keyboard-first Overview, Sources, Models, Settings, and private Groups TUI with manual collection;
 - GitHub device-flow `login` and revoking `logout` commands backed by the OS credential vault;
 - bounded `sync` and exact-payload `sync --dry-run` commands with durable acknowledgements;
+- opt-in hourly macOS autosync with a stable binary, overlap lock, private logs, status, and complete removal;
 - one authenticated account usage row across active devices with independent revocation and freshness;
 - private groups with owner/member roles, expiring limited-use invites, and membership-authorized reads;
 - timezone-aware group leaderboards for total tokens, output, and API estimates with explicit coverage and freshness;
@@ -66,6 +67,9 @@ OVERTOK_API_URL=https://api.example.test overtok login
 OVERTOK_API_URL=https://api.example.test overtok logout
 OVERTOK_API_URL=https://api.example.test overtok sync --dry-run
 OVERTOK_API_URL=https://api.example.test overtok sync
+OVERTOK_API_URL=https://api.example.test overtok autosync enable
+overtok autosync status
+overtok autosync disable
 OVERTOK_API_URL=https://api.example.test overtok group list
 OVERTOK_API_URL=https://api.example.test overtok group create "Quiet team"
 OVERTOK_API_URL=https://api.example.test overtok group invite --expires 24h --uses 10 "Quiet team"
