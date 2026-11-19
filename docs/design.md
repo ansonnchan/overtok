@@ -1,6 +1,6 @@
 # TUI design direction
 
-Status: local native application shell and views implemented
+Status: local and private-group application views implemented
 Last updated: November 18, 2026
 
 ## Intent
@@ -43,18 +43,19 @@ Color is never the only carrier of meaning. Pair status colors with text, symbol
 
 ## Information architecture
 
-The local native MVP has four TUI areas:
+The native MVP has five TUI areas:
 
 1. **Overview** — personal totals, recent periods, and collection freshness.
 2. **Sources** — local adapter coverage, source health, and availability.
 3. **Models** — model usage, token categories, and attribution quality.
 4. **Settings** — keyboard help, local settings, privacy, and diagnostics.
+5. **Groups** — authenticated private-group selection and leaderboards.
 
 Authentication and synchronization are available through the explicit
-`login`, `logout`, `sync`, and `sync --dry-run` CLI commands. Groups,
-multiplayer leaderboards, and sync controls remain deferred in the TUI until
-their presentation boundary is implemented. The hosted account summary is an
-application/API boundary and does not make the TUI own multi-device queries.
+`login`, `logout`, `sync`, and `sync --dry-run` CLI commands. The Groups area
+appears alongside local mode and uses the native multiplayer client boundary;
+it does not own credentials, HTTP, or multi-device queries. With no API origin
+configured, the first four views remain fully functional.
 
 ## Responsive layout
 
@@ -64,13 +65,13 @@ At 88 columns or more:
 
 ```text
 Overtok · local usage
-[1 Overview]    2 Sources    3 Models    4 Settings
+[1 Overview]    2 Sources    3 Models    4 Settings    5 Groups
 
 Overview
 [ready] Local data loaded
 Today ...
 
-1–4 views · tab navigate · r refresh · ? help · q quit
+1–5 views · tab navigate · r refresh · ? help · q quit
 ```
 
 Whitespace and short rows provide hierarchy without surrounding the screen in
@@ -90,10 +91,7 @@ From 48 through 87 columns:
 The minimum supported width is 48 columns. Below it, the application presents
 a resize instruction while preserving help and quit controls.
 
-## Future leaderboard behavior
-
-The following guidance applies only after authentication and multiplayer work
-is explicitly started; it is not part of the local native MVP.
+## Group leaderboard behavior
 
 Each row should prioritize:
 
@@ -144,12 +142,18 @@ Initial keyboard conventions:
 
 | Key | Action |
 | --- | --- |
-| `1`–`4` | Switch main area |
+| `1`–`5` | Switch main area |
 | `tab` / `shift+tab` | Move between controls |
 | `j` / `k`, arrows | Move selection |
 | `r` | Refresh current view |
 | `?` | Help |
 | `q` | Quit |
+
+Inside Groups, `j`/`k` switches private groups, `p` changes period, `m`
+changes metric, `c` creates a group, and `i` joins with an invite. Invite input
+is masked. Group creation uses the device's resolved IANA timezone. Owners use
+the explicit CLI invite command so a returned plaintext code is shown once in
+a conventional terminal output stream rather than retained in TUI state.
 
 Avoid modal dialogs when a focused inline confirmation is sufficient. Destructive actions require explicit confirmation.
 

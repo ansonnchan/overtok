@@ -1,6 +1,6 @@
 # Overtok roadmap
 
-Status: leaderboard queries implemented; multiplayer TUI next
+Status: multiplayer TUI implemented; account deletion next
 Last updated: November 18, 2026
 
 ## Product definition
@@ -346,7 +346,7 @@ Goal: complete the social product loop.
   - Acceptance: query tests cover timezone boundaries, multiple devices, unknown prices, and ties.
   - Depends on: OVT-023, OVT-030.
 
-- [ ] **OVT-032: Add group and leaderboard views to the TUI**
+- [x] **OVT-032: Add group and leaderboard views to the TUI**
   - Join/create/switch group, ranking, personal standing, source mix, most-used model, and freshness.
   - Acceptance: two users can join a group, sync independently, and see matching rankings.
   - Depends on: OVT-031.
