@@ -1,6 +1,6 @@
 # Overtok roadmap
 
-Status: accounts, devices, and synchronization milestone complete; private groups next
+Status: private groups implemented; leaderboard queries next
 Last updated: November 18, 2026
 
 ## Product definition
@@ -336,7 +336,7 @@ M2 exit criteria:
 
 Goal: complete the social product loop.
 
-- [ ] **OVT-030: Implement groups, memberships, roles, and invites**
+- [x] **OVT-030: Implement groups, memberships, roles, and invites**
   - Private groups only, owner/member roles, expiring invite codes, usage limits, and leave/revoke behavior.
   - Acceptance: authorization tests prevent non-members from reading or mutating a group.
 

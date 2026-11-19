@@ -11,15 +11,22 @@ func TestAllReturnsContiguousImmutablePrivacySafeMigrations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(migrations) != 1 || migrations[0].Version != 1 || migrations[0].Name != "initialize_server" || len(migrations[0].Checksum) != 64 {
+	if len(migrations) != 2 || migrations[0].Version != 1 || migrations[0].Name != "initialize_server" || migrations[1].Version != 2 || migrations[1].Name != "private_groups" {
 		t.Fatalf("All() = %#v", migrations)
+	}
+	for _, migration := range migrations {
+		if len(migration.Checksum) != 64 {
+			t.Fatalf("migration %d checksum = %q", migration.Version, migration.Checksum)
+		}
 	}
 	for _, prohibited := range []string{
 		"prompt_text", "response_text", "source_code", "file_path", "project_name",
 		"repository_name", "branch_name", "command_text", "provider_credential",
 	} {
-		if strings.Contains(strings.ToLower(migrations[0].SQL), prohibited) {
-			t.Fatalf("migration contains prohibited field %q", prohibited)
+		for _, migration := range migrations {
+			if strings.Contains(strings.ToLower(migration.SQL), prohibited) {
+				t.Fatalf("migration %d contains prohibited field %q", migration.Version, prohibited)
+			}
 		}
 	}
 	migrations[0].SQL = "mutated"

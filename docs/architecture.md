@@ -1,6 +1,6 @@
 # Architecture
 
-Status: accounts, devices, and synchronization implemented; private groups planned
+Status: private groups implemented; leaderboard queries next
 Last updated: November 18, 2026
 
 ## System goals
@@ -262,7 +262,12 @@ the operating-system credential vault with no plaintext-file fallback.
 
 ### Groups
 
-The MVP supports private groups with owner and member roles. Invite codes are expiring, usage-limited authorization artifacts, not permanent credentials.
+The MVP supports private groups with owner and member roles. Invite codes are
+expiring, usage-limited authorization artifacts, not permanent credentials.
+Only invite hashes are persisted. Group reads, invitation creation, joining,
+leaving, and member revocation authorize active membership inside the same
+repository boundary that performs the operation. Non-members receive the same
+not-found result whether a group exists or not.
 
 Leaderboard authorization checks membership on every request. A member of one group cannot enumerate another group or its users.
 

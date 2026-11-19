@@ -13,6 +13,5 @@ lock. Validate changes with `make test-postgres` and a disposable database URL.
 Schema comments should explain privacy, ownership, and unusual invariants
 instead of duplicating column names.
 
-Do not add authentication, synchronization, group, or deployment state before
-its roadmap stage. Server migrations must never introduce columns for raw local
-records or prohibited source material.
+Do not add deployment state before its roadmap stage. Server migrations must
+never introduce columns for raw local records or prohibited source material.

@@ -15,6 +15,7 @@ import (
 	"github.com/ansonnchan/overtok/internal/modelcatalog"
 	serveraccount "github.com/ansonnchan/overtok/server/account"
 	serverauth "github.com/ansonnchan/overtok/server/auth"
+	servergroup "github.com/ansonnchan/overtok/server/group"
 	"github.com/ansonnchan/overtok/server/httpapi"
 	"github.com/ansonnchan/overtok/server/postgres"
 	serversync "github.com/ansonnchan/overtok/server/sync"
@@ -82,7 +83,15 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	handler, err := httpapi.New(authentication, synchronization, accountUsage)
+	groupRepository, err := postgres.NewGroupRepository(pool)
+	if err != nil {
+		return err
+	}
+	groups, err := servergroup.NewService(authentication, groupRepository)
+	if err != nil {
+		return err
+	}
+	handler, err := httpapi.New(authentication, synchronization, accountUsage, groups)
 	if err != nil {
 		return err
 	}
