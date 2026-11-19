@@ -10,8 +10,8 @@ The hosted PostgreSQL data model, HTTP API, GitHub device login, idempotent
 absolute-bucket synchronization, and account-level multi-device aggregation
 complete the accounts/devices milestone. Private groups and authenticated
 multiplayer leaderboards are implemented in the API and TUI. Local mode still
-works without a server; account and uploaded-data deletion is the remaining
-social-loop milestone.
+works without a server. The final social-loop operation permanently deletes
+hosted account data without touching local usage.
 
 ## Privacy boundary
 
@@ -36,7 +36,8 @@ The native Go command currently provides:
 - bounded `sync` and exact-payload `sync --dry-run` commands with durable acknowledgements;
 - one authenticated account usage row across active devices with independent revocation and freshness;
 - private groups with owner/member roles, expiring limited-use invites, and membership-authorized reads;
-- timezone-aware group leaderboards for total tokens, output, and API estimates with explicit coverage and freshness; and
+- timezone-aware group leaderboards for total tokens, output, and API estimates with explicit coverage and freshness;
+- explicit authorization-checked deletion of the hosted account and uploaded aggregates; and
 - privacy-safe source and storage diagnostics through `overtok doctor`.
 
 Model names are not allowlisted. A previously unseen, non-empty observed identifier can retain its token counts while canonical resolution and pricing remain unavailable. Reported, resolved, inferred, and unknown attribution are separate states.
@@ -62,6 +63,7 @@ OVERTOK_API_URL=https://api.example.test overtok group create "Quiet team"
 OVERTOK_API_URL=https://api.example.test overtok group invite --expires 24h --uses 10 "Quiet team"
 OVERTOK_API_URL=https://api.example.test overtok group join "$OVERTOK_INVITE_CODE"
 OVERTOK_API_URL=https://api.example.test overtok group leave "Quiet team"
+OVERTOK_API_URL=https://api.example.test overtok account delete --confirm DELETE
 ```
 
 Login requests public GitHub identity only. The CLI never receives a GitHub
@@ -110,7 +112,7 @@ contents, or expose persisted observations.
 | `internal/normalize` | Provider-neutral observations, capabilities, and invariants |
 | `internal/collect` | Parsing orchestration, deduplication, cumulative reduction, and summaries |
 | `internal/application` | Local refresh sequencing and committed dashboard queries |
-| `internal/account` | Device login, rotation, revocation, and OS credential-vault storage |
+| `internal/account` | Device login, rotation, revocation, account deletion, and OS credential-vault storage |
 | `internal/doctor` | Privacy-safe source and storage diagnostic reporting |
 | `internal/fixturecheck` | Automated fixture privacy validation |
 | `internal/modelcatalog` | Versioned model aliases and API-equivalent pricing resolution |
@@ -119,7 +121,7 @@ contents, or expose persisted observations.
 | `internal/sync` | Privacy-allowlisted protocol, bounded batching, retry, and dry-run serialization |
 | `fixtures` | Synthetic compatibility and regression data |
 | `server/postgres` | Hosted PostgreSQL connection and migration boundary |
-| `server/account`, `server/auth`, `server/sync`, and `server/httpapi` | Account aggregation, device authorization, idempotent upload, and bounded JSON API |
+| `server/account`, `server/auth`, `server/sync`, and `server/httpapi` | Account aggregation/deletion, device authorization, idempotent upload, and bounded JSON API |
 | `migrations` | Immutable, embedded hosted PostgreSQL schema history |
 | `docs` | Cross-cutting architecture and design decisions |
 

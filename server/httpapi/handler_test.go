@@ -124,6 +124,30 @@ func TestAccountUsageRouteRequiresCredential(t *testing.T) {
 	}
 }
 
+func TestAccountDeletionRequiresExactConfirmation(t *testing.T) {
+	accountService := &fakeAccountUsageService{}
+	handler, err := New(&fakeAuthService{}, &fakeUsageSyncService{}, accountService, &fakeGroupService{}, &fakeLeaderboardService{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, body := range []string{"", `{}`, `{"confirmation":"delete"}`} {
+		request := httptest.NewRequest(http.MethodDelete, "/v1/account", strings.NewReader(body))
+		request.Header.Set("Authorization", "Bearer device")
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusBadRequest || accountService.deleted {
+			t.Fatalf("unconfirmed deletion = %d %q/%v", response.Code, response.Body.String(), accountService.deleted)
+		}
+	}
+	request := httptest.NewRequest(http.MethodDelete, "/v1/account", strings.NewReader(`{"confirmation":"DELETE"}`))
+	request.Header.Set("Authorization", "Bearer device")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusNoContent || !accountService.deleted || accountService.credential != "device" {
+		t.Fatalf("confirmed deletion = %d %q/%#v", response.Code, response.Body.String(), accountService)
+	}
+}
+
 func TestGroupRoutesPreserveAuthorizationAndStableErrors(t *testing.T) {
 	groupID := "10000000-0000-4000-8000-000000000001"
 	userID := "10000000-0000-4000-8000-000000000002"
@@ -251,6 +275,8 @@ type fakeUsageSyncService struct {
 type fakeAccountUsageService struct {
 	credential string
 	usage      serveraccount.Usage
+	deleted    bool
+	deleteErr  error
 }
 
 type fakeGroupService struct {
@@ -296,6 +322,12 @@ func (f *fakeGroupService) Revoke(context.Context, string, string, string) error
 func (f *fakeAccountUsageService) Usage(_ context.Context, credential string) (serveraccount.Usage, error) {
 	f.credential = credential
 	return f.usage, nil
+}
+
+func (f *fakeAccountUsageService) Delete(_ context.Context, credential string) error {
+	f.credential = credential
+	f.deleted = true
+	return f.deleteErr
 }
 
 func (f *fakeUsageSyncService) Apply(_ context.Context, credential string, batch protocol.Batch) (protocol.BatchResponse, error) {

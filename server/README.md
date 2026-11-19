@@ -11,7 +11,9 @@ revisions transactionally.
 PostgreSQL query runs in a repeatable-read snapshot, preserves unavailable and
 partial coverage, and reports device freshness and revocation without local
 machine identity. Revoked-device history remains stored but no longer
-contributes to active account totals.
+contributes to active account totals. Its deletion operation authenticates the
+presented device and hard-deletes the owning user so every account-owned row is
+erased by foreign-key cascades in one transaction.
 
 `group` implements private group creation, member-authorized reads, and
 owner-only invitation and revocation operations. Invitations expire, have a

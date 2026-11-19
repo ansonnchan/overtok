@@ -304,10 +304,53 @@ func TestGroupCommandRequiresAPIAndRedactsFailure(t *testing.T) {
 	}
 }
 
+func TestAccountDeleteRequiresExactConfirmation(t *testing.T) {
+	manager := &fakeAccountManager{}
+	deps := dependencies{
+		getenv: func(name string) string {
+			if name == "OVERTOK_API_URL" {
+				return "https://api.example.test"
+			}
+			return ""
+		},
+		account: func(string) (accountManager, error) { return manager, nil },
+	}
+	for _, args := range [][]string{
+		{"account", "delete"},
+		{"account", "delete", "--confirm", "delete"},
+	} {
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		if code := run(args, &stdout, &stderr, deps); code != 2 || manager.deleted {
+			t.Fatalf("run(%v) = %d/%q deleted=%v", args, code, stderr.String(), manager.deleted)
+		}
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if code := run([]string{"account", "delete", "--confirm", "DELETE"}, &stdout, &stderr, deps); code != 0 || !manager.deleted || !strings.Contains(stdout.String(), "Local usage data was not changed") {
+		t.Fatalf("confirmed delete = %d/%q/%q manager=%#v", code, stdout.String(), stderr.String(), manager)
+	}
+}
+
+func TestAccountDeleteFailureKeepsStableOutput(t *testing.T) {
+	manager := &fakeAccountManager{deleteErr: errors.New("credential /private/path")}
+	deps := dependencies{
+		getenv:  func(string) string { return "https://api.example.test" },
+		account: func(string) (accountManager, error) { return manager, nil },
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if code := run([]string{"account", "delete", "--confirm", "DELETE"}, &stdout, &stderr, deps); code != 1 || strings.Contains(stderr.String(), "/private/path") {
+		t.Fatalf("failed account delete = %d/%q", code, stderr.String())
+	}
+}
+
 type fakeAccountManager struct {
 	loginVersion string
 	loginErr     error
 	loggedOut    bool
+	deleted      bool
+	deleteErr    error
 }
 
 type fakeGroupManager struct {
@@ -347,4 +390,9 @@ func (f *fakeAccountManager) Login(_ context.Context, version string, _ io.Write
 func (f *fakeAccountManager) Logout(context.Context) error {
 	f.loggedOut = true
 	return nil
+}
+
+func (f *fakeAccountManager) DeleteAccount(context.Context) error {
+	f.deleted = true
+	return f.deleteErr
 }

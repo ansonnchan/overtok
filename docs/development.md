@@ -63,6 +63,7 @@ OVERTOK_API_URL='http://127.0.0.1:8080' go run ./cmd/overtok login
 OVERTOK_API_URL='http://127.0.0.1:8080' go run ./cmd/overtok logout
 OVERTOK_API_URL='http://127.0.0.1:8080' go run ./cmd/overtok sync --dry-run
 OVERTOK_API_URL='http://127.0.0.1:8080' go run ./cmd/overtok sync
+OVERTOK_API_URL='http://127.0.0.1:8080' go run ./cmd/overtok account delete --confirm DELETE
 ```
 
 Plain HTTP is accepted only for loopback development. Non-loopback API origins
@@ -74,6 +75,9 @@ client credential.
 rebuild. It then uploads committed outbox records in batches of at most 100.
 `sync --dry-run` follows the same path through serialization, but prints one
 exact request body per line without contacting the API or changing outbox state.
+Account deletion is permanent for hosted data and removes the local device
+session only after the server confirms deletion. It does not erase local SQLite
+usage or provider evidence.
 
 An authenticated client can inspect the account-level aggregation endpoint:
 
@@ -98,7 +102,7 @@ The Makefile places `GOCACHE` and `GOPATH` under `/tmp` by default. Override tho
 - PostgreSQL integration tests use only synthetic identities and values in a disposable schema.
 - Authentication tests use synthetic GitHub responses and never contact a real account.
 - Synchronization tests use allowlisted synthetic buckets and verify retry, replay, replacement, conflict, and acknowledgement behavior.
-- Account integration tests combine two synthetic devices, revoke one, retain its stored history, and keep the sibling writable.
+- Account integration tests cover multi-device revocation and complete account-owned data deletion without affecting unrelated accounts.
 
 Do not point automated tests at a real home directory or provider-owned storage. Real compatibility investigation requires explicit user approval and must produce a newly constructed sanitized regression fixture rather than a copied transcript.
 

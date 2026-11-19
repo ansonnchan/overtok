@@ -1,6 +1,6 @@
 # Architecture
 
-Status: multiplayer TUI implemented; account deletion next
+Status: M3 implementation complete; real-machine journey validation pending
 Last updated: November 18, 2026
 
 ## System goals
@@ -219,7 +219,12 @@ Only active devices contribute to the account total. The response includes all
 account devices with revocation, last-authenticated, and last-synchronized
 state. Revocation blocks subsequent writes and removes that device from active
 totals without deleting its synchronized history or affecting sibling devices.
-Explicit uploaded-data deletion remains a later account operation.
+Authenticated account deletion hard-deletes the user row. Ownership foreign
+keys erase GitHub identity, devices, credential hashes, synchronized usage,
+owned groups, invitations, and memberships in the same transaction while
+leaving unrelated accounts and shared pricing revisions intact. The native
+client removes its OS-vault session only after the API confirms deletion;
+local SQLite usage remains on each machine.
 
 ```text
 GitHub device authorization

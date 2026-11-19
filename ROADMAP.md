@@ -1,6 +1,6 @@
 # Overtok roadmap
 
-Status: multiplayer TUI implemented; account deletion next
+Status: M3 implementation complete; real-machine journey validation pending
 Last updated: November 18, 2026
 
 ## Product definition
@@ -351,7 +351,7 @@ Goal: complete the social product loop.
   - Acceptance: two users can join a group, sync independently, and see matching rankings.
   - Depends on: OVT-031.
 
-- [ ] **OVT-033: Implement account and uploaded-data deletion**
+- [x] **OVT-033: Implement account and uploaded-data deletion**
   - Revoke devices, leave groups, erase synchronized usage, and delete the account.
   - Acceptance: deletion is authorization-checked, complete, and tested.
   - Depends on: OVT-020, OVT-030.

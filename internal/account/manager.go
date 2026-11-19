@@ -20,6 +20,7 @@ type authClient interface {
 	Poll(context.Context, string) (PollResult, error)
 	Refresh(context.Context, string) (Session, error)
 	Logout(context.Context, string) error
+	DeleteAccount(context.Context, string) error
 }
 
 // Manager coordinates interactive login and local credential storage.
@@ -98,6 +99,23 @@ func (m *Manager) Logout(ctx context.Context) error {
 	err = m.client.Logout(ctx, session.Credential)
 	if err != nil && !errors.Is(err, ErrUnauthorized) {
 		return fmt.Errorf("revoke device: %w", err)
+	}
+	if err := m.store.Delete(); err != nil {
+		return fmt.Errorf("delete device credential: %w", err)
+	}
+	return nil
+}
+
+// DeleteAccount permanently erases hosted account data before removing the
+// local device session. A failed or unauthorized request keeps the credential
+// so the user can retry or reauthenticate without a false success signal.
+func (m *Manager) DeleteAccount(ctx context.Context) error {
+	session, err := m.store.Load()
+	if err != nil {
+		return fmt.Errorf("load device credential: %w", err)
+	}
+	if err := m.client.DeleteAccount(ctx, session.Credential); err != nil {
+		return fmt.Errorf("delete hosted account: %w", err)
 	}
 	if err := m.store.Delete(); err != nil {
 		return fmt.Errorf("delete device credential: %w", err)

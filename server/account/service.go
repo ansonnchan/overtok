@@ -63,6 +63,7 @@ type Authenticator interface {
 // Repository aggregates the authenticated user's active devices.
 type Repository interface {
 	AccountUsage(context.Context, serverauth.Principal) (Usage, error)
+	DeleteAccount(context.Context, serverauth.Principal) error
 }
 
 // Service owns account usage authorization.
@@ -86,4 +87,14 @@ func (s *Service) Usage(ctx context.Context, credential string) (Usage, error) {
 		return Usage{}, err
 	}
 	return s.repository.AccountUsage(ctx, principal)
+}
+
+// Delete authenticates one device and permanently erases its account-owned
+// server state. Local source data remains on each device.
+func (s *Service) Delete(ctx context.Context, credential string) error {
+	principal, err := s.auth.Authenticate(ctx, credential)
+	if err != nil {
+		return err
+	}
+	return s.repository.DeleteAccount(ctx, principal)
 }
