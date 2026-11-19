@@ -7,3 +7,16 @@ settings:
 importers:
 
   .: {}
+
+  packages/cli:
+    optionalDependencies:
+      '@overtok/darwin-arm64':
+        specifier: workspace:*
+        version: link:../darwin-arm64
+      '@overtok/darwin-x64':
+        specifier: workspace:*
+        version: link:../darwin-x64
+
+  packages/darwin-arm64: {}
+
+  packages/darwin-x64: {}

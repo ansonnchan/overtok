@@ -51,6 +51,14 @@ Model names are not allowlisted. A previously unseen, non-empty observed identif
 
 The pnpm workspace owns npm distribution tooling; it is not needed to build the native command from source. Checksummed macOS arm64/x64 archives are produced by the release workflow.
 
+Tagged releases publish the same native binaries through `npx @overtok/cli`.
+The launcher installs only the optional package matching macOS arm64 or x64;
+other platforms fail with a supported-target message.
+
+```sh
+npx @overtok/cli
+```
+
 Account commands require an Overtok API origin:
 
 ```sh

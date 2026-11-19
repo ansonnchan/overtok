@@ -345,6 +345,9 @@ native archive includes the pinned ccusage contract but never downloads or
 bundles an unverified parser executable. Platform packages consume these
 artifacts, and the umbrella npm package is published only after both platform
 packages exist.
+The launcher resolves only the package matching the current operating system
+and CPU, then executes its binary directly without a shell. Unsupported targets
+and missing optional packages fail explicitly.
 
 Autosync points to a stable installed binary, not an ephemeral package-runner cache.
 

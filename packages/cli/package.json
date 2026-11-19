@@ -1,0 +1,29 @@
+{
+  "name": "@overtok/cli",
+  "version": "0.0.0-development",
+  "description": "Native Overtok coding-agent usage tracker launcher",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ansonnchan/overtok.git"
+  },
+  "bin": {
+    "overtok": "bin/overtok.js"
+  },
+  "files": [
+    "bin/overtok.js"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "optionalDependencies": {
+    "@overtok/darwin-arm64": "workspace:*",
+    "@overtok/darwin-x64": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "check": "node --check bin/overtok.js",
+    "test": "node --test"
+  }
+}
