@@ -144,6 +144,11 @@ func (c *Client) Logout(ctx context.Context, credential string) error {
 	return nil
 }
 
+// DeleteAccount permanently erases the authenticated account's hosted data.
+func (c *Client) DeleteAccount(ctx context.Context, credential string) error {
+	return c.request(ctx, http.MethodDelete, "/v1/account", credential, map[string]string{"confirmation": "DELETE"}, nil)
+}
+
 func (c *Client) request(ctx context.Context, method, path, credential string, input, output any) error {
 	status, _, err := c.do(ctx, method, path, credential, input, output)
 	if err != nil {

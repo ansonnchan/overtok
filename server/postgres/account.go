@@ -120,6 +120,28 @@ func (r *AccountRepository) AccountUsage(ctx context.Context, principal serverau
 	return usage, nil
 }
 
+// DeleteAccount hard-deletes one authenticated user. Ownership foreign keys
+// cascade through identities, devices, credentials, uploaded usage, owned
+// groups, invitations, and memberships in the same transaction.
+func (r *AccountRepository) DeleteAccount(ctx context.Context, principal serverauth.Principal) (err error) {
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("begin account deletion: %w", err)
+	}
+	defer rollbackOnError(ctx, tx, &err)
+	tag, err := tx.Exec(ctx, `DELETE FROM users WHERE id = $1::uuid AND deleted_at IS NULL`, principal.UserID)
+	if err != nil {
+		return fmt.Errorf("delete account-owned server data: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return serverauth.ErrUnauthorized
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit account deletion: %w", err)
+	}
+	return nil
+}
+
 type aggregateScan struct {
 	value    *string
 	known    int64

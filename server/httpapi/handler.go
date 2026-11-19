@@ -36,6 +36,7 @@ type usageSyncService interface {
 
 type accountUsageService interface {
 	Usage(context.Context, string) (serveraccount.Usage, error)
+	Delete(context.Context, string) error
 }
 
 type groupService interface {
@@ -78,6 +79,7 @@ func New(authService authenticationService, syncService usageSyncService, accoun
 	handler.mux.HandleFunc("POST /v1/auth/logout", handler.logout)
 	handler.mux.HandleFunc("POST /v1/sync/buckets", handler.syncBuckets)
 	handler.mux.HandleFunc("GET /v1/account/usage", handler.accountUsage)
+	handler.mux.HandleFunc("DELETE /v1/account", handler.deleteAccount)
 	handler.mux.HandleFunc("POST /v1/groups", handler.createGroup)
 	handler.mux.HandleFunc("GET /v1/groups", handler.listGroups)
 	handler.mux.HandleFunc("GET /v1/groups/{group_id}", handler.getGroup)
@@ -87,6 +89,29 @@ func New(authService authenticationService, syncService usageSyncService, accoun
 	handler.mux.HandleFunc("DELETE /v1/groups/{group_id}/members/{user_id}", handler.revokeGroupMember)
 	handler.mux.HandleFunc("GET /v1/groups/{group_id}/leaderboard", handler.groupLeaderboard)
 	return handler, nil
+}
+
+func (h *Handler) deleteAccount(response http.ResponseWriter, request *http.Request) {
+	credential, ok := bearerCredential(request)
+	if !ok {
+		writeError(response, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var input struct {
+		Confirmation string `json:"confirmation"`
+	}
+	if err := decodeRequest(response, request, &input); err != nil || input.Confirmation != "DELETE" {
+		writeError(response, http.StatusBadRequest, "confirmation_required")
+		return
+	}
+	if err := h.account.Delete(request.Context(), credential); errors.Is(err, serverauth.ErrUnauthorized) {
+		writeError(response, http.StatusUnauthorized, "unauthorized")
+		return
+	} else if err != nil {
+		writeError(response, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	response.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) groupLeaderboard(response http.ResponseWriter, request *http.Request) {

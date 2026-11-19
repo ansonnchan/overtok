@@ -62,12 +62,35 @@ func TestManagerKeepsCredentialWhenRevocationFails(t *testing.T) {
 	}
 }
 
+func TestManagerDeletesLocalCredentialOnlyAfterHostedDeletion(t *testing.T) {
+	client := &fakeClient{}
+	store := &memoryStore{session: Session{Credential: "delete-credential"}}
+	manager, err := NewManager(client, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.DeleteAccount(t.Context()); err != nil || !store.deleted || client.deleteCredential != "delete-credential" {
+		t.Fatalf("DeleteAccount() = %v, deleted=%v credential=%q", err, store.deleted, client.deleteCredential)
+	}
+	client = &fakeClient{deleteErr: errors.New("server unavailable")}
+	store = &memoryStore{session: Session{Credential: "keep-credential"}}
+	manager, err = NewManager(client, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.DeleteAccount(t.Context()); err == nil || store.deleted {
+		t.Fatalf("failed DeleteAccount() = %v, deleted=%v", err, store.deleted)
+	}
+}
+
 type fakeClient struct {
 	start            DeviceStart
 	polls            []PollResult
 	refreshed        Session
 	logoutErr        error
 	logoutCredential string
+	deleteErr        error
+	deleteCredential string
 }
 
 func (f *fakeClient) Start(context.Context, string) (DeviceStart, error) { return f.start, nil }
@@ -80,6 +103,10 @@ func (f *fakeClient) Refresh(context.Context, string) (Session, error) { return 
 func (f *fakeClient) Logout(_ context.Context, credential string) error {
 	f.logoutCredential = credential
 	return f.logoutErr
+}
+func (f *fakeClient) DeleteAccount(_ context.Context, credential string) error {
+	f.deleteCredential = credential
+	return f.deleteErr
 }
 
 type memoryStore struct {
