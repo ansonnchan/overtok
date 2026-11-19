@@ -338,7 +338,13 @@ The core application is a native Go binary. pnpm manages npm package metadata an
        future Linux/Windows packages
 ```
 
-The user still runs `npx @overtok/cli`. Release automation cross-compiles the Go binary, verifies checksums, publishes platform packages, and finally publishes the umbrella package.
+The user still runs `npx @overtok/cli`. Release automation cross-compiles the
+Go binary without CGO, verifies its Mach-O architecture and embedded version,
+normalizes archive metadata, and publishes checksummed native artifacts. Each
+native archive includes the pinned ccusage contract but never downloads or
+bundles an unverified parser executable. Platform packages consume these
+artifacts, and the umbrella npm package is published only after both platform
+packages exist.
 
 Autosync points to a stable installed binary, not an ephemeral package-runner cache.
 

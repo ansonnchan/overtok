@@ -12,6 +12,7 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -108,6 +109,28 @@ func ValidateVersion(data []byte) error {
 	got := strings.TrimSpace(string(data))
 	if got != PinnedVersion && got != "ccusage "+PinnedVersion && got != "ccusage v"+PinnedVersion && got != "v"+PinnedVersion {
 		return fmt.Errorf("unsupported ccusage version %q; require %s", got, PinnedVersion)
+	}
+	return nil
+}
+
+// ValidateLock checks that a release parser manifest exactly matches the
+// executable version, schema, and offline commands compiled into Overtok.
+func ValidateLock(data []byte) error {
+	var lock struct {
+		Tool     string              `json:"tool"`
+		Version  string              `json:"version"`
+		Schema   string              `json:"schema"`
+		Commands map[string][]string `json:"commands"`
+	}
+	if err := strictDecode(data, &lock); err != nil {
+		return fmt.Errorf("decode lock manifest: %w", err)
+	}
+	claudeArgs, _, _ := commandFor(AgentClaude)
+	codexArgs, _, _ := commandFor(AgentCodex)
+	if lock.Tool != "ccusage" || lock.Version != PinnedVersion || lock.Schema != SchemaID ||
+		len(lock.Commands) != 2 || !slices.Equal(lock.Commands[string(AgentClaude)], claudeArgs) ||
+		!slices.Equal(lock.Commands[string(AgentCodex)], codexArgs) {
+		return errors.New("lock manifest does not match the compiled ccusage contract")
 	}
 	return nil
 }

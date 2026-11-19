@@ -18,6 +18,7 @@ jobs:
           go-version-file: go.mod
           cache: true
       - run: make check
+      - run: make release VERSION=0.0.0-ci
 
   postgres:
     runs-on: ubuntu-latest

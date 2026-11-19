@@ -1,6 +1,6 @@
 # Overtok roadmap
 
-Status: M3 implementation complete; real-machine journey validation pending
+Status: native release artifacts implemented; npm distribution next
 Last updated: November 18, 2026
 
 ## Product definition
@@ -366,7 +366,7 @@ M3 exit criteria:
 
 Goal: make Overtok installable and reliable without developer assistance.
 
-- [ ] **OVT-040: Build cross-platform release artifacts**
+- [x] **OVT-040: Build cross-platform release artifacts**
   - Produce checksummed macOS arm64/x64 binaries and pinned parser assets.
   - Acceptance: artifacts run on clean supported machines.
 

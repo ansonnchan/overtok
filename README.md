@@ -49,7 +49,7 @@ Model names are not allowlisted. A previously unseen, non-empty observed identif
 - PostgreSQL 18 only when exercising the hosted schema integration tests.
 - ccusage 20.0.51 only when exercising the optional ccusage integration. Overtok does not download it at runtime.
 
-The pnpm workspace is reserved for later npm release tooling; it is not needed to build the native command today.
+The pnpm workspace owns npm distribution tooling; it is not needed to build the native command from source. Checksummed macOS arm64/x64 archives are produced by the release workflow.
 
 Account commands require an Overtok API origin:
 
