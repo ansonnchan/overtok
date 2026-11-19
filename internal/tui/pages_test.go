@@ -59,6 +59,41 @@ func TestModelsPagePreservesAttributionQuality(t *testing.T) {
 	}
 }
 
+func TestMissingSupportedSourcesHaveActionableEmptyPage(t *testing.T) {
+	t.Parallel()
+	dashboard := application.Dashboard{Diagnostics: store.DiagnosticSnapshot{
+		AdapterHealth: []store.StoredAdapterHealth{
+			{Health: normalize.SourceHealth{Source: normalize.SourceClaude, Surface: normalize.SurfaceCLI, Status: normalize.HealthNotFound}},
+			{Health: normalize.SourceHealth{Source: normalize.SourceCodex, Surface: normalize.SurfaceSharedLocal, Status: normalize.HealthNotFound}},
+		},
+	}}
+	for _, page := range []Page{overviewPage(dashboard), modelsPage(dashboard)} {
+		joined := strings.Join(page.Lines, "\n")
+		if page.EmptyMessage != "No supported coding-agent usage found." {
+			t.Fatalf("empty message = %q", page.EmptyMessage)
+		}
+		for _, want := range []string{"Claude Code/Desktop", "Codex CLI/Desktop", "press r", "tokenholic doctor"} {
+			if !strings.Contains(joined, want) {
+				t.Fatalf("empty page = %#v, want %q", page, want)
+			}
+		}
+		if page.Warning != "" {
+			t.Fatalf("missing optional sources produced warning = %q", page.Warning)
+		}
+	}
+}
+
+func TestMissingSourceFallbackDoesNotHideExistingUsage(t *testing.T) {
+	t.Parallel()
+	dashboard := usageDashboard(store.AvailabilityComplete, 1)
+	dashboard.Diagnostics.AdapterHealth = []store.StoredAdapterHealth{{
+		Health: normalize.SourceHealth{Source: normalize.SourceClaude, Surface: normalize.SurfaceCLI, Status: normalize.HealthNotFound},
+	}}
+	if page := overviewPage(dashboard); page.EmptyMessage != "" {
+		t.Fatalf("existing usage rendered missing-source fallback = %#v", page)
+	}
+}
+
 func TestSourcesAndSettingsRemainLocalAndExplicit(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 11, 18, 0, 0, 0, 0, time.UTC)

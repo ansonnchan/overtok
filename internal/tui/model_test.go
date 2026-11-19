@@ -158,6 +158,33 @@ func TestModelStatesRemainExplicitWithoutColor(t *testing.T) {
 	}
 }
 
+func TestModelExplainsWhenNoSupportedSourceIsAvailable(t *testing.T) {
+	t.Parallel()
+	dashboard := application.Dashboard{Diagnostics: store.DiagnosticSnapshot{
+		AdapterHealth: []store.StoredAdapterHealth{
+			{Health: normalize.SourceHealth{Source: normalize.SourceClaude, Surface: normalize.SurfaceCLI, Status: normalize.HealthNotFound}},
+			{Health: normalize.SourceHealth{Source: normalize.SourceCodex, Surface: normalize.SurfaceSharedLocal, Status: normalize.HealthNotFound}},
+		},
+	}}
+	model := NewModel(t.Context(), &fakeApplication{dashboard: dashboard}, Config{NoColor: true})
+	updated, _ := model.Update(model.Init()())
+	updated, _ = updated.(Model).Update(tea.WindowSizeMsg{Width: MinimumWidth, Height: 20})
+	view := updated.(Model).View()
+	for _, want := range []string{"[empty] No supported coding-agent usage", "Claude Code/Desktop", "Codex CLI/Desktop", "press r", "tokenholic doctor"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("View() = %q, want %q", view, want)
+		}
+	}
+	if strings.Contains(view, "[warning]") || strings.Contains(view, "\x1b[") {
+		t.Fatalf("missing optional sources rendered as a warning or used color: %q", view)
+	}
+	for _, line := range strings.Split(view, "\n") {
+		if len([]rune(line)) > MinimumWidth {
+			t.Fatalf("empty-state line is %d columns: %q", len([]rune(line)), line)
+		}
+	}
+}
+
 func TestNarrowLayoutAndHelp(t *testing.T) {
 	t.Parallel()
 	model := NewModel(t.Context(), nil, Config{NoColor: true})

@@ -103,6 +103,11 @@ func (m Model) renderContent(output *strings.Builder, width int) {
 		if m.section == GroupsSection {
 			fmt.Fprintln(output, m.styles.muted.Render("[empty] No private groups to show yet."))
 			fmt.Fprintln(output, "Press c to create or i to join.")
+		} else if m.page.EmptyMessage != "" {
+			for _, line := range wrap("[empty] "+cleanLine(m.page.EmptyMessage), width) {
+				fmt.Fprintln(output, m.styles.muted.Render(line))
+			}
+			m.renderLines(output, width)
 		} else {
 			fmt.Fprintln(output, m.styles.muted.Render("[empty] No local data to show yet."))
 			fmt.Fprintln(output, "Press r to collect and refresh.")

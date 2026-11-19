@@ -55,8 +55,9 @@ const (
 
 // Page contains presentation-ready, privacy-safe content for one section.
 type Page struct {
-	Lines   []string
-	Warning string
+	Lines        []string
+	Warning      string
+	EmptyMessage string
 }
 
 // Application supplies committed local state and owns refresh behavior.
@@ -183,7 +184,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.errMessage = "Could not load local data"
 		case m.page.Warning != "":
 			m.state = StateWarning
-		case len(m.page.Lines) == 0:
+		case m.page.EmptyMessage != "" || len(m.page.Lines) == 0:
 			m.state = StateEmpty
 		default:
 			m.state = StateReady

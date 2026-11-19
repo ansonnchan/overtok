@@ -126,12 +126,28 @@ func (r Report) Render() string {
 	if r.Database.State != "" {
 		r.renderDatabase(&output)
 	}
+	if r.noSupportedSources() {
+		fmt.Fprintln(&output, "Source summary: no supported coding-agent usage found")
+		fmt.Fprintln(&output, "Next: install or use a supported coding agent, then refresh Tokenholic")
+	}
 	if r.ExitCode() == 0 {
 		fmt.Fprintln(&output, "Result: ready; missing optional sources are not errors")
 	} else {
 		fmt.Fprintln(&output, "Result: issues found; review the warnings above")
 	}
 	return output.String()
+}
+
+func (r Report) noSupportedSources() bool {
+	if len(r.Findings) == 0 {
+		return false
+	}
+	for _, finding := range r.Findings {
+		if finding.Status != normalize.HealthNotFound {
+			return false
+		}
+	}
+	return true
 }
 
 func (r Report) renderDatabase(output *strings.Builder) {
