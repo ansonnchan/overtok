@@ -127,7 +127,7 @@ func (m Model) renderContent(output *strings.Builder, width int) {
 		}
 		action := "Press r to retry or run `tokenholic doctor` for details."
 		if m.section == GroupsSection {
-			action = "Press r to retry; check TOKENHOLIC_API_URL and `tokenholic login`."
+			action = "Press r to retry; check TOKENHOLIC_API_URL and `tokenholic claim`."
 		}
 		for _, line := range wrap(action, width) {
 			fmt.Fprintln(output, line)

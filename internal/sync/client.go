@@ -66,12 +66,27 @@ func NewClient(baseURL string, httpClient *http.Client) (*Client, error) {
 	}, nil
 }
 
-// Run serializes pending revisions through one path for real uploads and dry
-// runs. Dry-run output contains one exact request body per line.
-func (c *Client) Run(ctx context.Context, outbox Outbox, credential string, dryRun bool, output io.Writer) (Summary, error) {
+// Run uploads pending revisions and acknowledges the exact revisions accepted
+// by the server.
+func (c *Client) Run(ctx context.Context, outbox Outbox, credential string) (Summary, error) {
 	if outbox == nil || credential == "" {
 		return Summary{}, errors.New("synchronize usage: outbox and credential are required")
 	}
+	return runBatches(ctx, outbox, nil, func(body []byte) (BatchResponse, error) {
+		return c.sendWithRetry(ctx, credential, body)
+	})
+}
+
+// DryRun writes the exact request body for each pending batch without needing
+// an API origin, account, or device credential.
+func DryRun(ctx context.Context, outbox Outbox, output io.Writer) (Summary, error) {
+	if outbox == nil || output == nil {
+		return Summary{}, errors.New("show usage data: outbox and output are required")
+	}
+	return runBatches(ctx, outbox, output, nil)
+}
+
+func runBatches(ctx context.Context, outbox Outbox, output io.Writer, send func([]byte) (BatchResponse, error)) (Summary, error) {
 	records, err := outbox.PendingOutbox(ctx)
 	if err != nil {
 		return Summary{}, err
@@ -88,13 +103,13 @@ func (c *Client) Run(ctx context.Context, outbox Outbox, credential string, dryR
 		}
 		summary.Batches++
 		summary.Buckets += len(batch.Buckets)
-		if dryRun {
+		if send == nil {
 			if _, err := output.Write(append(body, '\n')); err != nil {
 				return Summary{}, fmt.Errorf("write sync dry run: %w", err)
 			}
 			continue
 		}
-		response, err := c.sendWithRetry(ctx, credential, body)
+		response, err := send(body)
 		if err != nil {
 			return Summary{}, err
 		}

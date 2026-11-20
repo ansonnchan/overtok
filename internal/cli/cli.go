@@ -106,6 +106,13 @@ func run(args []string, stdout, stderr io.Writer, deps dependencies) int {
 	if len(args) > 0 && args[0] == "sync" {
 		return runSyncCommand(args[1:], stdout, stderr, deps)
 	}
+	if len(args) > 0 && args[0] == "show-data" {
+		if len(args) != 1 {
+			fmt.Fprintln(stderr, "show-data accepts no arguments")
+			return 2
+		}
+		return runSynchronization(true, stdout, stderr, deps)
+	}
 	if len(args) > 0 && args[0] == "group" {
 		return runGroupCommand(args[1:], stdout, stderr, deps)
 	}
@@ -132,6 +139,9 @@ func run(args []string, stdout, stderr io.Writer, deps dependencies) int {
 	if flags.NArg() == 1 && flags.Arg(0) == "login" {
 		return runLogin(stdout, stderr, deps)
 	}
+	if flags.NArg() == 1 && flags.Arg(0) == "claim" {
+		return runClaim(stdout, stderr, deps)
+	}
 	if flags.NArg() == 1 && flags.Arg(0) == "logout" {
 		return runLogout(stdout, stderr, deps)
 	}
@@ -154,6 +164,10 @@ func runSyncCommand(args []string, stdout, stderr io.Writer, deps dependencies) 
 		fmt.Fprintln(stderr, "sync accepts only --dry-run")
 		return 2
 	}
+	return runSynchronization(*dryRun, stdout, stderr, deps)
+}
+
+func runSynchronization(dryRun bool, stdout, stderr io.Writer, deps dependencies) int {
 	home, err := deps.homeDir()
 	if err != nil {
 		fmt.Fprintln(stderr, "could not resolve the local home directory")
@@ -165,7 +179,7 @@ func runSyncCommand(args []string, stdout, stderr io.Writer, deps dependencies) 
 		return 1
 	}
 	apiURL := strings.TrimSpace(deps.getenv("TOKENHOLIC_API_URL"))
-	if apiURL == "" {
+	if apiURL == "" && !dryRun {
 		fmt.Fprintln(stderr, "TOKENHOLIC_API_URL is required for synchronization")
 		return 1
 	}
@@ -175,13 +189,29 @@ func runSyncCommand(args []string, stdout, stderr io.Writer, deps dependencies) 
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	if err := deps.sync(ctx, home, codexHome, apiURL, *dryRun, stdout); err != nil {
+	if err := deps.sync(ctx, home, codexHome, apiURL, dryRun, stdout); err != nil {
 		if errors.Is(err, autosync.ErrAlreadyRunning) {
 			fmt.Fprintln(stderr, "synchronization is already running")
 			return 1
 		}
-		fmt.Fprintln(stderr, "could not synchronize usage; local pending data was preserved")
+		if dryRun {
+			fmt.Fprintln(stderr, "could not show usage data; local pending data was preserved")
+		} else {
+			fmt.Fprintln(stderr, "could not synchronize usage; local pending data was preserved")
+		}
 		return 1
+	}
+	return 0
+}
+
+func runClaim(stdout, stderr io.Writer, deps dependencies) int {
+	if code := runLogin(stdout, stderr, deps); code != 0 {
+		return code
+	}
+	fmt.Fprintln(stdout)
+	if code := runSynchronization(false, stdout, stderr, deps); code != 0 {
+		fmt.Fprintln(stderr, "Signed in, but the initial sync did not complete; run `tokenholic sync` to retry.")
+		return code
 	}
 	return 0
 }

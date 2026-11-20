@@ -294,6 +294,20 @@ func TestGroupsViewLoadsSwitchesPeriodMetricAndSelection(t *testing.T) {
 	}
 }
 
+func TestGroupsViewOffersClaimWhenMultiplayerIsNotConfigured(t *testing.T) {
+	t.Parallel()
+	model := NewModel(t.Context(), &fakeApplication{}, Config{NoColor: true})
+	updated, command := model.Update(key('5'))
+	if command == nil {
+		t.Fatal("groups navigation did not load")
+	}
+	updated, _ = updated.(Model).Update(command())
+	view := updated.(Model).View()
+	if !strings.Contains(view, "tokenholic claim") || strings.Contains(view, "tokenholic login") {
+		t.Fatalf("groups claim guidance = %q", view)
+	}
+}
+
 func TestGroupsViewCreatesAndMasksInviteInput(t *testing.T) {
 	t.Parallel()
 	remote := &fakeMultiplayer{snapshot: multiplayer.Snapshot{Groups: []multiplayer.Group{

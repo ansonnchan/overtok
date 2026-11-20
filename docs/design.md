@@ -52,8 +52,8 @@ The native MVP has five TUI areas:
 5. **Groups** — authenticated private-group selection and leaderboards.
 
 Authentication and synchronization are available through the explicit
-`login`, `logout`, `sync`, `sync --dry-run`, and opt-in `autosync`
-CLI commands. The Groups area
+`claim`/`login`, `logout`, `sync`, offline `show-data`/`sync --dry-run`, and
+opt-in `autosync` CLI commands. The Groups area
 appears alongside local mode and uses the native multiplayer client boundary;
 it does not own credentials, HTTP, or multi-device queries. With no API origin
 configured, the first four views remain fully functional.

@@ -32,8 +32,8 @@ The native Go command currently provides:
 - transactional local SQLite observations, checkpoints, health, and absolute usage buckets;
 - timezone-aware local totals with explicit complete, partial, unavailable, and empty states;
 - a keyboard-first Overview, Sources, Models, Settings, and private Groups TUI with manual collection;
-- GitHub device-flow `login` and revoking `logout` commands backed by the OS credential vault;
-- bounded `sync` and exact-payload `sync --dry-run` commands with durable acknowledgements;
+- GitHub device-flow `claim`/`login` and revoking `logout` commands backed by the OS credential vault;
+- bounded `sync` and offline exact-payload `show-data`/`sync --dry-run` commands with durable acknowledgements;
 - opt-in hourly macOS autosync with a stable binary, overlap lock, private logs, status, and complete removal;
 - one authenticated account usage row across active devices with independent revocation and freshness;
 - private groups with owner/member roles, expiring limited-use invites, and membership-authorized reads;
@@ -56,55 +56,55 @@ Tagged releases publish the same native binaries through `npx @tokenholic/cli`.
 The launcher installs only the optional package matching macOS arm64 or x64;
 other platforms fail with a supported-target message.
 
-## Run from npm
-
-No installation is required. Run the latest published CLI directly with
-`npx`:
+## Quickstart
 
 ```sh
-npx --yes @tokenholic/cli@latest --version
-npx --yes @tokenholic/cli@latest doctor
-npx --yes @tokenholic/cli@latest
+npx @tokenholic/cli        # see your usage locally — no login required
 ```
 
-The last command opens the interactive TUI. The first npm invocation downloads
-the small launcher and the native binary for the current Mac; later invocations
-can reuse npm's cache.
+That's it. The command opens the native dashboard using supported usage records
+already on this Mac. Nothing is uploaded and no account is created. The first
+run may ask npm for permission to download the launcher and matching native
+binary.
 
-To exercise the hosted demo, export its API origin once in the current shell,
-then authenticate and synchronize before opening the TUI:
+Install it globally when you want the shorter command:
+
+```sh
+npm install --global @tokenholic/cli
+
+tokenholic                 # local dashboard + option to claim
+tokenholic show-data       # exact payload preview; nothing uploaded
+tokenholic claim           # GitHub sign-in followed by the initial sync
+tokenholic sync            # collect and upload now
+tokenholic autosync enable # explicitly enable hourly background sync
+```
+
+`show-data` is the friendly alias for `sync --dry-run`; both work without a
+login or API configuration. `claim` is the onboarding form of `login` and runs
+the first sync after GitHub authorization. Existing `login` and `sync --dry-run`
+commands remain supported.
+
+Claiming and synchronization require a tokenholic API origin. To use the free
+hosted demo, export its origin once in the current shell:
 
 ```sh
 export TOKENHOLIC_API_URL='https://tokenholic-api.onrender.com'
 
-npx --yes @tokenholic/cli@latest login
-npx --yes @tokenholic/cli@latest sync --dry-run
-npx --yes @tokenholic/cli@latest sync
-npx --yes @tokenholic/cli@latest group create "Demo group"
-npx --yes @tokenholic/cli@latest
-```
-
-The free demo API may take about a minute to wake after inactivity. A dry run
-collects and commits local aggregates, then prints the exact privacy-limited
-payload without uploading it.
-
-For a persistent `tokenholic` command, install the launcher globally instead:
-
-```sh
-npm install --global @tokenholic/cli@latest
-tokenholic --version
-tokenholic doctor
+tokenholic claim
+tokenholic sync
+tokenholic group create "Demo group"
 tokenholic
 ```
 
-After global installation, account and group commands use the shorter binary
-name. They require `TOKENHOLIC_API_URL` to reference a deployed tokenholic API:
+The free demo API may take about a minute to wake after inactivity. Hourly
+synchronization is opt-in and is never silently installed by `sync`.
+
+The complete command surface remains available after global installation:
 
 ```sh
-export TOKENHOLIC_API_URL='https://tokenholic-api.onrender.com'
-
 tokenholic login
 tokenholic logout
+tokenholic show-data
 tokenholic sync --dry-run
 tokenholic sync
 tokenholic autosync enable

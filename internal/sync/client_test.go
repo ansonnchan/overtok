@@ -43,7 +43,7 @@ func TestClientRetriesBatchesAndAcknowledgesExactRevisions(t *testing.T) {
 	var waits []time.Duration
 	client.sleep = func(_ context.Context, duration time.Duration) error { waits = append(waits, duration); return nil }
 	client.jitter = func(time.Duration) time.Duration { return 0 }
-	summary, err := client.Run(t.Context(), outbox, "device-credential", false, io.Discard)
+	summary, err := client.Run(t.Context(), outbox, "device-credential")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,16 +54,8 @@ func TestClientRetriesBatchesAndAcknowledgesExactRevisions(t *testing.T) {
 
 func TestClientDryRunUsesRequestSerializationWithoutNetwork(t *testing.T) {
 	outbox := &fakeOutbox{records: outboxRecords(t, MaxBatchBuckets+1)}
-	transport := syncRoundTripFunc(func(*http.Request) (*http.Response, error) {
-		t.Fatal("dry run made a network request")
-		return nil, nil
-	})
-	client, err := NewClient("https://api.example.test", &http.Client{Transport: transport})
-	if err != nil {
-		t.Fatal(err)
-	}
 	var output strings.Builder
-	summary, err := client.Run(t.Context(), outbox, "device-credential", true, &output)
+	summary, err := DryRun(t.Context(), outbox, &output)
 	if err != nil {
 		t.Fatal(err)
 	}

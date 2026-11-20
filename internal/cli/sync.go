@@ -37,6 +37,10 @@ func synchronizeLocal(ctx context.Context, home, codexHome, apiURL string, dryRu
 	if err := application.Refresh(ctx); err != nil {
 		return err
 	}
+	if dryRun {
+		_, err := usageSync.DryRun(ctx, database, output)
+		return err
+	}
 	credentialStore := account.NewKeyringStore(apiURL)
 	session, err := credentialStore.Load()
 	if err != nil {
@@ -63,12 +67,10 @@ func synchronizeLocal(ctx context.Context, home, codexHome, apiURL string, dryRu
 	if err != nil {
 		return err
 	}
-	summary, err := client.Run(ctx, database, session.Credential, dryRun, output)
+	summary, err := client.Run(ctx, database, session.Credential)
 	if err != nil {
 		return err
 	}
-	if !dryRun {
-		fmt.Fprintf(output, "Synchronized %d buckets in %d batches.\n", summary.Acknowledged, summary.Batches)
-	}
+	fmt.Fprintf(output, "Synchronized %d buckets in %d batches.\n", summary.Acknowledged, summary.Batches)
 	return nil
 }
