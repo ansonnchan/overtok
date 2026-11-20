@@ -87,7 +87,7 @@ func (r Report) ExitCode() int {
 // Render formats a deterministic report using only redaction-safe finding fields.
 func (r Report) Render() string {
 	var output strings.Builder
-	fmt.Fprintln(&output, "Tokenholic doctor")
+	fmt.Fprintln(&output, "tokenholic doctor")
 	fmt.Fprintf(&output, "Platform: %s/%s\n", r.GOOS, r.GOARCH)
 	switch {
 	case r.Parser.Compatible:
@@ -128,7 +128,7 @@ func (r Report) Render() string {
 	}
 	if r.noSupportedSources() {
 		fmt.Fprintln(&output, "Source summary: no supported coding-agent usage found")
-		fmt.Fprintln(&output, "Next: install or use a supported coding agent, then refresh Tokenholic")
+		fmt.Fprintln(&output, "Next: install or use a supported coding agent, then refresh tokenholic")
 	}
 	if r.ExitCode() == 0 {
 		fmt.Fprintln(&output, "Result: ready; missing optional sources are not errors")
@@ -162,11 +162,11 @@ func (r Report) renderDatabase(output *strings.Builder) {
 	case DatabaseNotInitialized:
 		fmt.Fprintln(output, "  Open: not initialized; run `tokenholic` to create local storage")
 	case DatabaseLocked:
-		fmt.Fprintln(output, "  Open: locked; close other Tokenholic processes and retry")
+		fmt.Fprintln(output, "  Open: locked; close other tokenholic processes and retry")
 	case DatabaseCorrupt:
 		fmt.Fprintln(output, "  Integrity: failed; restore or replace the local database")
 	case DatabaseIncompatible:
-		fmt.Fprintf(output, "  Schema: incompatible (supported %d); update Tokenholic before retrying\n", database.SupportedVersion)
+		fmt.Fprintf(output, "  Schema: incompatible (supported %d); update tokenholic before retrying\n", database.SupportedVersion)
 	default:
 		fmt.Fprintln(output, "  Open: failed; check application-data permissions and retry")
 	}

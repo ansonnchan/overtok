@@ -1,4 +1,4 @@
-// Command release builds deterministic Tokenholic distribution archives.
+// Command release builds deterministic tokenholic distribution archives.
 package main
 
 import (

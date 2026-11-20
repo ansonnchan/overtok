@@ -25,12 +25,12 @@ func runAutosyncCommand(args []string, stdout, stderr io.Writer, deps dependenci
 	}
 	executable, err := deps.executable()
 	if err != nil {
-		fmt.Fprintln(stderr, "could not resolve the current Tokenholic executable")
+		fmt.Fprintln(stderr, "could not resolve the current tokenholic executable")
 		return 1
 	}
 	executable, err = filepath.Abs(executable)
 	if err != nil {
-		fmt.Fprintln(stderr, "could not resolve the current Tokenholic executable")
+		fmt.Fprintln(stderr, "could not resolve the current tokenholic executable")
 		return 1
 	}
 	apiURL := strings.TrimSpace(deps.getenv("TOKENHOLIC_API_URL"))
@@ -61,7 +61,7 @@ func runAutosyncCommand(args []string, stdout, stderr io.Writer, deps dependenci
 			fmt.Fprintln(stderr, "could not enable autosync; no schedule was activated")
 			return 1
 		}
-		fmt.Fprintln(stdout, "Enabled autosync at login and hourly. Re-enable it after upgrading Tokenholic.")
+		fmt.Fprintln(stdout, "Enabled autosync at login and hourly. Re-enable it after upgrading tokenholic.")
 	case "disable":
 		if err := manager.Disable(ctx); err != nil {
 			fmt.Fprintln(stderr, "could not disable autosync; inspect its status and retry")

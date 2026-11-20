@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/ncruces/go-sqlite3/driver"
@@ -15,11 +16,12 @@ import (
 )
 
 const (
-	databaseFileName = "tokenholic.db"
-	busyTimeoutMS    = 5000
+	applicationDirectory = "tokenholic"
+	databaseFileName     = "tokenholic.db"
+	busyTimeoutMS        = 5000
 )
 
-// DB is Tokenholic's local SQLite database.
+// DB is tokenholic's local SQLite database.
 type DB struct {
 	sql       *sql.DB
 	closeOnce sync.Once
@@ -33,7 +35,28 @@ func DefaultPath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolve user config directory: %w", err)
 	}
-	return filepath.Join(configDir, "Tokenholic", databaseFileName), nil
+	return defaultPath(configDir)
+}
+
+func defaultPath(configDir string) (string, error) {
+	preferred := filepath.Join(configDir, applicationDirectory, databaseFileName)
+	if _, err := os.Lstat(preferred); err == nil {
+		return preferred, nil
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf("inspect local database path: %w", err)
+	}
+	// Previous releases capitalized this directory; keep existing databases in place.
+	legacy := filepath.Join(configDir, legacyApplicationDirectory(), databaseFileName)
+	if _, err := os.Lstat(legacy); err == nil {
+		return legacy, nil
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf("inspect legacy local database path: %w", err)
+	}
+	return preferred, nil
+}
+
+func legacyApplicationDirectory() string {
+	return strings.ToUpper(applicationDirectory[:1]) + applicationDirectory[1:]
 }
 
 // Open prepares a private database file, configures SQLite, and applies all

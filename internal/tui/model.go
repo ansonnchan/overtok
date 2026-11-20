@@ -200,7 +200,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		case errors.Is(message.err, errMultiplayerNotConfigured):
 			m.page = Page{Warning: "Multiplayer needs an API configuration", Lines: []string{
 				"Multiplayer is not configured.",
-				"Set TOKENHOLIC_API_URL and run `tokenholic login`, then reopen Tokenholic.",
+				"Set TOKENHOLIC_API_URL and run `tokenholic login`, then reopen tokenholic.",
 			}}
 			m.state = StateWarning
 		case errors.Is(message.err, multiplayer.ErrSignedOut):

@@ -158,7 +158,7 @@ func settingsPage(dashboard application.Dashboard) Page {
 		"No account, server, group, or synchronization is required.",
 		"",
 		"Privacy",
-		"Tokenholic stores normalized usage counts only.",
+		"tokenholic stores normalized usage counts only.",
 		"Never stored: prompts, responses, source code, command text, or credentials.",
 		"Never stored: paths, project names, repository names, or branch names.",
 		"",

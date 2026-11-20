@@ -31,6 +31,25 @@ func TestLockPreventsOverlapAndCanBeReacquired(t *testing.T) {
 	}
 }
 
+func TestDefaultLockCoordinatesLowercaseAndLegacyPaths(t *testing.T) {
+	root := t.TempDir()
+	lock, err := acquireDefault(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{
+		filepath.Join(root, applicationDirectory, "sync.lock"),
+		filepath.Join(root, legacyApplicationDirectory(), "sync.lock"),
+	} {
+		if _, err := Acquire(path); !errors.Is(err, ErrAlreadyRunning) {
+			t.Fatalf("Acquire(%q) = %v, want overlap", path, err)
+		}
+	}
+	if err := lock.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestLockRejectsSymbolicLink(t *testing.T) {
 	root := t.TempDir()
 	target := filepath.Join(root, "target")

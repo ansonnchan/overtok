@@ -14,7 +14,7 @@ function targetPackage(platform, arch) {
   const packageName = packageByTarget[`${platform}-${arch}`];
   if (!packageName) {
     throw new Error(
-      `Tokenholic does not support ${platform}/${arch}. Supported targets: macOS arm64 and x64.`,
+      `tokenholic does not support ${platform}/${arch}. Supported targets: macOS arm64 and x64.`,
     );
   }
   return packageName;
@@ -53,7 +53,7 @@ function run(argv, options = {}) {
       throw result.error;
     }
     if (result.signal) {
-      stderr.write(`Tokenholic stopped after signal ${result.signal}.\n`);
+      stderr.write(`tokenholic stopped after signal ${result.signal}.\n`);
       return 1;
     }
     return result.status ?? 1;

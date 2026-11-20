@@ -5,7 +5,7 @@ Last updated: November 18, 2026
 
 ## System goals
 
-Tokenholic must:
+tokenholic must:
 
 - collect supported coding-agent usage without intercepting model traffic;
 - preserve the difference between observed and inferred metadata;
@@ -26,7 +26,7 @@ internal/
   account/                 Native login and OS credential-vault storage
   adapters/                Source-specific discovery and parsing
   application/             Local refresh and dashboard orchestration
-  collect/                 Deduplication, counter reduction, and summaries
+  collect/                 Deduplication and counter reduction
   doctor/                  Privacy-safe source and storage diagnostics
   fixturecheck/            Fixture privacy enforcement
   modelcatalog/            Model resolution and pricing revisions
@@ -36,7 +36,7 @@ internal/
   tui/                     Bubble Tea application shell and local views
 server/
   account/                 Authorized multi-device account aggregation
-  auth/                    GitHub device flow and Tokenholic device credentials
+  auth/                    GitHub device flow and tokenholic device credentials
   cmd/api/                 Hosted HTTP API entry point
   httpapi/                 Bounded JSON routing and protocol errors
   postgres/                Hosted connection and migration boundary
@@ -238,7 +238,7 @@ local SQLite usage remains on each machine.
 
 ```text
 GitHub device authorization
-    -> Tokenholic user
+    -> tokenholic user
     -> revocable device credential
 
 Signed-in client
@@ -264,19 +264,19 @@ the local TUI remains fully usable and the Groups area explains how to opt in.
 
 The leaderboard identity is the user account. Devices only collect and upload.
 
-- One GitHub identity maps to one Tokenholic user.
+- One GitHub identity maps to one tokenholic user.
 - One user can register multiple devices.
 - Each device has a separate revocable credential.
 - Memberships and invites reference users, not devices.
 - Revoking a device prevents future writes without deleting other device data.
 
-The CLI begins authorization through the Tokenholic API and displays GitHub's
+The CLI begins authorization through the tokenholic API and displays GitHub's
 verification URL and user code. Short-lived GitHub device state is encrypted
 and authenticated inside an opaque flow token. After approval, the API uses the
 GitHub access token only in memory to read the stable numeric ID and login, then
 discards it. Neither PostgreSQL nor the native client stores that token.
 
-Tokenholic device credentials contain a public credential ID and 256-bit random
+tokenholic device credentials contain a public credential ID and 256-bit random
 secret. PostgreSQL stores only the SHA-256 secret hash. Rotation revokes the old
 credential atomically, logout revokes the entire device, and other devices on
 the same account remain independent. The native client stores its session in

@@ -5,9 +5,9 @@ Last updated: November 18, 2026
 
 ## Intent
 
-The Tokenholic TUI should feel calm, compact, and deliberate. It is a metrics application, not a simulated hacker console.
+The tokenholic TUI should feel calm, compact, and deliberate. It is a metrics application, not a simulated hacker console.
 
-The supplied Tokenboard reference is useful for its hierarchy, warm accent, restrained dark surfaces, clear table rows, selected-user emphasis, and compact summary cards. Tokenholic should adapt those principles to terminal constraints without reproducing the web layout or branding.
+The supplied Tokenboard reference is useful for its hierarchy, warm accent, restrained dark surfaces, clear table rows, selected-user emphasis, and compact summary cards. tokenholic should adapt those principles to terminal constraints without reproducing the web layout or branding.
 
 The presentation layer begins after local persistence and model resolution.
 `tokenholic doctor` remains plain diagnostic output. The TUI consumes
@@ -65,7 +65,7 @@ configured, the first four views remain fully functional.
 At 88 columns or more:
 
 ```text
-Tokenholic · local usage
+tokenholic · local usage
 [1 Overview]    2 Sources    3 Models    4 Settings    5 Groups
 
 Overview

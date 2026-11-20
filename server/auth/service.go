@@ -15,7 +15,7 @@ import (
 
 const defaultCredentialLifetime = 90 * 24 * time.Hour
 
-// Service coordinates GitHub device flow and Tokenholic device credentials.
+// Service coordinates GitHub device flow and tokenholic device credentials.
 type Service struct {
 	github             GitHub
 	repository         Repository
@@ -129,7 +129,7 @@ func (s *Service) Poll(ctx context.Context, flowToken string) (PollResponse, err
 	}}, nil
 }
 
-// Authenticate validates a Tokenholic device credential.
+// Authenticate validates a tokenholic device credential.
 func (s *Service) Authenticate(ctx context.Context, credential string) (Principal, error) {
 	proof, err := parseCredential(credential)
 	if err != nil {

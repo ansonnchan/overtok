@@ -55,7 +55,7 @@ type Usage struct {
 	Devices       []Device   `json:"devices"`
 }
 
-// Authenticator resolves a Tokenholic device credential.
+// Authenticator resolves a tokenholic device credential.
 type Authenticator interface {
 	Authenticate(context.Context, string) (serverauth.Principal, error)
 }

@@ -3,6 +3,7 @@ package autosync
 import (
 	"context"
 	"encoding/xml"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -101,6 +102,45 @@ func TestManagerRequiresMacOSAndValidAPI(t *testing.T) {
 		if err := manager.Enable(t.Context()); err == nil {
 			t.Fatalf("Enable(%#v) succeeded", config)
 		}
+	}
+}
+
+func TestManagerRecognizesAndRemovesLegacyInstallation(t *testing.T) {
+	home := t.TempDir()
+	source := filepath.Join(t.TempDir(), "tokenholic")
+	if err := os.WriteFile(source, []byte("fixture"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	launcher := &fakeLauncher{loaded: true}
+	manager, err := NewManager(Config{
+		Home: home, Executable: source, APIURL: "https://api.example.test",
+		platform: "darwin", uid: 501, launcher: launcher,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy := manager.legacyPaths()
+	if err := os.MkdirAll(filepath.Dir(legacy.binary), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(legacy.plist), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(legacy.binary, []byte("legacy"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(legacy.plist, []byte("legacy"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	status, err := manager.Status(t.Context())
+	if err != nil || !status.Installed || !status.Loaded {
+		t.Fatalf("Status() = %#v, %v", status, err)
+	}
+	if err := manager.Disable(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(legacy.binary); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("legacy binary still exists: %v", err)
 	}
 }
 

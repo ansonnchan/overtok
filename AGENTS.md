@@ -1,4 +1,4 @@
-# Tokenholic contributor guidance
+# tokenholic contributor guidance
 
 Read these documents before changing the project:
 
@@ -8,7 +8,7 @@ Read these documents before changing the project:
 
 ## Product boundaries
 
-Tokenholic tracks coding-agent usage from supported local evidence. It must not upload prompts, responses, source code, file paths, project names, repository names, branch names, command text, or provider credentials.
+tokenholic tracks coding-agent usage from supported local evidence. It must not upload prompts, responses, source code, file paths, project names, repository names, branch names, command text, or provider credentials.
 
 Ordinary desktop/web chat is outside the product. Claude Desktop local Code/Agent/Cowork sessions are in scope when they expose compatible local usage records.
 
