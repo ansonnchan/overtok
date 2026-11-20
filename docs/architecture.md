@@ -324,7 +324,18 @@ Unknown models retain token totals and display unavailable cost. Historical valu
 
 ## Deployment
 
-The beta should use one Go API deployment and one PostgreSQL database. Terraform manages infrastructure only after M0 and local correctness are complete.
+The optional demo environment uses one stateless Go API deployment on Render
+and one Supabase PostgreSQL database. A root Blueprint and a production
+container make that environment reproducible without introducing application
+dependencies on either provider. Local collection remains the primary product
+and does not require the hosted service.
+
+The free environment exists for end-to-end personal testing and interviews,
+not for a production availability or durability claim. Free-tier sleeping,
+pausing, and missing automatic backups are accepted constraints. If measured
+usage later justifies a persistent beta, infrastructure-as-code, managed
+backups, budgets, and alerts should be evaluated as a separate operational
+milestone rather than implied by the demo configuration.
 
 The MVP does not require:
 

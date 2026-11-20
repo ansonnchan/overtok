@@ -136,7 +136,8 @@ For stacked work, open and report each parent PR before starting its child branc
 
 ## CI
 
-GitHub Actions runs `make check` on macOS and the hosted schema integration test
-against PostgreSQL 18 on Linux. Both jobs use the Go version declared in
+GitHub Actions runs `make check` on macOS, validates the npm release workspace,
+builds the production API container, and runs the hosted schema integration
+test against PostgreSQL 18 on Linux. Go jobs use the version declared in
 `go.mod`. A local clean checkout should pass the same applicable commands before
 a PR is marked ready.

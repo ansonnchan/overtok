@@ -5,9 +5,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -108,9 +110,9 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	address := strings.TrimSpace(os.Getenv("TOKENHOLIC_LISTEN_ADDR"))
-	if address == "" {
-		address = "127.0.0.1:8080"
+	address, err := listenAddress(os.Getenv)
+	if err != nil {
+		return err
 	}
 	server := &http.Server{
 		Addr: address, Handler: handler,
@@ -135,6 +137,21 @@ func run() error {
 		}
 		return nil
 	}
+}
+
+func listenAddress(getenv func(string) string) (string, error) {
+	if address := strings.TrimSpace(getenv("TOKENHOLIC_LISTEN_ADDR")); address != "" {
+		return address, nil
+	}
+	port := strings.TrimSpace(getenv("PORT"))
+	if port == "" {
+		return "127.0.0.1:8080", nil
+	}
+	value, err := strconv.ParseUint(port, 10, 16)
+	if err != nil || value == 0 {
+		return "", errors.New("PORT must be an integer between 1 and 65535")
+	}
+	return net.JoinHostPort("0.0.0.0", port), nil
 }
 
 func decodeStateKey(encoded string) ([]byte, error) {

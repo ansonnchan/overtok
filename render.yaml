@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: tokenholic-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./deploy/render/Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    maxShutdownDelaySeconds: 15
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: TOKENHOLIC_AUTH_STATE_KEY
+        generateValue: true

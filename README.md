@@ -82,6 +82,10 @@ Login requests public GitHub identity only. The CLI never receives a GitHub
 access token, and the API uses it only in memory to resolve the stable numeric
 GitHub identity before discarding it.
 
+The API can be run locally or deployed as an optional free demo. The documented
+Render and Supabase configuration is intentionally a personal test environment,
+not a production availability claim. See the [deployment guide](./docs/deployment.md).
+
 ## Build and verify
 
 Run the complete local verification suite from a clean checkout:
@@ -134,6 +138,7 @@ contents, or expose persisted observations.
 | `fixtures` | Synthetic compatibility and regression data |
 | `server/postgres` | Hosted PostgreSQL connection and migration boundary |
 | `server/account`, `server/auth`, `server/sync`, and `server/httpapi` | Account aggregation/deletion, device authorization, idempotent upload, and bounded JSON API |
+| `deploy/render` and `render.yaml` | Optional free demo API container and Render Blueprint |
 | `migrations` | Immutable, embedded hosted PostgreSQL schema history |
 | `docs` | Cross-cutting architecture and design decisions |
 
@@ -153,6 +158,7 @@ Package-level navigation and ownership are documented in [internal/README.md](./
 
 - [Documentation index](./docs/README.md)
 - [Development guide](./docs/development.md)
+- [Free demo deployment](./docs/deployment.md)
 - [Roadmap](./ROADMAP.md)
 - [Architecture](./docs/architecture.md)
 - [TUI design direction](./docs/design.md)

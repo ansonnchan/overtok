@@ -38,7 +38,9 @@ source records. Local discovery, provider parsing, cumulative-counter
 reduction, and raw-record deduplication remain native-client responsibilities.
 
 The API requires `DATABASE_URL`, `GITHUB_CLIENT_ID`, and a dedicated 32-byte
-base64 `TOKENHOLIC_AUTH_STATE_KEY`. `TOKENHOLIC_LISTEN_ADDR` defaults to loopback.
+base64 `TOKENHOLIC_AUTH_STATE_KEY`. `TOKENHOLIC_LISTEN_ADDR` defaults to
+loopback. When that explicit override is absent, a hosting platform's numeric
+`PORT` binds on all container interfaces before the loopback default is used.
 Register the GitHub OAuth app with Device Flow enabled and no repository scopes.
 GitHub access tokens are used only in memory for the authenticated-user request
 and are never stored or returned to the native client.
@@ -55,3 +57,8 @@ Run the disposable-schema integration suite with `make test-postgres` and an
 `TOKENHOLIC_TEST_DATABASE_URL`. Do not target production. Do not add distributed
 infrastructure, background queues, caches, or deployment configuration before
 a measured requirement and the corresponding roadmap stage.
+
+The optional free demo environment is documented in
+[`docs/deployment.md`](../docs/deployment.md). It keeps the API stateless and
+uses one external PostgreSQL database; it does not add queues, caches, or
+workers.

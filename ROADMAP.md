@@ -1,7 +1,7 @@
 # tokenholic roadmap
 
-Status: pre-deployment implementation complete; clean-machine release validation pending
-Last updated: November 18, 2026
+Status: free demo deployment configuration complete; live validation pending
+Last updated: November 19, 2026
 
 ## Product definition
 
@@ -139,8 +139,8 @@ Leaderboard responses
 
 - Go HTTP API.
 - PostgreSQL for relational group and device state.
-- Terraform-managed deployment after local collection semantics are proven.
-- One API deployment and one database for the beta; no load balancer or distributed cache unless measurements justify them.
+- Optional free Render and Supabase demo deployment for end-to-end validation.
+- One API deployment and one database for the demo; no load balancer or distributed cache unless measurements justify them.
 
 ### Distribution
 
@@ -382,16 +382,17 @@ Goal: make tokenholic installable and reliable without developer assistance.
   - Acceptance: hourly sync survives logout/restart, does not overlap manual sync, and is fully removable.
   - Depends on: TKH-022, TKH-040.
 
-- [ ] **TKH-043: Provision the beta environment with Terraform**
-  - Deploy the Go API, PostgreSQL, TLS, secrets, backups, logs, budgets, and alerts.
-  - Acceptance: the environment can be created from documented inputs and restored from a tested backup.
+- [ ] **TKH-043: Provision the free demo environment**
+  - Deploy the Go API on Render and PostgreSQL on Supabase using documented secret inputs.
+  - Preserve free-tier limitations honestly; do not claim production backup or availability guarantees.
+  - Acceptance: the Blueprint builds, `/healthz` succeeds, embedded migrations apply, and the complete login-to-leaderboard journey is validated manually.
   - Depends on: M3.
 
 M4 exit criteria:
 
 - A tester can install with one command, authenticate, join a group, sync, and enable autosync without repository access.
 - Releases are reproducible and versioned.
-- The beta environment has backups, cost limits, and minimum operational visibility.
+- The free demo environment can be removed without affecting authoritative local usage.
 
 ### M5 — Private beta and hardening
 
@@ -473,6 +474,8 @@ Each source must ship with:
 ## Next delivery sequence
 
 The local, multiplayer, packaging, and autosync implementation is complete.
-Provision the beta environment, publish the first tagged packages, validate the
-complete install-to-leaderboard journey, and then begin the measured private
-beta. Source and product extensions remain deferred until that path is stable.
+Provision the optional free demo environment, publish the first tagged
+packages, and validate the complete install-to-leaderboard journey. A measured
+private beta and paid operational infrastructure remain optional rather than
+requirements for the resume project. Source and product extensions remain
+deferred until that path is stable.
