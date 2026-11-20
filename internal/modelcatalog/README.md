@@ -32,6 +32,6 @@ standard API input, cache-read, 5-minute/30-minute cache-write as applicable,
 and output rates. They are always labelled `API-equivalent estimate`; they are
 not subscription usage or actual spending.
 
-Claude Haiku 5.5 changes price at a prompt-length threshold. Tokenholic resolves
+Claude Haiku 5.5 changes price at a prompt-length threshold. tokenholic resolves
 its canonical metadata but intentionally leaves its price unavailable because
 the normalized observation does not prove the applicable context tier.

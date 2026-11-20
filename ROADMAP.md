@@ -1,11 +1,11 @@
-# Tokenholic roadmap
+# tokenholic roadmap
 
 Status: pre-deployment implementation complete; clean-machine release validation pending
 Last updated: November 18, 2026
 
 ## Product definition
 
-Tokenholic is a terminal-native, multiplayer leaderboard for coding-agent usage. It reads locally available usage records, normalizes model and token metadata, and synchronizes privacy-limited aggregates to private groups.
+tokenholic is a terminal-native, multiplayer leaderboard for coding-agent usage. It reads locally available usage records, normalizes model and token metadata, and synchronizes privacy-limited aggregates to private groups.
 
 The product tracks coding-agent activity only. Ordinary Claude Desktop chat, claude.ai, general chat applications, prompts, responses, source code, file paths, and project names are outside the MVP.
 
@@ -75,7 +75,7 @@ Models and sources are different extension points:
 - A **source adapter** knows where a coding client stores usage and how its records behave.
 - A **model resolver** maps the model identifier emitted by a source to a canonical model and pricing entry.
 
-A newly released model should continue to count tokens without a Tokenholic release when an existing source reports its identifier. Until pricing metadata is available, Tokenholic displays the observed model and token counts with cost marked as unavailable.
+A newly released model should continue to count tokens without a tokenholic release when an existing source reports its identifier. Until pricing metadata is available, tokenholic displays the observed model and token counts with cost marked as unavailable.
 
 A newly supported coding client requires a source adapter or a validated ccusage integration.
 
@@ -312,7 +312,7 @@ Goal: establish one account across multiple independently managed devices.
 
 - [x] **TKH-021: Implement GitHub device-flow login**
   - Complete CLI-friendly authorization without accepting a GitHub password.
-  - Exchange GitHub identity for a Tokenholic account and device credential.
+  - Exchange GitHub identity for a tokenholic account and device credential.
   - Acceptance: login, logout, credential refresh/failure, and device revocation are tested.
   - Depends on: TKH-020.
 
@@ -364,16 +364,16 @@ M3 exit criteria:
 
 ### M4 — Packaging, autosync, and deployment
 
-Goal: make Tokenholic installable and reliable without developer assistance.
+Goal: make tokenholic installable and reliable without developer assistance.
 
 - [x] **TKH-040: Build cross-platform release artifacts**
   - Produce checksummed macOS arm64/x64 binaries and pinned parser assets.
   - Acceptance: artifacts run on clean supported machines.
 
-- [x] **TKH-041: Publish the npm umbrella and platform packages**
+- [x] **TKH-041: Prepare the npm umbrella and platform packages**
   - Expose one `tokenholic` executable through `npx @tokenholic/cli`.
   - Fail with an actionable message on unsupported platforms.
-  - Acceptance: a clean macOS machine reaches the TUI with the documented one-liner.
+  - Acceptance: package preparation and launcher tests pass for both macOS architectures.
   - Depends on: TKH-040.
 
 - [x] **TKH-042: Implement macOS autosync**
@@ -470,6 +470,9 @@ Each source must ship with:
 - Do not optimize for scale before measuring a real bottleneck.
 - Do not publish adoption, latency, or reliability numbers that were not measured.
 
-## Immediate starting sequence
+## Next delivery sequence
 
-M0 is complete. Begin M1 with local SQLite storage, then connect the proven discovery and normalization pipeline to transactional collection orchestration. Do not begin the API, authentication, groups, Terraform, or npm platform packages before the corresponding later milestone.
+The local, multiplayer, packaging, and autosync implementation is complete.
+Provision the beta environment, publish the first tagged packages, validate the
+complete install-to-leaderboard journey, and then begin the measured private
+beta. Source and product extensions remain deferred until that path is stable.

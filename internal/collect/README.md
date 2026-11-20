@@ -50,7 +50,3 @@ adapter health and returned to the caller.
 Cumulative state is isolated by source and local session identity. If a session identifier is unavailable, the adapter supplies a logical-file identity so unrelated files do not share state.
 
 A decreased known counter starts a new segment and emits `counter_reset`; the current snapshot becomes the first increment in that segment. A missing category remains unknown for that observation, but the reducer remembers the last known value so a later reappearance is compared with the correct snapshot.
-
-## Summaries
-
-Summaries group by source, observed model identifier, and resolution quality. Reported and inferred usage for the same model string must remain distinct. If either side of a category is unknown, the summarized category remains unknown instead of presenting a partial sum as complete.

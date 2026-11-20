@@ -15,7 +15,7 @@ Reasoning output is subset metadata when a source exposes it. It is already incl
 Resolution values mean:
 
 - `reported`: the source directly supplied the observed model identifier;
-- `resolved`: Tokenholic mapped an observed identifier to canonical metadata;
+- `resolved`: tokenholic mapped an observed identifier to canonical metadata;
 - `inferred`: the identifier is attributable only through surrounding source context and carries a warning;
 - `unknown`: the available record cannot be attributed safely.
 

@@ -1,6 +1,6 @@
 # Release artifacts
 
-Tokenholic releases checksummed native archives for macOS arm64 and x64. Release
+tokenholic releases checksummed native archives for macOS arm64 and x64. Release
 builds disable CGO, remove local filesystem paths and VCS metadata, inject the
 semantic version into `tokenholic --version`, and verify each Mach-O architecture
 before packaging it.

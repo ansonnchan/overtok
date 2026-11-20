@@ -35,6 +35,40 @@ func TestOpenCreatesConfiguredPrivateDatabase(t *testing.T) {
 	}
 }
 
+func TestDefaultPathUsesLowercaseAndPreservesExistingDatabase(t *testing.T) {
+	root := t.TempDir()
+	preferred := filepath.Join(root, applicationDirectory, databaseFileName)
+	path, err := defaultPath(root)
+	if err != nil || path != preferred {
+		t.Fatalf("defaultPath() = %q, %v; want %q", path, err, preferred)
+	}
+	legacy := filepath.Join(root, legacyApplicationDirectory(), databaseFileName)
+	if err := os.MkdirAll(filepath.Dir(legacy), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(legacy, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	wantLegacy := legacy
+	if _, err := os.Lstat(preferred); err == nil {
+		wantLegacy = preferred
+	}
+	path, err = defaultPath(root)
+	if err != nil || path != wantLegacy {
+		t.Fatalf("legacy defaultPath() = %q, %v; want %q", path, err, wantLegacy)
+	}
+	if err := os.MkdirAll(filepath.Dir(preferred), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(preferred, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	path, err = defaultPath(root)
+	if err != nil || path != preferred {
+		t.Fatalf("preferred defaultPath() = %q, %v; want %q", path, err, preferred)
+	}
+}
+
 func TestOpenRejectsCanceledContextAndRelativePath(t *testing.T) {
 	t.Parallel()
 	canceled, cancel := context.WithCancel(context.Background())

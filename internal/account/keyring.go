@@ -12,7 +12,7 @@ import (
 
 const keyringService = "io.tokenholic.cli"
 
-// ErrNoSession means no Tokenholic session is stored for this API origin.
+// ErrNoSession means no tokenholic session is stored for this API origin.
 var ErrNoSession = errors.New("not signed in")
 
 // KeyringStore keeps device credentials in the operating-system credential

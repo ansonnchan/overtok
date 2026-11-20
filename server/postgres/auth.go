@@ -48,7 +48,7 @@ func (r *AuthRepository) RegisterDevice(ctx context.Context, githubUser serverau
 	case errors.Is(err, pgx.ErrNoRows):
 		userID = registration.UserID
 		if _, err = tx.Exec(ctx, `INSERT INTO users(id, display_name) VALUES ($1::uuid, $2)`, userID, githubUser.Login); err != nil {
-			return identity, fmt.Errorf("create Tokenholic user: %w", err)
+			return identity, fmt.Errorf("create tokenholic user: %w", err)
 		}
 		if _, err = tx.Exec(ctx, `INSERT INTO github_identities(github_user_id, user_id, login) VALUES ($1, $2::uuid, $3)`, githubUser.ID, userID, githubUser.Login); err != nil {
 			return identity, fmt.Errorf("create GitHub identity: %w", err)
@@ -60,7 +60,7 @@ func (r *AuthRepository) RegisterDevice(ctx context.Context, githubUser serverau
 			return identity, fmt.Errorf("refresh GitHub identity: %w", err)
 		}
 		if _, err = tx.Exec(ctx, `UPDATE users SET display_name = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1::uuid`, userID, githubUser.Login); err != nil {
-			return identity, fmt.Errorf("refresh Tokenholic user: %w", err)
+			return identity, fmt.Errorf("refresh tokenholic user: %w", err)
 		}
 	}
 	deviceTag, err := tx.Exec(ctx, `

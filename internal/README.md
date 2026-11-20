@@ -21,10 +21,10 @@ multiplayer owns authenticated group and leaderboard HTTP calls
 
 | Package | Owns | Does not own |
 | --- | --- | --- |
-| `account` | Tokenholic API login, credential rotation/revocation, and OS vault storage | GitHub tokens, source collection, or server persistence |
+| `account` | tokenholic API login, credential rotation/revocation, and OS vault storage | GitHub tokens, source collection, or server persistence |
 | `adapters` | Source discovery, source formats, and external parser contracts | Cross-source totals, persistence, or UI |
 | `normalize` | Provider-neutral records, capability vocabulary, and validation | Filesystem discovery or provider parsing |
-| `collect` | Application scan orchestration, deduplication, cumulative reduction, and summaries | SQL implementation or uploads |
+| `collect` | Application scan orchestration, deduplication, and cumulative reduction | SQL implementation or uploads |
 | `application` | Committed dashboard queries and manual refresh sequencing | Source parsing, SQL, or terminal rendering |
 | `autosync` | Opt-in macOS launch agent lifecycle and cross-command synchronization lock | Collection, uploads, credentials, or deployment |
 | `doctor` | Redacted source, parser, and storage diagnostics | Usage collection or repair |

@@ -9,7 +9,7 @@ import (
 var (
 	// ErrInvalidInput means an authentication request contains invalid client data.
 	ErrInvalidInput = errors.New("authentication input is invalid")
-	// ErrUnauthorized means a Tokenholic device credential is absent, invalid,
+	// ErrUnauthorized means a tokenholic device credential is absent, invalid,
 	// expired, or revoked.
 	ErrUnauthorized = errors.New("device credential is unauthorized")
 )
@@ -42,7 +42,7 @@ type GitHubPollResult struct {
 	RetryAfter  time.Duration
 }
 
-// GitHubUser is the minimal stable identity Tokenholic retains from GitHub.
+// GitHubUser is the minimal stable identity tokenholic retains from GitHub.
 type GitHubUser struct {
 	ID    int64
 	Login string
@@ -57,13 +57,13 @@ type GitHub interface {
 }
 
 // CredentialProof is the parsed identity and one-way hash of a presented
-// Tokenholic device credential.
+// tokenholic device credential.
 type CredentialProof struct {
 	CredentialID string
 	SecretHash   [32]byte
 }
 
-// NewCredential is a newly generated Tokenholic credential ready for persistence.
+// NewCredential is a newly generated tokenholic credential ready for persistence.
 type NewCredential struct {
 	CredentialID string
 	SecretHash   [32]byte
@@ -85,7 +85,7 @@ type Identity struct {
 	Login    string
 }
 
-// Principal is an authenticated Tokenholic device.
+// Principal is an authenticated tokenholic device.
 type Principal struct {
 	UserID       string
 	DeviceID     string

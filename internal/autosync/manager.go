@@ -18,8 +18,9 @@ import (
 )
 
 const (
-	launchLabel = "io.tokenholic.autosync"
-	interval    = 60 * 60
+	applicationDirectory = "tokenholic"
+	launchLabel          = "io.tokenholic.autosync"
+	interval             = 60 * 60
 )
 
 var errNotLoaded = errors.New("autosync launch agent is not loaded")
@@ -146,14 +147,15 @@ func (m *Manager) Disable(ctx context.Context) error {
 			return fmt.Errorf("unload autosync launch agent: %w", err)
 		}
 	}
-	paths := m.paths()
-	for _, path := range []string{paths.plist, paths.binary, paths.stdout, paths.stderr} {
-		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("remove autosync-owned file: %w", err)
+	for _, paths := range []managerPaths{m.paths(), m.legacyPaths()} {
+		for _, path := range []string{paths.plist, paths.binary, paths.stdout, paths.stderr} {
+			if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return fmt.Errorf("remove autosync-owned file: %w", err)
+			}
 		}
+		_ = os.Remove(filepath.Dir(paths.binary))
+		_ = os.Remove(paths.logs)
 	}
-	_ = os.Remove(filepath.Dir(paths.binary))
-	_ = os.Remove(paths.logs)
 	return nil
 }
 
@@ -170,6 +172,12 @@ func (m *Manager) Status(ctx context.Context) (Status, error) {
 	binaryReady, err := regularFile(paths.binary, true)
 	if err != nil {
 		return Status{}, fmt.Errorf("inspect stable autosync executable: %w", err)
+	}
+	if !binaryReady {
+		binaryReady, err = regularFile(m.legacyPaths().binary, true)
+		if err != nil {
+			return Status{}, fmt.Errorf("inspect legacy autosync executable: %w", err)
+		}
 	}
 	launchErr := m.launcher.Run(ctx, "print", m.domain()+"/"+launchLabel)
 	if launchErr != nil && !errors.Is(launchErr, errNotLoaded) {
@@ -204,10 +212,18 @@ type managerPaths struct {
 }
 
 func (m *Manager) paths() managerPaths {
-	logs := filepath.Join(m.home, "Library", "Logs", "Tokenholic")
+	return m.pathsFor(applicationDirectory)
+}
+
+func (m *Manager) legacyPaths() managerPaths {
+	return m.pathsFor(legacyApplicationDirectory())
+}
+
+func (m *Manager) pathsFor(directory string) managerPaths {
+	logs := filepath.Join(m.home, "Library", "Logs", directory)
 	return managerPaths{
 		plist:  filepath.Join(m.home, "Library", "LaunchAgents", launchLabel+".plist"),
-		binary: filepath.Join(m.home, "Library", "Application Support", "Tokenholic", "bin", "tokenholic"),
+		binary: filepath.Join(m.home, "Library", "Application Support", directory, "bin", "tokenholic"),
 		logs:   logs, stdout: filepath.Join(logs, "autosync.log"), stderr: filepath.Join(logs, "autosync-error.log"),
 	}
 }

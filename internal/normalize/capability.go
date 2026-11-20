@@ -6,7 +6,7 @@ type CapabilitySupport string
 const (
 	// CapabilityReported means the source records the field directly.
 	CapabilityReported CapabilitySupport = "reported"
-	// CapabilityDerived means Tokenholic computes the field without estimation.
+	// CapabilityDerived means tokenholic computes the field without estimation.
 	CapabilityDerived CapabilitySupport = "derived"
 	// CapabilityInferred means surrounding source context supplies the field.
 	CapabilityInferred CapabilitySupport = "inferred"

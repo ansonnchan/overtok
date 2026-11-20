@@ -53,7 +53,7 @@ type leaderboardService interface {
 	Get(context.Context, string, string, serverleaderboard.Period, serverleaderboard.Metric) (serverleaderboard.Board, error)
 }
 
-// Handler is the hosted Tokenholic HTTP API.
+// Handler is the hosted tokenholic HTTP API.
 type Handler struct {
 	auth         authenticationService
 	sync         usageSyncService

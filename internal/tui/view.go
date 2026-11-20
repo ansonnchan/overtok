@@ -13,7 +13,7 @@ func (m Model) render() string {
 	}
 	if width < MinimumWidth {
 		lines := []string{
-			m.styles.title.Render("Tokenholic"),
+			m.styles.title.Render("tokenholic"),
 			"",
 			m.styles.warning.Render("[warning] Terminal is too narrow"),
 			fmt.Sprintf("Resize to at least %d columns.", MinimumWidth),
@@ -27,9 +27,9 @@ func (m Model) render() string {
 	}
 
 	var output strings.Builder
-	title := "Tokenholic · local usage"
+	title := "tokenholic · local usage"
 	if m.section == GroupsSection {
-		title = "Tokenholic · private groups"
+		title = "tokenholic · private groups"
 	}
 	fmt.Fprintln(&output, m.styles.title.Render(title))
 	fmt.Fprintln(&output, m.renderNavigation(width))

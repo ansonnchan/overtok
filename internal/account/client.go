@@ -16,7 +16,7 @@ import (
 
 const maxResponseBytes = 1 << 20
 
-// ErrUnauthorized means the stored Tokenholic device credential is no longer valid.
+// ErrUnauthorized means the stored tokenholic device credential is no longer valid.
 var ErrUnauthorized = errors.New("stored device credential is unauthorized")
 
 // Session is the authentication state stored in the OS credential vault.
@@ -55,10 +55,10 @@ type Client struct {
 func NewClient(baseURL string, httpClient *http.Client) (*Client, error) {
 	parsed, err := url.Parse(strings.TrimSpace(baseURL))
 	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
-		return nil, errors.New("invalid Tokenholic API URL")
+		return nil, errors.New("invalid tokenholic API URL")
 	}
 	if parsed.Scheme != "https" && !(parsed.Scheme == "http" && isLoopbackHost(parsed.Hostname())) {
-		return nil, errors.New("Tokenholic API URL must use HTTPS or loopback HTTP")
+		return nil, errors.New("tokenholic API URL must use HTTPS or loopback HTTP")
 	}
 	parsed.Path = strings.TrimRight(parsed.Path, "/")
 	if httpClient == nil {
@@ -69,7 +69,7 @@ func NewClient(baseURL string, httpClient *http.Client) (*Client, error) {
 	return &Client{baseURL: parsed, httpClient: &clientCopy}, nil
 }
 
-// Start begins GitHub device authorization through Tokenholic.
+// Start begins GitHub device authorization through tokenholic.
 func (c *Client) Start(ctx context.Context, clientVersion string) (DeviceStart, error) {
 	var response struct {
 		FlowToken       string `json:"flow_token"`
@@ -120,7 +120,7 @@ func (c *Client) Poll(ctx context.Context, flowToken string) (PollResult, error)
 	}
 }
 
-// Refresh rotates the current Tokenholic device credential.
+// Refresh rotates the current tokenholic device credential.
 func (c *Client) Refresh(ctx context.Context, credential string) (Session, error) {
 	var session Session
 	if err := c.request(ctx, http.MethodPost, "/v1/auth/refresh", credential, nil, &session); err != nil {
@@ -129,7 +129,7 @@ func (c *Client) Refresh(ctx context.Context, credential string) (Session, error
 	return session, nil
 }
 
-// Logout revokes the current Tokenholic device.
+// Logout revokes the current tokenholic device.
 func (c *Client) Logout(ctx context.Context, credential string) error {
 	status, _, err := c.do(ctx, http.MethodPost, "/v1/auth/logout", credential, nil, nil)
 	if err != nil {
@@ -187,13 +187,13 @@ func (c *Client) do(ctx context.Context, method, path, credential string, input,
 	}
 	response, err := c.httpClient.Do(request)
 	if err != nil {
-		return 0, nil, fmt.Errorf("request Tokenholic API: %w", err)
+		return 0, nil, fmt.Errorf("request tokenholic API: %w", err)
 	}
 	defer response.Body.Close()
 	if output != nil && response.StatusCode >= 200 && response.StatusCode < 300 && response.StatusCode != http.StatusNoContent {
 		decoder := json.NewDecoder(io.LimitReader(response.Body, maxResponseBytes))
 		if err := decoder.Decode(output); err != nil {
-			return 0, nil, fmt.Errorf("decode Tokenholic API response: %w", err)
+			return 0, nil, fmt.Errorf("decode tokenholic API response: %w", err)
 		}
 	} else {
 		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, maxResponseBytes))

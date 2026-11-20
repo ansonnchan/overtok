@@ -14,7 +14,7 @@ Adapters are the only packages that understand provider-owned storage layouts an
 
 These roots are intentionally narrow. Ordinary Claude Desktop chat and general web/desktop chat storage are out of scope. Discovery is read-only, refuses root symlinks, skips nested symlinks and non-regular files, and records health through stable warning codes.
 
-Candidate paths are local implementation details. They are needed to open a file but must not appear in diagnostics, normalized observations, logs, fixtures, or future uploads. Relative paths may be used locally to separate otherwise anonymous files, but are never public metadata.
+Candidate paths are local implementation details. They are needed to open a file but must not appear in diagnostics, normalized observations, logs, fixtures, or uploads. Relative paths may be used locally to separate otherwise anonymous files, but are never public metadata.
 
 ## Native JSONL parsers
 

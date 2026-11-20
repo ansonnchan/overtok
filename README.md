@@ -1,6 +1,6 @@
-# Tokenholic
+# tokenholic
 
-Tokenholic is a terminal-first application for understanding coding-agent usage.
+tokenholic is a terminal-first application for understanding coding-agent usage.
 The current local implementation collects supported Claude and Codex evidence,
 normalizes token and model metadata, persists privacy-safe aggregates, reports
 installation health, and provides a keyboard-first application shell without
@@ -15,7 +15,7 @@ hosted account data without touching local usage.
 
 ## Privacy boundary
 
-Tokenholic is designed to count usage, not inspect work. Local collection must never upload or retain prompts, responses, source code, command text, credentials, identifying paths, project names, repository metadata, branch names, or raw transcripts.
+tokenholic is designed to count usage, not inspect work. Local collection must never upload or retain prompts, responses, source code, command text, credentials, identifying paths, project names, repository metadata, branch names, or raw transcripts.
 
 The compatibility suite uses synthetic fixtures. Do not replace them with records copied from a real local agent installation. See [fixtures/README.md](./fixtures/README.md) before adding a source-format regression case.
 
@@ -60,7 +60,7 @@ other platforms fail with a supported-target message.
 npx @tokenholic/cli
 ```
 
-Account commands require a Tokenholic API origin:
+Account commands require a tokenholic API origin:
 
 ```sh
 TOKENHOLIC_API_URL=https://api.example.test tokenholic login
@@ -120,9 +120,9 @@ contents, or expose persisted observations.
 | Path | Responsibility |
 | --- | --- |
 | `cmd/tokenholic` | Native executable entry point |
-| `internal/adapters` | Source discovery, ccusage validation, and source-specific parsers |
+| `internal/adapters` | Source discovery, source-specific parsers, and the ccusage compatibility contract |
 | `internal/normalize` | Provider-neutral observations, capabilities, and invariants |
-| `internal/collect` | Parsing orchestration, deduplication, cumulative reduction, and summaries |
+| `internal/collect` | Parsing orchestration, deduplication, and cumulative reduction |
 | `internal/application` | Local refresh sequencing and committed dashboard queries |
 | `internal/account` | Device login, rotation, revocation, account deletion, and OS credential-vault storage |
 | `internal/doctor` | Privacy-safe source and storage diagnostic reporting |
@@ -147,7 +147,7 @@ Package-level navigation and ownership are documented in [internal/README.md](./
 - Make repeated collection deterministic and safe.
 - Keep provider-specific rules inside adapters.
 - Validate external tool output as a pinned, versioned contract.
-- Normalize and commit local state before any future upload attempt.
+- Normalize and commit local state before any network upload attempt.
 
 ## Documentation
 

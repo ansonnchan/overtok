@@ -1,7 +1,7 @@
 {
   "name": "@tokenholic/cli",
   "version": "0.0.0-development",
-  "description": "Native Tokenholic coding-agent usage tracker launcher",
+  "description": "Native tokenholic coding-agent usage tracker launcher",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ansonnchan/tokenholic.git"

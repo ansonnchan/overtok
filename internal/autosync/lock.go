@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/sys/unix"
 )
@@ -16,7 +17,7 @@ var ErrAlreadyRunning = errors.New("synchronization is already running")
 // Lock is an advisory process lock. Keep the lock file in place across runs so
 // competing processes always address the same inode.
 type Lock struct {
-	file *os.File
+	files []*os.File
 }
 
 // AcquireDefault acquires the per-user synchronization lock without waiting.
@@ -25,7 +26,30 @@ func AcquireDefault() (*Lock, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolve autosync lock directory: %w", err)
 	}
-	return Acquire(filepath.Join(root, "Tokenholic", "sync.lock"))
+	return acquireDefault(root)
+}
+
+func acquireDefault(root string) (*Lock, error) {
+	preferredPath := filepath.Join(root, applicationDirectory, "sync.lock")
+	preferred, err := Acquire(preferredPath)
+	if err != nil {
+		return nil, err
+	}
+	legacyPath := filepath.Join(root, legacyApplicationDirectory(), "sync.lock")
+	preferredInfo, preferredErr := os.Lstat(preferredPath)
+	legacyInfo, legacyErr := os.Lstat(legacyPath)
+	if preferredErr == nil && legacyErr == nil && os.SameFile(preferredInfo, legacyInfo) {
+		return preferred, nil
+	}
+	// Lock both directory spellings while older scheduled binaries may still run.
+	legacy, err := Acquire(legacyPath)
+	if err != nil {
+		_ = preferred.Close()
+		return nil, err
+	}
+	preferred.files = append(preferred.files, legacy.files...)
+	legacy.files = nil
+	return preferred, nil
 }
 
 // Acquire takes a non-blocking exclusive lock at an explicit path.
@@ -59,21 +83,27 @@ func Acquire(path string) (*Lock, error) {
 		}
 		return nil, fmt.Errorf("acquire autosync lock: %w", err)
 	}
-	return &Lock{file: file}, nil
+	return &Lock{files: []*os.File{file}}, nil
 }
 
 // Close releases the synchronization lock.
 func (l *Lock) Close() error {
-	if l == nil || l.file == nil {
+	if l == nil || len(l.files) == 0 {
 		return nil
 	}
-	if err := unix.Flock(int(l.file.Fd()), unix.LOCK_UN); err != nil {
-		_ = l.file.Close()
-		return fmt.Errorf("release autosync lock: %w", err)
+	var result error
+	for _, file := range l.files {
+		if err := unix.Flock(int(file.Fd()), unix.LOCK_UN); err != nil {
+			result = errors.Join(result, fmt.Errorf("release autosync lock: %w", err))
+		}
+		if err := file.Close(); err != nil {
+			result = errors.Join(result, fmt.Errorf("close autosync lock: %w", err))
+		}
 	}
-	if err := l.file.Close(); err != nil {
-		return fmt.Errorf("close autosync lock: %w", err)
-	}
-	l.file = nil
-	return nil
+	l.files = nil
+	return result
+}
+
+func legacyApplicationDirectory() string {
+	return strings.ToUpper(applicationDirectory[:1]) + applicationDirectory[1:]
 }

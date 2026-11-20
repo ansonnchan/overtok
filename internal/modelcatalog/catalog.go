@@ -17,7 +17,7 @@ const (
 	MatchExact MatchKind = "exact"
 	// MatchAlias means the provider documents the exact alias.
 	MatchAlias MatchKind = "alias"
-	// MatchReviewed means Tokenholic explicitly reviewed a source-specific mapping.
+	// MatchReviewed means tokenholic explicitly reviewed a source-specific mapping.
 	MatchReviewed MatchKind = "reviewed"
 	// MatchUnknown means no safe mapping exists.
 	MatchUnknown MatchKind = "unknown"

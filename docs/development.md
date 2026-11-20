@@ -1,6 +1,8 @@
 # Development guide
 
-This guide covers the current native Go workspace. The pnpm workspace is reserved for later npm release tooling and does not participate in the local collection build.
+This guide covers the native Go workspace and the pnpm release workspace. pnpm
+is needed only for npm metadata, launcher, and package-preparation checks; it
+does not participate in local collection builds.
 
 ## Prerequisites
 

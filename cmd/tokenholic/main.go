@@ -1,4 +1,4 @@
-// Command tokenholic is the native Tokenholic CLI entry point.
+// Command tokenholic is the native tokenholic CLI entry point.
 package main
 
 import (

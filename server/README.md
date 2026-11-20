@@ -3,7 +3,7 @@
 The hosted PostgreSQL persistence foundation is implemented in `postgres`. It
 opens a pgx connection pool and applies the embedded, checksummed migrations in
 one advisory-locked transaction. `auth` and `httpapi` implement GitHub device
-authorization, Tokenholic credential rotation/revocation, and bounded JSON routes.
+authorization, tokenholic credential rotation/revocation, and bounded JSON routes.
 `sync` authenticates privacy-limited uploads and `postgres` applies absolute
 revisions transactionally.
 

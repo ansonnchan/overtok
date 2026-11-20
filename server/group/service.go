@@ -92,7 +92,7 @@ type NewInvite struct {
 	MaxUses   int
 }
 
-// Authenticator verifies a Tokenholic device credential.
+// Authenticator verifies a tokenholic device credential.
 type Authenticator interface {
 	Authenticate(context.Context, string) (serverauth.Principal, error)
 }
