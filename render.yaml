@@ -6,7 +6,6 @@ services:
     dockerfilePath: ./deploy/render/Dockerfile
     dockerContext: .
     healthCheckPath: /healthz
-    maxShutdownDelaySeconds: 15
     envVars:
       - key: DATABASE_URL
         sync: false
