@@ -26,9 +26,11 @@ npx @tokenholic/cli
 
 ```text
 tokenholic                         # Open the TUI
+tokenholic claim                   # GitHub authentication followed by initial sync
 tokenholic login                   # GitHub device authentication
 tokenholic logout
 tokenholic sync                    # Collect locally and upload pending aggregates
+tokenholic show-data               # Show the exact upload payload without an account
 tokenholic sync --dry-run          # Show what would be uploaded
 tokenholic group create <name>
 tokenholic group join <code>
@@ -212,7 +214,9 @@ It must not include:
 - provider credentials;
 - raw session transcripts.
 
-`tokenholic sync --dry-run` must use the real serialization path and show exactly what would be uploaded.
+`tokenholic show-data` and its `sync --dry-run` alias must use the real
+serialization path and show exactly what would be uploaded without requiring an
+API origin, account, or device credential.
 
 ## Milestones and PR-sized workstreams
 

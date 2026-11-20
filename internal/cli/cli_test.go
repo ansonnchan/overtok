@@ -215,9 +215,10 @@ func TestAccountCommandRequiresAPIURL(t *testing.T) {
 	}
 }
 
-func TestSyncCommandParsesDryRunAndRedactsFailure(t *testing.T) {
+func TestClaimLogsInAndPerformsInitialSync(t *testing.T) {
 	t.Parallel()
-	var gotDryRun bool
+	manager := &fakeAccountManager{}
+	syncCalls := 0
 	deps := dependencies{
 		homeDir: func() (string, error) { return "/synthetic/home", nil },
 		getenv: func(name string) string {
@@ -226,9 +227,38 @@ func TestSyncCommandParsesDryRunAndRedactsFailure(t *testing.T) {
 			}
 			return ""
 		},
-		sync: func(_ context.Context, home, codexHome, apiURL string, dryRun bool, output io.Writer) error {
-			if home != "/synthetic/home" || codexHome != "" || apiURL != "https://api.example.test" {
-				t.Fatalf("sync inputs = %q/%q/%q", home, codexHome, apiURL)
+		account: func(string) (accountManager, error) { return manager, nil },
+		sync: func(_ context.Context, _, _, apiURL string, dryRun bool, output io.Writer) error {
+			syncCalls++
+			if apiURL != "https://api.example.test" || dryRun {
+				t.Fatalf("claim sync inputs = %q/%v", apiURL, dryRun)
+			}
+			_, _ = io.WriteString(output, "Synchronized 1 bucket in 1 batch.\n")
+			return nil
+		},
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if code := run([]string{"claim"}, &stdout, &stderr, deps); code != 0 || manager.loginVersion != version || syncCalls != 1 || stderr.Len() != 0 {
+		t.Fatalf("claim = %d/%q/%q manager=%#v syncs=%d", code, stdout.String(), stderr.String(), manager, syncCalls)
+	}
+}
+
+func TestSyncCommandParsesDryRunAndRedactsFailure(t *testing.T) {
+	t.Parallel()
+	var gotDryRun bool
+	apiURL := ""
+	deps := dependencies{
+		homeDir: func() (string, error) { return "/synthetic/home", nil },
+		getenv: func(name string) string {
+			if name == "TOKENHOLIC_API_URL" {
+				return apiURL
+			}
+			return ""
+		},
+		sync: func(_ context.Context, home, codexHome, gotAPIURL string, dryRun bool, output io.Writer) error {
+			if home != "/synthetic/home" || codexHome != "" || gotAPIURL != apiURL {
+				t.Fatalf("sync inputs = %q/%q/%q", home, codexHome, gotAPIURL)
 			}
 			gotDryRun = dryRun
 			_, _ = io.WriteString(output, "{\"schema_version\":1}\n")
@@ -240,6 +270,13 @@ func TestSyncCommandParsesDryRunAndRedactsFailure(t *testing.T) {
 	if code := run([]string{"sync", "--dry-run"}, &stdout, &stderr, deps); code != 0 || !gotDryRun || !strings.Contains(stdout.String(), "schema_version") {
 		t.Fatalf("sync dry run = %d/%q/%q dry=%v", code, stdout.String(), stderr.String(), gotDryRun)
 	}
+	gotDryRun = false
+	stdout.Reset()
+	stderr.Reset()
+	if code := run([]string{"show-data"}, &stdout, &stderr, deps); code != 0 || !gotDryRun || !strings.Contains(stdout.String(), "schema_version") {
+		t.Fatalf("show-data = %d/%q/%q dry=%v", code, stdout.String(), stderr.String(), gotDryRun)
+	}
+	apiURL = "https://api.example.test"
 	deps.sync = func(context.Context, string, string, string, bool, io.Writer) error {
 		return errors.New("private/path and credential")
 	}

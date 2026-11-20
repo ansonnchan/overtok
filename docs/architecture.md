@@ -174,11 +174,12 @@ only this committed outbox, sends at most 100 allowlisted buckets per request,
 and marks only the exact acknowledged revision as durable remotely. A late
 acknowledgement cannot clear a newer local replacement.
 
-Both real sync and dry run collect, normalize, and commit locally before reading
-the outbox. Dry run writes the exact request JSON produced by the real serializer
-and performs no network or acknowledgement mutation. Transient network, rate
-limit, and server failures receive one exponential-backoff retry with jitter;
-an interrupted or rejected batch remains pending.
+Both real sync and `show-data`/`sync --dry-run` collect, normalize, and commit
+locally before reading the outbox. The offline preview writes the exact request
+JSON produced by the real serializer without requiring an API origin, account,
+or credential, and performs no network or acknowledgement mutation. Transient
+network, rate limit, and server failures receive one exponential-backoff retry
+with jitter; an interrupted or rejected batch remains pending.
 
 Local buckets use one-minute UTC intervals. This preserves exact modern IANA
 timezone day and week boundaries while grouping events that occur in the same
