@@ -1,0 +1,114 @@
+# Free demo deployment
+
+The hosted API is optional. Local collection, SQLite persistence, diagnostics,
+and the first four TUI views work without it. Deploy the API only to exercise
+GitHub login, multi-device synchronization, private groups, and leaderboards.
+
+The repository's free demo configuration uses one Render web service and one
+Supabase PostgreSQL project:
+
+```text
+macOS tokenholic client
+        |
+        | privacy-limited HTTPS requests
+        v
+Render free Go API
+        |
+        | encrypted PostgreSQL connection
+        v
+Supabase free PostgreSQL
+```
+
+This environment is suitable for personal testing and interviews. It is not a
+production service: free instances can sleep or pause, and the free database
+does not include automatic backups. Do not publish availability, durability,
+latency, or adoption claims from this environment.
+
+## 1. Create the Supabase database
+
+Create a free Supabase project near the Render region you plan to use. Keep the
+generated database password in a password manager.
+
+In the Supabase project's **Connect** dialog, copy the **Session pooler** URI.
+The Go API is a persistent backend, so use session mode on port `5432`, not the
+transaction pooler on port `6543`. Append `sslmode=require` and cap this small
+demo's application pool:
+
+```text
+postgresql://postgres.<project-ref>:<encoded-password>@<pooler-host>:5432/postgres?sslmode=require&pool_max_conns=4
+```
+
+Copy the host and username from the dashboard rather than constructing them.
+Percent-encode reserved characters in the password. Never commit the completed
+URI or paste it into an issue, test, log, or documentation.
+
+The API applies the repository's embedded, checksummed migrations during
+startup. Do not run automated tests against this database.
+
+## 2. Create the GitHub OAuth app
+
+Create a GitHub OAuth app owned by the account that will operate the demo:
+
+- use the repository URL as the homepage until the Render URL exists;
+- use a loopback callback URL such as `http://127.0.0.1` because Device Flow
+  does not use the callback; and
+- enable **Device Flow** in the OAuth app settings.
+
+The API needs only the OAuth app's client ID. Do not create, store, or configure
+a client secret, and do not request repository or organization scopes.
+
+## 3. Deploy the Render Blueprint
+
+In Render, create a Blueprint from this repository. The root [`render.yaml`](../render.yaml)
+builds [`deploy/render/Dockerfile`](../deploy/render/Dockerfile), configures the
+existing `/healthz` endpoint, and generates the 32-byte authentication-state
+key. Render prompts for the remaining secrets:
+
+- `DATABASE_URL`: the Supabase Session pooler URI from step 1;
+- `GITHUB_CLIENT_ID`: the OAuth app client ID from step 2.
+
+The container reads Render's `PORT` and binds to all container interfaces.
+`TOKENHOLIC_LISTEN_ADDR` remains available for an explicit override and takes
+precedence over `PORT`; do not set it on Render.
+
+After the first deployment completes, verify the generated HTTPS origin:
+
+```sh
+curl --fail --show-error https://<service>.onrender.com/healthz
+```
+
+The response should be `{"status":"ok"}`. A free service sleeps after an idle
+period, so the first request can take noticeably longer while it wakes.
+
+## 4. Exercise the complete journey
+
+Point a release binary at the HTTPS origin without writing the value into the
+repository:
+
+```sh
+export TOKENHOLIC_API_URL='https://<service>.onrender.com'
+tokenholic login
+tokenholic sync --dry-run
+tokenholic sync
+tokenholic group create 'Demo group'
+tokenholic
+```
+
+Use a second GitHub identity or a second tester to validate invitations and
+ranking. Confirm that a repeated `sync` does not increase unchanged totals.
+Before enabling autosync, remember that it preserves the configured API origin
+in the private launch-agent configuration.
+
+## 5. Operate or remove the demo
+
+Before an interview or manual test:
+
+1. resume the Supabase project if its dashboard shows it as paused;
+2. request `/healthz` and wait for the Render service to wake;
+3. run `tokenholic login` or `tokenholic sync`; and
+4. inspect Render and Supabase logs without copying request bodies or secrets.
+
+Free Supabase projects have no automatic backups. Treat synchronized records as
+disposable copies of local aggregates. The source evidence and local SQLite
+database remain authoritative; deleting the Render service and Supabase project
+removes the demo without affecting local usage.

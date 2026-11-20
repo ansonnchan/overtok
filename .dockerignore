@@ -1,0 +1,17 @@
+.git
+.github
+.agents
+.codex
+.env
+.env.*
+.DS_Store
+bin
+dist
+node_modules
+packages/darwin-arm64/bin
+packages/darwin-x64/bin
+coverage.out
+*.db
+*.db-shm
+*.db-wal
+*.sqlite*

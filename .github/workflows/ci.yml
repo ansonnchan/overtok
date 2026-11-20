@@ -32,6 +32,12 @@ jobs:
       - run: pnpm check
       - run: pnpm test
 
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build --file deploy/render/Dockerfile --tag tokenholic-api:ci .
+
   postgres:
     runs-on: ubuntu-latest
     services:
