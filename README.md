@@ -56,26 +56,66 @@ Tagged releases publish the same native binaries through `npx @tokenholic/cli`.
 The launcher installs only the optional package matching macOS arm64 or x64;
 other platforms fail with a supported-target message.
 
+## Run from npm
+
+No installation is required. Run the latest published CLI directly with
+`npx`:
+
 ```sh
-npx @tokenholic/cli
+npx --yes @tokenholic/cli@latest --version
+npx --yes @tokenholic/cli@latest doctor
+npx --yes @tokenholic/cli@latest
 ```
 
-Account commands require a tokenholic API origin:
+The last command opens the interactive TUI. The first npm invocation downloads
+the small launcher and the native binary for the current Mac; later invocations
+can reuse npm's cache.
+
+To exercise the hosted demo, export its API origin once in the current shell,
+then authenticate and synchronize before opening the TUI:
 
 ```sh
-TOKENHOLIC_API_URL=https://api.example.test tokenholic login
-TOKENHOLIC_API_URL=https://api.example.test tokenholic logout
-TOKENHOLIC_API_URL=https://api.example.test tokenholic sync --dry-run
-TOKENHOLIC_API_URL=https://api.example.test tokenholic sync
-TOKENHOLIC_API_URL=https://api.example.test tokenholic autosync enable
+export TOKENHOLIC_API_URL='https://tokenholic-api.onrender.com'
+
+npx --yes @tokenholic/cli@latest login
+npx --yes @tokenholic/cli@latest sync --dry-run
+npx --yes @tokenholic/cli@latest sync
+npx --yes @tokenholic/cli@latest group create "Demo group"
+npx --yes @tokenholic/cli@latest
+```
+
+The free demo API may take about a minute to wake after inactivity. A dry run
+collects and commits local aggregates, then prints the exact privacy-limited
+payload without uploading it.
+
+For a persistent `tokenholic` command, install the launcher globally instead:
+
+```sh
+npm install --global @tokenholic/cli@latest
+tokenholic --version
+tokenholic doctor
+tokenholic
+```
+
+After global installation, account and group commands use the shorter binary
+name. They require `TOKENHOLIC_API_URL` to reference a deployed tokenholic API:
+
+```sh
+export TOKENHOLIC_API_URL='https://tokenholic-api.onrender.com'
+
+tokenholic login
+tokenholic logout
+tokenholic sync --dry-run
+tokenholic sync
+tokenholic autosync enable
 tokenholic autosync status
 tokenholic autosync disable
-TOKENHOLIC_API_URL=https://api.example.test tokenholic group list
-TOKENHOLIC_API_URL=https://api.example.test tokenholic group create "Quiet team"
-TOKENHOLIC_API_URL=https://api.example.test tokenholic group invite --expires 24h --uses 10 "Quiet team"
-TOKENHOLIC_API_URL=https://api.example.test tokenholic group join "$TOKENHOLIC_INVITE_CODE"
-TOKENHOLIC_API_URL=https://api.example.test tokenholic group leave "Quiet team"
-TOKENHOLIC_API_URL=https://api.example.test tokenholic account delete --confirm DELETE
+tokenholic group list
+tokenholic group create "Quiet team"
+tokenholic group invite --expires 24h --uses 10 "Quiet team"
+tokenholic group join "$TOKENHOLIC_INVITE_CODE"
+tokenholic group leave "Quiet team"
+tokenholic account delete --confirm DELETE
 ```
 
 Login requests public GitHub identity only. The CLI never receives a GitHub
