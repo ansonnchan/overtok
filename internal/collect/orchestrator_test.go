@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/ansonnchan/tokenholic/internal/adapters"
-	"github.com/ansonnchan/tokenholic/internal/modelcatalog"
 	"github.com/ansonnchan/tokenholic/internal/normalize"
 	"github.com/ansonnchan/tokenholic/internal/store"
 )
@@ -134,18 +133,8 @@ func TestOrchestratorPersistsValidSourcesWhenAnotherIsPartial(t *testing.T) {
 		testRoot(adapters.RootCodexShared, normalize.SourceCodex, normalize.SurfaceSharedLocal, codexRoot),
 	}}
 	db := openCollectionStore(t)
-	resolver, err := modelcatalog.NewResolver(modelcatalog.Catalog{
-		Revision: "synthetic-r1",
-		Models: []modelcatalog.Model{
-			{CanonicalID: "claude-sonnet-synthetic", Provider: "synthetic-provider"},
-			{CanonicalID: "gpt-6-synthetic", Provider: "synthetic-provider"},
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	result, err := (Orchestrator{
-		Discovery: discovery, Collector: Collector{SourceVersion: "synthetic-v1"}, Models: resolver, Store: db,
+		Discovery: discovery, Collector: Collector{SourceVersion: "synthetic-v1"}, Store: db,
 		Now: func() time.Time { return time.Date(2026, 11, 17, 20, 0, 0, 0, time.UTC) },
 	}).Scan(t.Context())
 	if err != nil {
@@ -161,8 +150,17 @@ func TestOrchestratorPersistsValidSourcesWhenAnotherIsPartial(t *testing.T) {
 	sources := map[normalize.Source]int{}
 	for _, observation := range observations {
 		sources[observation.Source]++
-		if observation.CanonicalModelID == nil || observation.ModelProvider == nil {
-			t.Fatalf("observation was not model-resolved: %#v", observation)
+		// Collection stores source evidence only; catalog results are derived
+		// per bucket and must not be frozen into an observation.
+		if observation.CanonicalModelID != nil || observation.ModelProvider != nil || observation.PricingKey != nil {
+			t.Fatalf("observation carries a catalog result: %#v", observation)
+		}
+		wantEvidence := normalize.ModelReported
+		if observation.Source == normalize.SourceCodex {
+			wantEvidence = normalize.ModelInferred
+		}
+		if observation.ModelResolution != wantEvidence {
+			t.Fatalf("%s evidence = %q, want %q", observation.Source, observation.ModelResolution, wantEvidence)
 		}
 	}
 	if sources[normalize.SourceClaude] != 2 || sources[normalize.SourceCodex] != 1 {

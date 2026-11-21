@@ -297,7 +297,7 @@ The default upload payload may include:
 - user and device identifiers;
 - UTC time bucket;
 - source and surface;
-- observed/canonical model identifiers and resolution quality;
+- the observed model identifier and how the source attributed it;
 - normalized token categories;
 - schema and adapter versions.
 
@@ -567,7 +567,7 @@ before any presentation work depends on them.
     all five priced categories and unknown models.
   - Depends on: TKH-061.
 
-- [ ] **TKH-063: Make sync v2 server-authoritative** (`feat/sync-v2`)
+- [x] **TKH-063: Make sync v2 server-authoritative** (`feat/sync-v2`)
   - Clients upload observed model IDs and the six token categories only.
   - The server resolves models and derives estimates plus priced and
     unpriced token counts.

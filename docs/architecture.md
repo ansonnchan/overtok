@@ -48,7 +48,7 @@ server/
   httpapi/                 Bounded JSON routing and protocol errors
   postgres/                Hosted connection and migration boundary
   sync/                    Authenticated absolute-revision application
-  pricing/                 Server-owned model resolution and LiteLLM pricing (planned)
+  pricing/                 Server-owned model resolution and estimates
   web/                     Public JSON, share pages, and PNG cards (planned)
 migrations/                Embedded hosted PostgreSQL schema history
 fixtures/                  Sanitized compatibility fixtures
@@ -75,16 +75,16 @@ Narrow read-only source discovery
 Persistence follows this transaction flow:
 
 ```text
-Normalized observations
-    -> model resolution
+Normalized observations (source evidence only)
     -> observation transaction
          - observation
          - source checkpoint
          - adapter health
     -> read committed observations
     -> aggregate transaction
-         - absolute usage bucket revision
+         - absolute usage bucket revision (changed buckets only)
          - matching outbox revision
+         - local preview of model resolution and estimate
 ```
 
 Collection never depends on the server. The TUI reads derived local state
@@ -174,14 +174,18 @@ checks never render observations, source identities, or database contents.
 
 ### Local usage buckets
 
-Local bucket keys include the UTC interval, source, surface, observed and
-canonical model identity, resolution quality, measurement quality, and
-normalization version. A later upload envelope will add account and device
-identity without changing the local absolute value.
+Local bucket keys include the UTC interval, source, surface, observed model,
+model evidence quality, measurement quality, and normalization version. They
+contain no catalog result, so a catalog or price update never moves a bucket.
+Observations store source evidence only; canonical model, unpriced reason, and
+estimate are a per-bucket preview derived with the bundled catalog and kept in
+a separate local column that is never uploaded.
 
-Each local change increments the bucket revision. A newer local revision
-replaces its earlier absolute value and the outbox retains only that newest
-pending payload. Replaying a revision is therefore safe. The sync client reads
+A bucket's revision increments only when its uploadable content changes. A
+newer local revision replaces its earlier absolute value and the outbox retains
+only that newest pending payload. An unchanged bucket keeps its revision and
+its acknowledgement, so a refresh does not upload history again; only its
+local preview is refreshed in place. Replaying a revision is therefore safe. The sync client reads
 only this committed outbox, sends at most 100 allowlisted buckets per request,
 and marks only the exact acknowledged revision as durable remotely. A late
 acknowledgement cannot clear a newer local replacement.
@@ -214,11 +218,11 @@ being silently repaired. The current implementation targets PostgreSQL 18 and
 uses pgx for connection pooling and migration execution.
 
 The schema owns bucket identity with `(device_id, bucket_key)`. Equal revisions
-with the same canonical client-evidence payload are no-ops, older revisions are
+with the same client-evidence payload are no-ops, older revisions are
 acknowledged as stale, and newer absolute revisions replace earlier values.
-Server-derived price and pricing-revision fields are excluded from conflict
-identity so a trusted catalog update cannot turn an otherwise identical retry
-into a conflict. Other equal-revision differences reject the transaction.
+The payload hash covers client evidence only. Every server-derived column sits
+outside it, so a catalog update cannot turn an identical retry into a
+conflict. Other equal-revision differences reject the transaction.
 Foreign keys make user ownership explicit and cascade user deletion through
 devices, credential hashes, and usage buckets. The schema has no columns for
 raw source records, local identities, paths, prompts, responses, code, project
@@ -226,12 +230,21 @@ metadata, commands, or provider credentials.
 
 The server registers only trusted bundled model and pricing revisions. Upload
 serialization is an explicit field allowlist and stores normalized columns plus
-a canonical payload hash, never the client JSON body or local observation IDs.
-Clients report locally observed token counts and evidence quality, but the API
-rejects model metadata that disagrees with its catalog and replaces every
-client-provided API-equivalent estimate and pricing revision with a value
-derived from its trusted registry. Missing token categories or prices remain
-unavailable; partial token coverage produces a partial lower bound.
+a payload hash, never the client JSON body or local observation IDs.
+
+Sync protocol v2 carries observed evidence only: the observed model ID, how the
+source attributed it (`reported`, `inferred`, or `unknown`), measurement
+quality, and the six token categories plus reasoning. It has no field for a
+canonical model, provider, pricing key, estimate, or pricing revision. The
+`server/pricing` engine derives all of those from the bundled catalog and
+stores them beside the raw counts with the revision that produced them. A
+model the server does not recognize is stored as unknown and unpriced; it is
+never a reason to reject an upload. Unpriced tokens are counted, and priced
+plus unpriced tokens always equal the bucket's known total.
+
+`POST /v1/sync/buckets` answers `426 Upgrade Required` with an upgrade
+instruction for every caller. The v2 route rejects a body that carries v1's
+client-resolved fields.
 
 Account usage is read as one repeatable PostgreSQL snapshot. Normalized token
 categories, non-overlapping total tokens, and API-equivalent estimates preserve
@@ -256,8 +269,8 @@ GitHub device authorization
 
 Signed-in client
     -> bounded HTTPS batch
-    -> authentication, schema, and model-catalog validation
-    -> server-derived API-equivalent estimate
+    -> authentication and protocol validation
+    -> server-derived model, estimate, and priced/unpriced tokens
     -> idempotent bucket upsert
     -> acknowledgement
 
@@ -347,9 +360,9 @@ models retain token totals and display unavailable cost.
 The catalog and pricing share one revision derived from their content, so any
 price or rule change produces a new revision.
 
-Until sync v2 lands, the upload payload carries no cache-write lifetime and the
-server still requires the client and server catalogs to agree exactly. See
-"Planned target design".
+The CLI and API build the same catalog code. The server's derivation is stored
+and authoritative; the CLI's is a preview labelled as such. Their revisions may
+differ without affecting uploads.
 
 ## Deployment
 
@@ -383,6 +396,9 @@ Polling on TUI entry and explicit refresh is sufficient. Add infrastructure only
 These decisions are accepted and drive the roadmap's M6–M10 milestones.
 
 ### Server-authoritative models and pricing
+
+Implemented except startup repricing, which is the next workstream. The
+sections above describe the shipped behavior; this list records the decisions.
 
 ```text
 client: observed model ID + token categories (protocol v2)

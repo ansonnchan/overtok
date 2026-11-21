@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/ansonnchan/tokenholic/internal/modelcatalog"
-	protocol "github.com/ansonnchan/tokenholic/internal/sync"
 	serveraccount "github.com/ansonnchan/tokenholic/server/account"
 	serverauth "github.com/ansonnchan/tokenholic/server/auth"
+	serversync "github.com/ansonnchan/tokenholic/server/sync"
 )
 
 func TestPostgresAccountAggregatesActiveDevicesAndRetainsRevokedHistory(t *testing.T) {
@@ -49,16 +49,17 @@ func TestPostgresAccountAggregatesActiveDevicesAndRetainsRevokedHistory(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	firstEnvelope := localProtocolEnvelope(t, pricing.Revision)
+	engine := bundledEngine(t)
+	firstEnvelope := localProtocolEnvelope(t, "synthetic-model")
 	secondEnvelope := firstEnvelope
 	secondOutput := uint64(11)
 	secondEnvelope.Bucket.Tokens.Output.Value = &secondOutput
 	firstPrincipal := serverauth.Principal{UserID: first.UserID, DeviceID: first.DeviceID}
 	secondPrincipal := serverauth.Principal{UserID: second.UserID, DeviceID: second.DeviceID}
-	if _, err := usageRepository.ApplyUsageBuckets(ctx, firstPrincipal, []protocol.Envelope{firstEnvelope}); err != nil {
+	if _, err := usageRepository.ApplyUsageBuckets(ctx, firstPrincipal, []serversync.Bucket{derived(t, engine, firstEnvelope)}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := usageRepository.ApplyUsageBuckets(ctx, secondPrincipal, []protocol.Envelope{secondEnvelope}); err != nil {
+	if _, err := usageRepository.ApplyUsageBuckets(ctx, secondPrincipal, []serversync.Bucket{derived(t, engine, secondEnvelope)}); err != nil {
 		t.Fatal(err)
 	}
 	accountRepository, err := NewAccountRepository(pool)
@@ -96,7 +97,7 @@ func TestPostgresAccountAggregatesActiveDevicesAndRetainsRevokedHistory(t *testi
 	newer.Bucket.Revision = 2
 	newerOutput := uint64(13)
 	newer.Bucket.Tokens.Output.Value = &newerOutput
-	if _, err := usageRepository.ApplyUsageBuckets(ctx, secondPrincipal, []protocol.Envelope{newer}); err != nil {
+	if _, err := usageRepository.ApplyUsageBuckets(ctx, secondPrincipal, []serversync.Bucket{derived(t, engine, newer)}); err != nil {
 		t.Fatalf("active sibling upload: %v", err)
 	}
 	usage, err = accountRepository.AccountUsage(ctx, secondPrincipal)

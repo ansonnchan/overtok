@@ -108,6 +108,12 @@ Before an interview or manual test:
 3. run `tokenholic login` or `tokenholic sync`; and
 4. inspect Render and Supabase logs without copying request bodies or secrets.
 
+Deploying the sync v2 server resets demo usage. Its migration replaces the
+`usage_buckets` table and discards every uploaded bucket; accounts, devices,
+groups, and memberships are kept. Clients older than 0.2 receive
+`426 Upgrade Required` and must upgrade, after which they rebuild their local
+buckets and upload their full history again. Nothing local is lost.
+
 Free Supabase projects have no automatic backups. Treat synchronized records as
 disposable copies of local aggregates. The source evidence and local SQLite
 database remain authoritative; deleting the Render service and Supabase project

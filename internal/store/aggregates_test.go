@@ -2,9 +2,11 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"math"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -19,7 +21,7 @@ func TestBuildUsageBucketsPreservesPartialAndUnknownPricing(t *testing.T) {
 	first := storedObservation(start, normalize.SourceClaude, normalize.SurfaceCLI, "model-a", 2, 3)
 	second := storedObservation(start.Add(20*time.Second), normalize.SourceClaude, normalize.SurfaceCLI, "model-a", 5, 7)
 	second.Tokens.InputCacheWrite = nil
-	buckets, err := BuildUsageBuckets([]StoredObservation{first, second}, 1, syntheticEstimator(t))
+	buckets, err := BuildUsageBuckets([]StoredObservation{first, second}, 1, syntheticPreviewer(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,18 +35,122 @@ func TestBuildUsageBucketsPreservesPartialAndUnknownPricing(t *testing.T) {
 	if bucket.Tokens.InputCacheWrite.State != AvailabilityPartial || bucket.Tokens.InputCacheWrite.Value == nil {
 		t.Fatalf("cache-write coverage = %#v", bucket.Tokens.InputCacheWrite)
 	}
-	if bucket.APIEstimate.State != AvailabilityPartial || bucket.PricingRevision == nil {
-		t.Fatalf("price coverage = %#v revision=%v", bucket.APIEstimate, bucket.PricingRevision)
+	preview := bucket.Preview
+	if preview.APIEstimate.State != AvailabilityPartial || preview.CatalogRevision != "synthetic-r1" ||
+		preview.CanonicalModelID == nil || *preview.CanonicalModelID != "model-a" || preview.Resolution != normalize.ModelReported {
+		t.Fatalf("preview = %#v", preview)
+	}
+	// 7 input + 2 cache read + 1 cache write + 10 output, all with a rate.
+	if preview.PricedTokens != 20 || preview.UnpricedTokens != 0 {
+		t.Fatalf("priced/unpriced tokens = %d/%d, want 20/0", preview.PricedTokens, preview.UnpricedTokens)
 	}
 
 	unknown := storedObservation(start, normalize.SourceCodex, normalize.SurfaceCLI, "unknown-model", 1, 1)
-	unknown.PricingKey = nil
-	unknownBuckets, err := BuildUsageBuckets([]StoredObservation{unknown}, 1, syntheticEstimator(t))
+	unknown.ModelResolution = normalize.ModelInferred
+	unknownBuckets, err := BuildUsageBuckets([]StoredObservation{unknown}, 1, syntheticPreviewer(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if unknownBuckets[0].APIEstimate.State != AvailabilityUnavailable || unknownBuckets[0].APIEstimate.Value != nil {
-		t.Fatalf("unknown pricing = %#v", unknownBuckets[0].APIEstimate)
+	unknownPreview := unknownBuckets[0].Preview
+	if unknownPreview.APIEstimate.State != AvailabilityUnavailable || unknownPreview.APIEstimate.Value != nil ||
+		unknownPreview.UnpricedReason != modelcatalog.ReasonUnknownModel || unknownPreview.UnpricedTokens != 4 {
+		t.Fatalf("unknown pricing = %#v", unknownPreview)
+	}
+	// The upload still says how the source attributed the model.
+	if unknownBuckets[0].ModelEvidence != normalize.ModelInferred || unknownPreview.Resolution != normalize.ModelUnknown {
+		t.Fatalf("evidence/resolution = %q/%q", unknownBuckets[0].ModelEvidence, unknownPreview.Resolution)
+	}
+}
+
+func TestUsageBucketPayloadCarriesObservedEvidenceOnly(t *testing.T) {
+	t.Parallel()
+	db := openStoreForTest(t)
+	start := time.Date(2026, 11, 17, 20, 1, 0, 0, time.UTC)
+	buckets, err := BuildUsageBuckets([]StoredObservation{
+		storedObservation(start, normalize.SourceClaude, normalize.SurfaceCLI, "model-a", 2, 3),
+	}, 1, syntheticPreviewer(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if buckets[0].Preview.APIEstimate.Value == nil {
+		t.Fatal("test bucket has no preview estimate to leak")
+	}
+	if _, err := db.ApplyBucketRevisions(t.Context(), buckets); err != nil {
+		t.Fatal(err)
+	}
+	outbox, err := db.PendingOutbox(t.Context())
+	if err != nil || len(outbox) != 1 {
+		t.Fatalf("outbox = %#v, %v", outbox, err)
+	}
+	var payload struct {
+		BucketKey string                     `json:"bucket_key"`
+		Bucket    map[string]json.RawMessage `json:"bucket"`
+	}
+	if err := json.Unmarshal(outbox[0].Payload, &payload); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"measurement", "model_evidence", "normalization_version", "observed_model_id", "revision", "source", "start", "surface", "tokens"}
+	got := make([]string, 0, len(payload.Bucket))
+	for field := range payload.Bucket {
+		got = append(got, field)
+	}
+	sort.Strings(got)
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("uploaded bucket fields = %v, want exactly %v", got, want)
+	}
+	for _, leaked := range []string{"canonical", "provider", "pricing", "estimate", "microusd", "priced", "catalog_revision"} {
+		if strings.Contains(string(outbox[0].Payload), leaked) {
+			t.Fatalf("upload payload contains client-derived %q: %s", leaked, outbox[0].Payload)
+		}
+	}
+}
+
+func TestUnchangedBucketKeepsItsRevisionAndStaysAcknowledged(t *testing.T) {
+	t.Parallel()
+	db := openStoreForTest(t)
+	start := time.Date(2026, 11, 17, 20, 1, 0, 0, time.UTC)
+	observations := []StoredObservation{storedObservation(start, normalize.SourceClaude, normalize.SurfaceCLI, "model-a", 2, 3)}
+	if result, err := db.rebuildForTest(t, observations, 1, syntheticPreviewer(t)); err != nil || result.Applied != 1 {
+		t.Fatalf("first rebuild = %#v, %v", result, err)
+	}
+	outbox, err := db.PendingOutbox(t.Context())
+	if err != nil || len(outbox) != 1 {
+		t.Fatalf("outbox = %#v, %v", outbox, err)
+	}
+	if _, err := db.AcknowledgeOutbox(t.Context(), []OutboxAcknowledgement{{BucketKey: outbox[0].BucketKey, Revision: 1}}); err != nil {
+		t.Fatal(err)
+	}
+
+	// A later refresh proposes a higher revision for identical content, and a
+	// newer bundled catalog changes only the local preview.
+	repriced := syntheticPreviewerAt(t, "synthetic-r2", 20_000_000)
+	if result, err := db.rebuildForTest(t, observations, 2, repriced); err != nil || result.Applied != 0 || result.Ignored != 1 {
+		t.Fatalf("unchanged rebuild = %#v, %v", result, err)
+	}
+	if count, err := db.PendingOutboxCount(t.Context()); err != nil || count != 0 {
+		t.Fatalf("pending after unchanged rebuild = %d, %v; want nothing to upload", count, err)
+	}
+	if revision, err := db.NextUsageBucketRevision(t.Context()); err != nil || revision != 2 {
+		t.Fatalf("next revision = %d, %v; want 2 because the bucket kept revision 1", revision, err)
+	}
+	summary, err := db.QueryUsage(t.Context(), PeriodAllTime, start.Add(time.Hour), time.UTC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 2 input*$2 + 1 read*$0.10 + 1 write*$2.50 + 3 output*$20 = 66.6, floored
+	// to 66 micro-USD. At the old $10 output rate it was 36.
+	if summary.APIEstimate.Value == nil || *summary.APIEstimate.Value != 66 {
+		t.Fatalf("refreshed preview estimate = %#v", summary.APIEstimate)
+	}
+
+	// Changed usage does upload again, at the new revision.
+	observations = append(observations, storedObservation(start.Add(time.Second), normalize.SourceClaude, normalize.SurfaceCLI, "model-a", 1, 1))
+	if result, err := db.rebuildForTest(t, observations, 2, repriced); err != nil || result.Applied != 1 {
+		t.Fatalf("changed rebuild = %#v, %v", result, err)
+	}
+	outbox, err = db.PendingOutbox(t.Context())
+	if err != nil || len(outbox) != 1 || outbox[0].Revision != 2 {
+		t.Fatalf("outbox after change = %#v, %v", outbox, err)
 	}
 }
 
@@ -70,11 +176,11 @@ func TestBucketEstimateUsesCacheWriteLifetimes(t *testing.T) {
 			observation.Tokens.InputCacheRead = value(0)
 			observation.Tokens.InputCacheWrite = value(1_000_000)
 			observation.Tokens.InputCacheWrite5m, observation.Tokens.InputCacheWrite1h = tt.fiveMinute, tt.oneHour
-			buckets, err := BuildUsageBuckets([]StoredObservation{observation}, 1, syntheticEstimator(t))
+			buckets, err := BuildUsageBuckets([]StoredObservation{observation}, 1, syntheticPreviewer(t))
 			if err != nil {
 				t.Fatal(err)
 			}
-			estimate := buckets[0].APIEstimate
+			estimate := buckets[0].Preview.APIEstimate
 			if estimate.Value == nil || *estimate.Value != tt.wantMicroUSD || estimate.State != tt.wantState {
 				t.Fatalf("estimate = %#v, want %d micro-USD %s", estimate, tt.wantMicroUSD, tt.wantState)
 			}
@@ -243,24 +349,64 @@ func TestUsageAggregationRejectsOverflow(t *testing.T) {
 
 func storedObservation(at time.Time, source normalize.Source, surface normalize.Surface, model string, input, output uint64) StoredObservation {
 	cacheRead, cacheWrite := uint64(1), uint64(1)
-	provider, pricing := "synthetic", "synthetic/model"
-	return StoredObservation{Source: source, Surface: surface, OccurredAt: at, ObservedModelID: model, CanonicalModelID: &model, ModelProvider: &provider, PricingKey: &pricing, ModelResolution: normalize.ModelResolved, Measurement: normalize.MeasurementReported, NormalizationVersion: "1", Tokens: normalize.TokenCounts{InputUncached: &input, InputCacheRead: &cacheRead, InputCacheWrite: &cacheWrite, Output: &output}}
+	return StoredObservation{
+		Source: source, Surface: surface, OccurredAt: at, ObservedModelID: model,
+		ModelResolution: normalize.ModelReported, Measurement: normalize.MeasurementReported, NormalizationVersion: "1",
+		Tokens: normalize.TokenCounts{InputUncached: &input, InputCacheRead: &cacheRead, InputCacheWrite: &cacheWrite, Output: &output},
+	}
 }
 
-func syntheticEstimator(t *testing.T) *modelcatalog.PricingRegistry {
+// syntheticPreviewer prices "model-a" at $2 input, $0.10 cache read, $2.50
+// base cache write, $4 one-hour cache write, and $10 output per million.
+func syntheticPreviewer(t *testing.T) *modelcatalog.Deriver {
 	t.Helper()
-	input, read, write, writeHour, output := uint64(2_000_000), uint64(100_000), uint64(2_500_000), uint64(4_000_000), uint64(10_000_000)
-	registry, err := modelcatalog.NewPricingRegistry("synthetic-pricing-r1", []modelcatalog.Price{{Key: "synthetic/model", Provider: "synthetic", Rate: modelcatalog.Rate{InputUncached: &input, InputCacheRead: &read, InputCacheWrite: &write, InputCacheWrite1h: &writeHour, Output: &output}, SourceURL: "https://synthetic.invalid/pricing", SourceRevision: "synthetic-r1", EffectiveDate: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)}})
+	return syntheticPreviewerAt(t, "synthetic-r1", 10_000_000)
+}
+
+func syntheticPreviewerAt(t *testing.T, revision string, outputRate uint64) *modelcatalog.Deriver {
+	t.Helper()
+	input, read, write, writeHour := uint64(2_000_000), uint64(100_000), uint64(2_500_000), uint64(4_000_000)
+	registry, err := modelcatalog.NewPricingRegistry(revision, []modelcatalog.Price{{
+		Key: "synthetic/model-a", Provider: "synthetic",
+		Rate:      modelcatalog.Rate{InputUncached: &input, InputCacheRead: &read, InputCacheWrite: &write, InputCacheWrite1h: &writeHour, Output: &outputRate},
+		SourceURL: "https://synthetic.invalid/pricing", SourceRevision: "synthetic-r1", EffectiveDate: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+	}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return registry
+	deriver, err := modelcatalog.NewDeriver(modelcatalog.Catalog{
+		Revision: revision,
+		Models:   []modelcatalog.Model{{CanonicalID: "model-a", Provider: "synthetic", PricingKey: "synthetic/model-a"}},
+	}, registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return deriver
+}
+
+func (db *DB) rebuildForTest(t *testing.T, observations []StoredObservation, revision uint64, previewer Previewer) (BucketApplyResult, error) {
+	t.Helper()
+	buckets, err := BuildUsageBuckets(observations, revision, previewer)
+	if err != nil {
+		return BucketApplyResult{}, err
+	}
+	return db.ApplyBucketRevisions(t.Context(), buckets)
 }
 
 func completeBucket(start time.Time, source normalize.Source, surface normalize.Surface, model string, output, revision uint64) UsageBucket {
-	canonical, provider, pricing, pricingRevision := model, "synthetic", "synthetic/model", "synthetic-r1"
 	zero := uint64(0)
-	return UsageBucket{Start: start, Source: source, Surface: surface, ObservedModelID: model, CanonicalModelID: &canonical, ModelProvider: &provider, PricingKey: &pricing, ModelResolution: normalize.ModelResolved, Measurement: normalize.MeasurementReported, NormalizationVersion: "1", Tokens: TokenBreakdown{InputUncached: AggregateValue{Value: &zero, State: AvailabilityComplete}, InputCacheRead: AggregateValue{Value: &zero, State: AvailabilityComplete}, InputCacheWrite: AggregateValue{Value: &zero, State: AvailabilityComplete}, Output: AggregateValue{Value: &output, State: AvailabilityComplete}, ReasoningOutput: AggregateValue{State: AvailabilityUnavailable}}, APIEstimate: AggregateValue{Value: &zero, State: AvailabilityComplete}, PricingRevision: &pricingRevision, Revision: revision}
+	complete := AggregateValue{Value: &zero, State: AvailabilityComplete}
+	return UsageBucket{
+		Start: start, Source: source, Surface: surface, ObservedModelID: model,
+		ModelEvidence: normalize.ModelReported, Measurement: normalize.MeasurementReported, NormalizationVersion: "1",
+		Tokens: TokenBreakdown{
+			InputUncached: complete, InputCacheRead: complete, InputCacheWrite: complete,
+			InputCacheWrite5m: complete, InputCacheWrite1h: complete,
+			Output: AggregateValue{Value: &output, State: AvailabilityComplete}, ReasoningOutput: AggregateValue{State: AvailabilityUnavailable},
+		},
+		Preview:  Preview{Resolution: normalize.ModelUnknown, APIEstimate: AggregateValue{State: AvailabilityUnavailable}},
+		Revision: revision,
+	}
 }
 
 func setAggregate(value *AggregateValue, number uint64, state Availability) {

@@ -11,8 +11,14 @@ func TestAllReturnsContiguousImmutablePrivacySafeMigrations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(migrations) != 2 || migrations[0].Version != 1 || migrations[0].Name != "initialize_server" || migrations[1].Version != 2 || migrations[1].Name != "private_groups" {
-		t.Fatalf("All() = %#v", migrations)
+	wantNames := []string{"initialize_server", "private_groups", "sync_v2_usage_buckets"}
+	if len(migrations) != len(wantNames) {
+		t.Fatalf("All() returned %d migrations, want %d", len(migrations), len(wantNames))
+	}
+	for index, name := range wantNames {
+		if migrations[index].Version != index+1 || migrations[index].Name != name {
+			t.Fatalf("migration %d = version %d %q, want %q", index+1, migrations[index].Version, migrations[index].Name, name)
+		}
 	}
 	for _, migration := range migrations {
 		if len(migration.Checksum) != 64 {

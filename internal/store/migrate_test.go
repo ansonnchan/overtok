@@ -126,7 +126,8 @@ func TestCacheWriteLifetimeMigrationRemovesLocalNoticeUsage(t *testing.T) {
 		}
 	}
 
-	if err := migrate(t.Context(), db, applicationMigrations); err != nil {
+	// Stop at the lifetime migration: a later one rebuilds the bucket tables.
+	if err := migrate(t.Context(), db, applicationMigrations[:4]); err != nil {
 		t.Fatal(err)
 	}
 	for _, table := range []string{"observations", "usage_buckets", "outbox_records"} {
@@ -148,6 +149,83 @@ func TestCacheWriteLifetimeMigrationRemovesLocalNoticeUsage(t *testing.T) {
 	}
 	if total != "40" || fiveMinute.Valid || oneHour.Valid {
 		t.Fatalf("migrated cache write = %q/%v/%v, want 40 with unknown lifetimes", total, fiveMinute, oneHour)
+	}
+}
+
+func TestSyncV2MigrationRebuildsBucketsAndKeepsSourceEvidence(t *testing.T) {
+	t.Parallel()
+	db := openTestSQLDB(t)
+	if err := migrate(t.Context(), db, applicationMigrations[:4]); err != nil {
+		t.Fatal(err)
+	}
+	const insertObservation = `
+		INSERT INTO observations(
+			identity, source, surface, source_version, occurred_at, observed_model_id,
+			canonical_model_id, model_provider, pricing_key, model_resolution, output_tokens,
+			count_semantics, measurement, adapter_version, normalization_version, warnings_json
+		) VALUES (?, ?, 'cli', 'synthetic-v1', '2026-01-06T03:00:00Z', ?, ?, ?, ?, ?, '7',
+			'incremental', 'reported', '1', '1', ?)`
+	rows := []struct {
+		identity, source, model string
+		canonical, pricing      any
+		resolution, warnings    string
+		wantEvidence            string
+	}{
+		{"resolved", "claude", "model-latest", "model-a", "synthetic/model-a", "resolved", `[]`, "reported"},
+		{"uncatalogued", "claude", "model-new", nil, nil, "unknown", `[{"code":"model_unresolved"}]`, "reported"},
+		{"inferred-known", "codex", "model-b", "model-b", nil, "inferred", `[{"code":"model_inferred"}]`, "inferred"},
+		{"inferred-uncatalogued", "codex", "model-c", nil, nil, "unknown", `[{"code":"model_inferred"},{"code":"model_unresolved"}]`, "inferred"},
+		{"no-model", "codex", "", nil, nil, "unknown", `[{"code":"model_unavailable"}]`, "unknown"},
+	}
+	for _, row := range rows {
+		var provider any
+		if row.canonical != nil {
+			provider = "synthetic"
+		}
+		if _, err := db.ExecContext(t.Context(), insertObservation, row.identity, row.source, row.model,
+			row.canonical, provider, row.pricing, row.resolution, row.warnings); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.ExecContext(t.Context(), `
+		INSERT INTO usage_buckets(
+			bucket_key, bucket_start, interval_seconds, source, surface, observed_model_id,
+			model_resolution, measurement, normalization_version, input_uncached_state,
+			input_cache_read_state, input_cache_write_state, output_state,
+			reasoning_output_state, api_estimate_state, revision, payload_json
+		) VALUES ('old', '2026-01-06T03:00:00Z', 60, 'claude', 'cli', 'model-new', 'unknown', 'reported', '1',
+			'unavailable', 'unavailable', 'unavailable', 'unavailable', 'unavailable', 'unavailable', '9', '{}')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(t.Context(), `INSERT INTO outbox_records(bucket_key, revision, payload_json) VALUES ('old', '9', '{}')`); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := migrate(t.Context(), db, applicationMigrations); err != nil {
+		t.Fatal(err)
+	}
+	// Buckets are derived state and are rebuilt by the next refresh.
+	for _, table := range []string{"usage_buckets", "outbox_records"} {
+		var count int
+		if err := db.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM "+table).Scan(&count); err != nil {
+			t.Fatal(err)
+		}
+		if count != 0 {
+			t.Fatalf("%s rows after migration = %d, want 0", table, count)
+		}
+	}
+	for _, row := range rows {
+		var evidence string
+		var canonical, provider, pricing sql.NullString
+		if err := db.QueryRowContext(t.Context(), `
+			SELECT model_resolution, canonical_model_id, model_provider, pricing_key
+			FROM observations WHERE identity = ?`, row.identity).Scan(&evidence, &canonical, &provider, &pricing); err != nil {
+			t.Fatal(err)
+		}
+		if evidence != row.wantEvidence || canonical.Valid || provider.Valid || pricing.Valid {
+			t.Errorf("%s: evidence = %q, catalog columns = %v/%v/%v; want %q and none",
+				row.identity, evidence, canonical, provider, pricing, row.wantEvidence)
+		}
 	}
 }
 

@@ -60,21 +60,40 @@ none do.
 Token categories use nullable decimal text. This preserves unavailable versus
 reported zero and supports the complete `uint64` range that SQLite's signed
 integer storage cannot represent. Cache writes store the combined total plus
-nullable 5-minute and 1-hour lifetimes. Model resolution, observed and canonical
-identifiers, pricing keys, measurement quality, counter semantics, versions,
-capabilities, and safe warnings remain separate fields.
+nullable 5-minute and 1-hour lifetimes. The model columns hold the observed
+identifier and how the source attributed it (`reported`, `inferred`, or
+`unknown`). The canonical, provider, and pricing-key columns remain in the
+schema but are no longer written.
 
 ## Absolute usage buckets
 
 Committed observations reduce into absolute one-minute UTC buckets keyed by
-source, surface, observed and canonical model identity, resolution quality,
-measurement quality, and normalization version. A higher revision replaces the
-entire earlier value. Replaying the same revision is a no-op; an older revision
-is ignored; the same revision with different content is rejected.
+source, surface, observed model, model evidence quality, measurement quality,
+and normalization version. The key holds observed evidence only, so a catalog
+update never moves a bucket.
+
+Each bucket row keeps two JSON documents:
+
+| Column | Contents | Uploaded |
+| --- | --- | --- |
+| `payload_json` | Observed model, evidence quality, and token categories | Yes, exactly as stored |
+| `preview_json` | This build's canonical model, unpriced reason, estimate, and priced/unpriced tokens | Never |
+
+A bucket's revision changes only when `payload_json` content changes. A higher
+revision with different content replaces the earlier value and is enqueued. A
+bucket whose content is unchanged keeps its revision and acknowledgement and
+has only its preview refreshed, so repeated refreshes upload nothing. An older
+revision is ignored; the same revision with different content is rejected.
 
 Only the newest pending revision for each bucket remains in the local outbox.
-Its JSON is built from an explicit aggregate payload and has no source record,
-session, or path fields. This package does not implement a network client.
+Its JSON is the upload payload and has no source record, session, path, or
+client-derived model or price field. This package does not implement a network
+client.
+
+Migration `0005` drops and recreates these two tables. They are derived state:
+the next refresh rebuilds every bucket from stored observations and enqueues it
+under its v2 key. The same migration resets each observation's model columns to
+source evidence, because catalog results are no longer stored per observation.
 
 Manual application refreshes choose the next revision by parsing every stored
 decimal revision as an unsigned 64-bit value. This avoids SQLite signed-integer

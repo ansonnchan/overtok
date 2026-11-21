@@ -2,25 +2,25 @@ package sync
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
+	"encoding/json"
 	"errors"
-	"strings"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/ansonnchan/tokenholic/internal/modelcatalog"
+	"github.com/ansonnchan/tokenholic/internal/normalize"
+	"github.com/ansonnchan/tokenholic/internal/store"
 	protocol "github.com/ansonnchan/tokenholic/internal/sync"
 	serverauth "github.com/ansonnchan/tokenholic/server/auth"
+	"github.com/ansonnchan/tokenholic/server/pricing"
 )
 
-func TestApplyUsesServerCatalogAndPricing(t *testing.T) {
+// The synthetic server prices "model-a" at $2 input, $0.10 cache read, $2.50
+// base cache write, $4 one-hour cache write, and $10 output per million.
+func TestApplyDerivesModelAndPriceOnTheServer(t *testing.T) {
 	service, repository := testService(t)
-	batch := pricedBatch(t)
-	forgedCost := uint64(1)
-	forgedRevision := "client-supplied"
-	batch.Buckets[0].Bucket.APIEstimate = protocol.Value{Value: &forgedCost, State: "complete"}
-	batch.Buckets[0].Bucket.PricingRevision = &forgedRevision
+	batch := batchFor(t, "model-a", "reported")
 
 	response, err := service.Apply(t.Context(), "credential", batch)
 	if err != nil {
@@ -29,153 +29,200 @@ func TestApplyUsesServerCatalogAndPricing(t *testing.T) {
 	if len(response.Acknowledgements) != 1 || len(repository.buckets) != 1 {
 		t.Fatalf("response/repository = %#v/%#v", response, repository.buckets)
 	}
-	stored := repository.buckets[0].Bucket
-	// The million cache-write tokens have no lifetime in the v1 payload, so
-	// they are priced at the base rate and the estimate is a lower bound.
-	if stored.APIEstimate.Value == nil || *stored.APIEstimate.Value != 14_600_000 || stored.APIEstimate.State != "partial" {
-		t.Fatalf("authoritative estimate = %#v", stored.APIEstimate)
+	stored := repository.buckets[0]
+	// One million tokens each: 2 + 0.10 + 2.50 (5m) + 4 (1h) + 10 = $18.60.
+	derived := stored.Derived
+	if derived.EstimateMicroUSD == nil || *derived.EstimateMicroUSD != 18_600_000 || derived.EstimateState != "complete" {
+		t.Fatalf("server estimate = %v/%q", derived.EstimateMicroUSD, derived.EstimateState)
 	}
-	if stored.PricingRevision == nil || *stored.PricingRevision != "synthetic-pricing-r1" {
-		t.Fatalf("authoritative pricing revision = %#v", stored.PricingRevision)
+	if derived.CanonicalModelID == nil || *derived.CanonicalModelID != "model-a" || derived.ModelMatch != "exact" ||
+		derived.PricedTokens != 5_000_000 || derived.UnpricedTokens != 0 || derived.PricingRevision != "server-r2" {
+		t.Fatalf("derived = %#v", derived)
+	}
+	// What is stored as evidence is exactly what the client sent.
+	sent, _ := json.Marshal(batch.Buckets[0])
+	kept, _ := json.Marshal(stored.Envelope)
+	if string(sent) != string(kept) {
+		t.Fatalf("stored evidence differs from the upload:\nsent %s\nkept %s", sent, kept)
 	}
 }
 
-func TestApplyPreservesPartialAndUnavailableEstimateState(t *testing.T) {
+// A client never tells the server what a model is, so a client built against
+// an older or newer catalog uploads the same bytes and is always accepted.
+func TestApplyAcceptsModelsRegardlessOfTheClientCatalog(t *testing.T) {
 	tests := []struct {
-		name      string
-		mutate    func(*protocol.Bucket)
-		wantState string
-		wantValue bool
+		name, observed, evidence string
+		wantResolution           string
+		wantReason               string
+		wantPriced               bool
 	}{
-		{
-			name: "partial input produces lower bound", wantState: "partial", wantValue: true,
-			mutate: func(bucket *protocol.Bucket) { bucket.Tokens.InputUncached.State = "partial" },
-		},
-		{
-			name: "missing input is unavailable", wantState: "unavailable", wantValue: false,
-			mutate: func(bucket *protocol.Bucket) {
-				bucket.Tokens.InputUncached = protocol.Value{State: "unavailable"}
-			},
-		},
+		{name: "model the server prices", observed: "model-a", evidence: "reported", wantResolution: "reported", wantPriced: true},
+		{name: "alias only the server resolves", observed: "model-a[1m]", evidence: "reported", wantResolution: "resolved", wantPriced: true},
+		{name: "model newer than the server catalog", observed: "model-released-tomorrow", evidence: "reported", wantResolution: "unknown", wantReason: modelcatalog.ReasonUnknownModel},
+		{name: "inferred model the server does not know", observed: "model-other", evidence: "inferred", wantResolution: "unknown", wantReason: modelcatalog.ReasonUnknownModel},
+		{name: "routing alias", observed: "auto", evidence: "reported", wantResolution: "unknown", wantReason: modelcatalog.ReasonAmbiguousAlias},
+		{name: "no model", observed: "", evidence: "unknown", wantResolution: "unknown", wantReason: modelcatalog.ReasonModelUnavailable},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			service, repository := testService(t)
-			batch := pricedBatch(t)
-			test.mutate(&batch.Buckets[0].Bucket)
-			if _, err := service.Apply(t.Context(), "credential", batch); err != nil {
-				t.Fatal(err)
+			if _, err := service.Apply(t.Context(), "credential", batchFor(t, test.observed, test.evidence)); err != nil {
+				t.Fatalf("Apply() error = %v; a catalog difference must never reject an upload", err)
 			}
-			estimate := repository.buckets[0].Bucket.APIEstimate
-			if estimate.State != test.wantState || (estimate.Value != nil) != test.wantValue {
-				t.Fatalf("estimate = %#v", estimate)
+			derived := repository.buckets[0].Derived
+			reason := ""
+			if derived.UnpricedReason != nil {
+				reason = *derived.UnpricedReason
+			}
+			if derived.ModelResolution != test.wantResolution || reason != test.wantReason || (derived.EstimateMicroUSD != nil) != test.wantPriced {
+				t.Fatalf("derived = %#v (reason %q)", derived, reason)
+			}
+			// Unpriced tokens are kept and counted, never dropped.
+			if derived.PricedTokens+derived.UnpricedTokens != 5_000_000 {
+				t.Fatalf("priced+unpriced = %d+%d, want every uploaded token", derived.PricedTokens, derived.UnpricedTokens)
 			}
 		})
 	}
 }
 
-func TestApplyRejectsClientModelMetadataThatDisagreesWithServer(t *testing.T) {
-	service, repository := testService(t)
-	batch := pricedBatch(t)
-	wrongProvider := "untrusted-provider"
-	batch.Buckets[0].Bucket.ModelProvider = &wrongProvider
-	batch.Buckets[0].BucketKey = bucketKey(batch.Buckets[0].Bucket)
+func TestApplyRejectsProtocolViolationsBeforeStorage(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*protocol.Batch)
+	}{
+		{name: "retired schema version", mutate: func(batch *protocol.Batch) { batch.SchemaVersion = 1 }},
+		{name: "empty batch", mutate: func(batch *protocol.Batch) { batch.Buckets = nil }},
+		{name: "duplicate bucket", mutate: func(batch *protocol.Batch) { batch.Buckets = append(batch.Buckets, batch.Buckets[0]) }},
+		{name: "key does not match evidence", mutate: func(batch *protocol.Batch) { batch.Buckets[0].Bucket.ObservedModelID = "model-b" }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			service, repository := testService(t)
+			batch := batchFor(t, "model-a", "reported")
+			test.mutate(&batch)
+			if _, err := service.Apply(t.Context(), "credential", batch); !errors.Is(err, ErrInvalidBatch) {
+				t.Fatalf("Apply() error = %v, want ErrInvalidBatch", err)
+			}
+			if repository.called {
+				t.Fatal("repository received an invalid batch")
+			}
+		})
+	}
+}
 
-	_, err := service.Apply(t.Context(), "credential", batch)
-	if !errors.Is(err, ErrInvalidBatch) {
+func TestApplyPassesThroughAuthenticationFailure(t *testing.T) {
+	repository := &fakeRepository{}
+	service, err := NewService(&fakeAuthenticator{err: serverauth.ErrUnauthorized}, repository, serverPricer(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Apply(t.Context(), "credential", batchFor(t, "model-a", "reported")); !errors.Is(err, serverauth.ErrUnauthorized) {
 		t.Fatalf("Apply() error = %v", err)
 	}
 	if repository.called {
-		t.Fatal("repository received an invalid batch")
+		t.Fatal("repository was reached without authentication")
 	}
 }
 
 func testService(t *testing.T) (*Service, *fakeRepository) {
 	t.Helper()
-	// A synthetic catalog keeps these protocol tests independent of the
-	// bundled price snapshot.
-	models, err := modelcatalog.NewResolver(modelcatalog.Catalog{
-		Revision: "synthetic-catalog-r1",
-		Models:   []modelcatalog.Model{{CanonicalID: "gpt-6.2-sol", Provider: "openai", PricingKey: "openai/gpt-6.2-sol"}},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	input, read, write, output := uint64(2_000_000), uint64(100_000), uint64(2_500_000), uint64(10_000_000)
-	pricing, err := modelcatalog.NewPricingRegistry("synthetic-pricing-r1", []modelcatalog.Price{{
-		Key: "openai/gpt-6.2-sol", Provider: "openai",
-		Rate:      modelcatalog.Rate{InputUncached: &input, InputCacheRead: &read, InputCacheWrite: &write, Output: &output},
-		SourceURL: "https://provider.invalid/pricing", SourceRevision: "synthetic-r1",
-		EffectiveDate: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
-	}})
-	if err != nil {
-		t.Fatal(err)
-	}
 	repository := &fakeRepository{}
-	service, err := NewService(&fakeAuthenticator{}, repository, models, pricing)
+	service, err := NewService(&fakeAuthenticator{}, repository, serverPricer(t))
 	if err != nil {
 		t.Fatal(err)
 	}
 	return service, repository
 }
 
-func pricedBatch(t *testing.T) protocol.Batch {
+// serverPricer is deliberately a different revision from anything a client
+// in these tests could hold.
+func serverPricer(t *testing.T) *pricing.Engine {
+	t.Helper()
+	rate := func(v uint64) *uint64 { return &v }
+	registry, err := modelcatalog.NewPricingRegistry("server-r2", []modelcatalog.Price{{
+		Key: "provider/model-a", Provider: "provider",
+		Rate: modelcatalog.Rate{
+			InputUncached: rate(2_000_000), InputCacheRead: rate(100_000), InputCacheWrite: rate(2_500_000),
+			InputCacheWrite1h: rate(4_000_000), Output: rate(10_000_000),
+		},
+		SourceURL: "https://provider.invalid/pricing", SourceRevision: "synthetic", EffectiveDate: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deriver, err := modelcatalog.NewDeriver(modelcatalog.Catalog{
+		Revision:         "server-r2",
+		AmbiguousAliases: []string{"auto"},
+		AliasRules:       modelcatalog.AliasRules{ContextMarkers: []string{"[1m]"}},
+		Models:           []modelcatalog.Model{{CanonicalID: "model-a", Provider: "provider", PricingKey: "provider/model-a"}},
+	}, registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine, err := pricing.NewEngine(deriver)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return engine
+}
+
+// batchFor builds the request exactly as a client does: a local bucket goes
+// through the outbox serializer. The client in these tests has no catalog at
+// all, which is the strongest form of "an older catalog".
+func batchFor(t *testing.T, observed, evidence string) protocol.Batch {
 	t.Helper()
 	million := uint64(1_000_000)
-	zero := uint64(0)
-	canonical, provider, pricingKey := "gpt-6.2-sol", "openai", "openai/gpt-6.2-sol"
-	bucket := protocol.Bucket{
+	twoMillion := 2 * million
+	complete := store.AggregateValue{Value: &million, State: store.AvailabilityComplete}
+	bucket := store.UsageBucket{
 		Start: time.Date(2026, 11, 18, 12, 0, 0, 0, time.UTC), Source: "codex", Surface: "cli",
-		ObservedModelID: "gpt-6.2-sol", CanonicalModelID: &canonical, ModelProvider: &provider,
-		PricingKey: &pricingKey, ModelResolution: "reported", Measurement: "reported", NormalizationVersion: "1",
-		Tokens: protocol.Tokens{
-			InputUncached:   protocol.Value{Value: &million, State: "complete"},
-			InputCacheRead:  protocol.Value{Value: &million, State: "complete"},
-			InputCacheWrite: protocol.Value{Value: &million, State: "complete"},
-			Output:          protocol.Value{Value: &million, State: "complete"},
-			ReasoningOutput: protocol.Value{Value: &zero, State: "complete"},
+		ObservedModelID: observed, ModelEvidence: normalize.ModelResolution(evidence), Measurement: "reported", NormalizationVersion: "1",
+		Tokens: store.TokenBreakdown{
+			InputUncached: complete, InputCacheRead: complete,
+			InputCacheWrite:   store.AggregateValue{Value: &twoMillion, State: store.AvailabilityComplete},
+			InputCacheWrite5m: complete, InputCacheWrite1h: complete, Output: complete,
+			ReasoningOutput: store.AggregateValue{State: store.AvailabilityUnavailable},
 		},
-		APIEstimate: protocol.Value{State: "unavailable"}, Revision: 1,
+		Preview:  store.Preview{Resolution: "unknown", APIEstimate: store.AggregateValue{State: store.AvailabilityUnavailable}},
+		Revision: 1,
 	}
-	return protocol.Batch{SchemaVersion: protocol.SchemaVersion, Buckets: []protocol.Envelope{{
-		BucketKey: bucketKey(bucket), Bucket: bucket,
-	}}}
+	database, err := store.Open(t.Context(), filepath.Join(t.TempDir(), "client.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close(context.Background()) })
+	if _, err := database.ApplyBucketRevisions(t.Context(), []store.UsageBucket{bucket}); err != nil {
+		t.Fatal(err)
+	}
+	records, err := database.PendingOutbox(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	batch, _, err := protocol.BuildBatch(records)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return batch
 }
 
-func bucketKey(bucket protocol.Bucket) string {
-	pointerText := func(value *string) string {
-		if value == nil {
-			return "<null>"
-		}
-		return *value
-	}
-	parts := []string{
-		bucket.Start.UTC().Format(time.RFC3339Nano), bucket.Source, bucket.Surface,
-		bucket.ObservedModelID, pointerText(bucket.CanonicalModelID), pointerText(bucket.ModelProvider),
-		pointerText(bucket.PricingKey), bucket.ModelResolution, bucket.Measurement, bucket.NormalizationVersion,
-	}
-	digest := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
-	return hex.EncodeToString(digest[:])
-}
-
-type fakeAuthenticator struct{}
+type fakeAuthenticator struct{ err error }
 
 func (f *fakeAuthenticator) Authenticate(context.Context, string) (serverauth.Principal, error) {
-	return serverauth.Principal{UserID: "user", DeviceID: "device"}, nil
+	return serverauth.Principal{UserID: "user", DeviceID: "device"}, f.err
 }
 
 type fakeRepository struct {
 	called  bool
-	buckets []protocol.Envelope
+	buckets []Bucket
 }
 
-func (f *fakeRepository) ApplyUsageBuckets(_ context.Context, _ serverauth.Principal, buckets []protocol.Envelope) ([]protocol.Acknowledgement, error) {
+func (f *fakeRepository) ApplyUsageBuckets(_ context.Context, _ serverauth.Principal, buckets []Bucket) ([]protocol.Acknowledgement, error) {
 	f.called = true
-	f.buckets = append([]protocol.Envelope(nil), buckets...)
+	f.buckets = append([]Bucket(nil), buckets...)
 	acknowledgements := make([]protocol.Acknowledgement, 0, len(buckets))
-	for _, envelope := range buckets {
+	for _, bucket := range buckets {
 		acknowledgements = append(acknowledgements, protocol.Acknowledgement{
-			BucketKey: envelope.BucketKey, Revision: envelope.Bucket.Revision, Status: protocol.AckApplied,
+			BucketKey: bucket.Envelope.BucketKey, Revision: bucket.Envelope.Bucket.Revision, Status: protocol.AckApplied,
 		})
 	}
 	return acknowledgements, nil

@@ -93,7 +93,7 @@ func TestSyncRouteAuthenticatesAndReturnsExactAcknowledgement(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	request := httptest.NewRequest(http.MethodPost, "/v1/sync/buckets", bytes.NewReader(body))
+	request := httptest.NewRequest(http.MethodPost, "/v2/sync/buckets", bytes.NewReader(body))
 	request.Header.Set("Authorization", "Bearer device-credential")
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
@@ -114,12 +114,75 @@ func TestSyncRouteRejectsServerValidationFailures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	request := httptest.NewRequest(http.MethodPost, "/v1/sync/buckets", bytes.NewReader(body))
+	request := httptest.NewRequest(http.MethodPost, "/v2/sync/buckets", bytes.NewReader(body))
 	request.Header.Set("Authorization", "Bearer device-credential")
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "invalid_batch") {
 		t.Fatalf("response = %d %q", response.Code, response.Body.String())
+	}
+}
+
+// A 0.1.x client posts protocol v1. It must be told to upgrade rather than see
+// a validation or authentication error it cannot act on.
+func TestRetiredSyncV1RouteRequiresUpgrade(t *testing.T) {
+	syncService := &fakeUsageSyncService{}
+	handler, err := New(&fakeAuthService{}, syncService, &fakeAccountUsageService{}, &fakeGroupService{}, &fakeLeaderboardService{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v1Body := `{"schema_version":1,"buckets":[{"bucket_key":"` + strings.Repeat("a", 64) + `","bucket":{"canonical_model_id":"client-resolved"}}]}`
+	tests := []struct {
+		name, credential, body string
+	}{
+		{name: "signed-in v1 client", credential: "Bearer device-credential", body: v1Body},
+		{name: "no credential", body: v1Body},
+		{name: "unreadable body", credential: "Bearer device-credential", body: "{"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodPost, "/v1/sync/buckets", strings.NewReader(test.body))
+			if test.credential != "" {
+				request.Header.Set("Authorization", test.credential)
+			}
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, request)
+			if response.Code != http.StatusUpgradeRequired || response.Header().Get("Upgrade") != "tokenholic-sync/2" {
+				t.Fatalf("response = %d upgrade=%q, want 426 naming the required protocol", response.Code, response.Header().Get("Upgrade"))
+			}
+			var body map[string]string
+			if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+				t.Fatal(err)
+			}
+			if body["error"] != "upgrade_required" || !strings.Contains(body["message"], "npx @tokenholic/cli@latest") {
+				t.Fatalf("body = %#v, want an upgrade instruction", body)
+			}
+		})
+	}
+	if syncService.credential != "" {
+		t.Fatal("a retired-protocol upload reached the synchronization service")
+	}
+}
+
+func TestSyncRouteRejectsV1PayloadOnTheV2Route(t *testing.T) {
+	syncService := &fakeUsageSyncService{}
+	handler, err := New(&fakeAuthService{}, syncService, &fakeAccountUsageService{}, &fakeGroupService{}, &fakeLeaderboardService{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Client-resolved fields are unknown to v2 and fail strict decoding.
+	batch := validSyncBatch()
+	encoded, err := json.Marshal(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	withClientResolution := strings.Replace(string(encoded), `"model_evidence"`, `"canonical_model_id":"client-resolved","model_evidence"`, 1)
+	request := httptest.NewRequest(http.MethodPost, "/v2/sync/buckets", strings.NewReader(withClientResolution))
+	request.Header.Set("Authorization", "Bearer device-credential")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest || syncService.credential != "" {
+		t.Fatalf("response = %d %q, want 400 before the service", response.Code, response.Body.String())
 	}
 }
 
@@ -249,21 +312,22 @@ func validSyncBatch() protocol.Batch {
 	zero, output := uint64(0), uint64(7)
 	bucket := protocol.Bucket{
 		Start:  time.Date(2026, 11, 18, 12, 0, 0, 0, time.UTC),
-		Source: "codex", Surface: "cli", ObservedModelID: "unknown-model",
-		ModelResolution: "unknown", Measurement: "reported", NormalizationVersion: "1",
+		Source: "codex", Surface: "cli", ObservedModelID: "model-the-server-has-never-seen",
+		ModelEvidence: "inferred", Measurement: "reported", NormalizationVersion: "1",
 		Tokens: protocol.Tokens{
-			InputUncached:   protocol.Value{Value: &zero, State: "complete"},
-			InputCacheRead:  protocol.Value{State: "unavailable"},
-			InputCacheWrite: protocol.Value{State: "unavailable"},
-			Output:          protocol.Value{Value: &output, State: "complete"},
-			ReasoningOutput: protocol.Value{State: "unavailable"},
+			InputUncached:     protocol.Value{Value: &zero, State: "complete"},
+			InputCacheRead:    protocol.Value{State: "unavailable"},
+			InputCacheWrite:   protocol.Value{State: "unavailable"},
+			InputCacheWrite5m: protocol.Value{State: "unavailable"},
+			InputCacheWrite1h: protocol.Value{State: "unavailable"},
+			Output:            protocol.Value{Value: &output, State: "complete"},
+			ReasoningOutput:   protocol.Value{State: "unavailable"},
 		},
-		APIEstimate: protocol.Value{State: "unavailable"}, Revision: 1,
+		Revision: 1,
 	}
 	parts := []string{
-		bucket.Start.Format(time.RFC3339Nano), bucket.Source, bucket.Surface,
-		bucket.ObservedModelID, "<null>", "<null>", "<null>",
-		bucket.ModelResolution, bucket.Measurement, bucket.NormalizationVersion,
+		bucket.Start.Format(time.RFC3339Nano), bucket.Source, bucket.Surface, bucket.ObservedModelID,
+		bucket.ModelEvidence, bucket.Measurement, bucket.NormalizationVersion,
 	}
 	digest := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
 	return protocol.Batch{SchemaVersion: protocol.SchemaVersion, Buckets: []protocol.Envelope{{

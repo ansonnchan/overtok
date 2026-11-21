@@ -197,27 +197,40 @@ func insertLeaderboardBucket(t *testing.T, pool interface {
 		modelProvider = bucket.modelProvider
 		pricingKey = bucket.pricingKey
 	}
+	// Every v2 row names the revision that derived it, priced or not.
+	pricingRevision = "leaderboard-r1"
 	if bucket.pricingRevision != "" {
 		pricingRevision = bucket.pricingRevision
 	}
+	// Derived columns follow the schema's invariants: a row is fully priced
+	// when the test gives it an estimate and fully unpriced otherwise.
 	if _, err := pool.Exec(t.Context(), `
 		INSERT INTO usage_buckets(
 			device_id, bucket_key, bucket_start, interval_seconds, source, surface,
-			observed_model_id, canonical_model_id, model_provider, pricing_key,
-			model_resolution, measurement, normalization_version,
+			observed_model_id, model_evidence, measurement, normalization_version,
 			input_uncached_tokens, input_uncached_state,
 			input_cache_read_tokens, input_cache_read_state,
 			input_cache_write_tokens, input_cache_write_state,
+			input_cache_write_5m_tokens, input_cache_write_5m_state,
+			input_cache_write_1h_tokens, input_cache_write_1h_state,
 			output_tokens, output_state,
 			reasoning_output_tokens, reasoning_output_state,
-			api_estimate_microusd, api_estimate_state, pricing_revision,
-			revision, payload_hash
+			revision, payload_hash,
+			canonical_model_id, model_provider, pricing_key, model_resolution, model_match, unpriced_reason,
+			priced_tokens, unpriced_tokens,
+			api_estimate_microusd, api_estimate_state, pricing_revision
 		) VALUES (
 			$1::uuid, $2, $3, 60, $4, $5,
-			$6, $7, $8, $9, $10, 'reported', '1',
-			$11, 'complete', 0, 'complete', 0, 'complete', $12, 'complete',
-			NULL, 'unavailable', $13, $14, $15,
-			1, $16
+			$6, CASE WHEN $10 = 'inferred' THEN 'inferred' ELSE 'reported' END, 'reported', '1',
+			$11, 'complete', 0, 'complete', 0, 'complete', 0, 'complete', 0, 'complete',
+			$12, 'complete', NULL, 'unavailable',
+			1, $16,
+			$7, $8, CASE WHEN $13::numeric IS NULL THEN NULL ELSE COALESCE($9, 'synthetic/price') END, $10,
+			CASE WHEN $10 = 'unknown' THEN 'unknown' ELSE 'exact' END,
+			CASE WHEN $13::numeric IS NULL THEN 'unknown_model' END,
+			CASE WHEN $13::numeric IS NULL THEN 0 ELSE $11::numeric + $12::numeric END,
+			CASE WHEN $13::numeric IS NULL THEN $11::numeric + $12::numeric ELSE 0 END,
+			$13, $14, $15
 		)
 	`, bucket.deviceID, bucket.key, bucket.start, bucket.source, bucket.surface,
 		bucket.observedModel, canonicalModel, modelProvider, pricingKey, bucket.resolution,

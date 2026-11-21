@@ -21,6 +21,7 @@ import (
 	"github.com/ansonnchan/tokenholic/server/httpapi"
 	serverleaderboard "github.com/ansonnchan/tokenholic/server/leaderboard"
 	"github.com/ansonnchan/tokenholic/server/postgres"
+	serverpricing "github.com/ansonnchan/tokenholic/server/pricing"
 	serversync "github.com/ansonnchan/tokenholic/server/sync"
 )
 
@@ -55,7 +56,11 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("load bundled pricing: %w", err)
 	}
-	models, err := modelcatalog.NewResolver(catalog)
+	deriver, err := modelcatalog.NewDeriver(catalog, pricing)
+	if err != nil {
+		return err
+	}
+	pricer, err := serverpricing.NewEngine(deriver)
 	if err != nil {
 		return err
 	}
@@ -78,7 +83,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	synchronization, err := serversync.NewService(authentication, usageRepository, models, pricing)
+	synchronization, err := serversync.NewService(authentication, usageRepository, pricer)
 	if err != nil {
 		return err
 	}

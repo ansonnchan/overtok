@@ -257,20 +257,6 @@ func matchRank(kind MatchKind) int {
 	}
 }
 
-// ResolveObservation returns a copy with catalog metadata while preserving all
-// observed usage and source evidence.
-func (r *Resolver) ResolveObservation(observation normalize.Observation) normalize.Observation {
-	resolution := r.Resolve(observation.ObservedModelID, observation.ModelResolution)
-	observation.CanonicalModelID = resolution.CanonicalID
-	observation.ModelProvider = resolution.Provider
-	observation.PricingKey = resolution.PricingKey
-	observation.ModelResolution = resolution.Quality
-	if resolution.Match == MatchUnknown {
-		observation.Warnings = appendWarning(observation.Warnings, normalize.Warning{Code: "model_unresolved"})
-	}
-	return observation
-}
-
 func (r *Resolver) add(identifier string, model Model, kind MatchKind) error {
 	if identifier == "" {
 		return fmt.Errorf("model %q has an empty %s identifier", model.CanonicalID, kind)
@@ -283,15 +269,6 @@ func (r *Resolver) add(identifier string, model Model, kind MatchKind) error {
 	}
 	r.matches[identifier] = catalogMatch{model: model, kind: kind}
 	return nil
-}
-
-func appendWarning(warnings []normalize.Warning, warning normalize.Warning) []normalize.Warning {
-	for _, existing := range warnings {
-		if existing.Code == warning.Code {
-			return warnings
-		}
-	}
-	return append(warnings, warning)
 }
 
 func stringPointer(value string) *string {

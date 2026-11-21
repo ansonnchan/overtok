@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	usageSync "github.com/ansonnchan/tokenholic/internal/sync"
 	"io"
 	"strings"
 	"testing"
@@ -244,6 +246,27 @@ func TestClaimLogsInAndPerformsInitialSync(t *testing.T) {
 	}
 }
 
+func TestSyncCommandTellsAnOutdatedClientToUpgrade(t *testing.T) {
+	t.Parallel()
+	deps := dependencies{
+		homeDir: func() (string, error) { return "/synthetic/home", nil },
+		getenv: func(name string) string {
+			if name == "TOKENHOLIC_API_URL" {
+				return "https://api.example.test"
+			}
+			return ""
+		},
+		sync: func(context.Context, string, string, string, bool, io.Writer) error {
+			return fmt.Errorf("upload batch: %w", usageSync.ErrUpgradeRequired)
+		},
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"sync"}, &stdout, &stderr, deps)
+	if code != 1 || !strings.Contains(stderr.String(), "npx @tokenholic/cli@latest") || !strings.Contains(stderr.String(), "local usage was preserved") {
+		t.Fatalf("sync = %d stderr=%q, want an upgrade instruction", code, stderr.String())
+	}
+}
+
 func TestSyncCommandParsesDryRunAndRedactsFailure(t *testing.T) {
 	t.Parallel()
 	var gotDryRun bool
@@ -261,7 +284,7 @@ func TestSyncCommandParsesDryRunAndRedactsFailure(t *testing.T) {
 				t.Fatalf("sync inputs = %q/%q/%q", home, codexHome, gotAPIURL)
 			}
 			gotDryRun = dryRun
-			_, _ = io.WriteString(output, "{\"schema_version\":1}\n")
+			_, _ = io.WriteString(output, "{\"schema_version\":2}\n")
 			return nil
 		},
 	}

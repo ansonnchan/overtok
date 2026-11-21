@@ -31,6 +31,12 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) (err error) {
 	if err != nil {
 		return err
 	}
+	return migrateTo(ctx, pool, available)
+}
+
+// migrateTo applies a contiguous migration history. Production always passes
+// the full embedded set; tests pass a prefix to exercise an upgrade.
+func migrateTo(ctx context.Context, pool *pgxpool.Pool, available []migrations.Migration) (err error) {
 	tx, err := pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return fmt.Errorf("begin PostgreSQL migration: %w", err)

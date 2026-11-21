@@ -77,7 +77,8 @@ func New(authService authenticationService, syncService usageSyncService, accoun
 	handler.mux.HandleFunc("POST /v1/auth/device/poll", handler.pollDevice)
 	handler.mux.HandleFunc("POST /v1/auth/refresh", handler.refresh)
 	handler.mux.HandleFunc("POST /v1/auth/logout", handler.logout)
-	handler.mux.HandleFunc("POST /v1/sync/buckets", handler.syncBuckets)
+	handler.mux.HandleFunc("POST "+protocol.BucketsPath, handler.syncBuckets)
+	handler.mux.HandleFunc("POST /v1/sync/buckets", handler.retiredSyncV1)
 	handler.mux.HandleFunc("GET /v1/account/usage", handler.accountUsage)
 	handler.mux.HandleFunc("DELETE /v1/account", handler.deleteAccount)
 	handler.mux.HandleFunc("POST /v1/groups", handler.createGroup)
@@ -315,6 +316,18 @@ func (h *Handler) syncBuckets(response http.ResponseWriter, request *http.Reques
 	default:
 		writeJSON(response, http.StatusOK, result)
 	}
+}
+
+// retiredSyncV1 answers the protocol 0.1.x clients speak. Those uploads carry
+// the client's own model resolution, which the server no longer accepts, so
+// the reply tells the user how to upgrade instead of failing validation. It
+// reads no body and needs no credential: the answer is the same for everyone.
+func (h *Handler) retiredSyncV1(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Upgrade", "tokenholic-sync/2")
+	writeJSON(response, http.StatusUpgradeRequired, map[string]string{
+		"error":   "upgrade_required",
+		"message": "This tokenholic version is too old to sync. Upgrade with `npx @tokenholic/cli@latest`; local usage is kept and uploads again after the upgrade.",
+	})
 }
 
 // ServeHTTP applies stable security headers before routing.

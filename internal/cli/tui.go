@@ -76,12 +76,9 @@ func openLocalApplication(ctx context.Context, home, codexHome string) (*store.D
 	if err != nil {
 		return nil, nil, err
 	}
-	catalog, pricing, err := modelcatalog.Bundled()
-	if err != nil {
-		_ = database.Close(context.Background())
-		return nil, nil, fmt.Errorf("initialize pricing catalog: %w", err)
-	}
-	resolver, err := modelcatalog.NewResolver(catalog)
+	// The bundled catalog only previews resolution and cost locally. The
+	// server derives its own values and never sees this preview.
+	previewer, err := modelcatalog.BundledDeriver()
 	if err != nil {
 		_ = database.Close(context.Background())
 		return nil, nil, fmt.Errorf("initialize model catalog: %w", err)
@@ -89,9 +86,9 @@ func openLocalApplication(ctx context.Context, home, codexHome string) (*store.D
 	orchestrator := collect.Orchestrator{
 		Discovery: adapters.Discoverer{Roots: adapters.DefaultMacRoots(home, codexHome)},
 		Collector: collect.Collector{SourceVersion: "local-jsonl-v1"},
-		Models:    resolver, Store: database, AdapterVersion: "native-v1",
+		Store:     database, AdapterVersion: "native-v1",
 	}
-	service, err := application.NewService(database, orchestrator, pricing, time.Local, time.Now)
+	service, err := application.NewService(database, orchestrator, previewer, time.Local, time.Now)
 	if err != nil {
 		_ = database.Close(context.Background())
 		return nil, nil, err

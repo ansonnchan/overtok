@@ -24,6 +24,10 @@ const (
 	baseRetryDelay       = 200 * time.Millisecond
 )
 
+// ErrUpgradeRequired means the server no longer accepts this client's upload
+// protocol. Local usage is unaffected and stays pending until the upgrade.
+var ErrUpgradeRequired = errors.New("synchronize usage: this tokenholic version is too old to sync; upgrade with `npx @tokenholic/cli@latest`")
+
 // Outbox is the local absolute-revision boundary consumed by Client.
 type Outbox interface {
 	PendingOutbox(context.Context) ([]store.OutboxRecord, error)
@@ -150,7 +154,7 @@ func (c *Client) sendWithRetry(ctx context.Context, credential string, body []by
 
 func (c *Client) send(ctx context.Context, credential string, body []byte) (BatchResponse, time.Duration, bool, error) {
 	endpoint := *c.baseURL
-	endpoint.Path += "/v1/sync/buckets"
+	endpoint.Path += BucketsPath
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(body))
 	if err != nil {
 		return BatchResponse{}, 0, false, fmt.Errorf("create sync request: %w", err)
@@ -169,6 +173,9 @@ func (c *Client) send(ctx context.Context, credential string, body []byte) (Batc
 	}
 	if response.StatusCode == http.StatusUnauthorized {
 		return BatchResponse{}, 0, false, errors.New("synchronize usage: device credential is unauthorized")
+	}
+	if response.StatusCode == http.StatusUpgradeRequired {
+		return BatchResponse{}, 0, false, ErrUpgradeRequired
 	}
 	if response.StatusCode == http.StatusConflict {
 		return BatchResponse{}, 0, false, errors.New("synchronize usage: equal revision conflicts with server payload")

@@ -13,5 +13,12 @@ lock. Validate changes with `make test-postgres` and a disposable database URL.
 Schema comments should explain privacy, ownership, and unusual invariants
 instead of duplicating column names.
 
+Migrations are forward-only. `0003_sync_v2_usage_buckets` is deliberately
+destructive: it replaces `usage_buckets` and discards uploaded demo usage
+instead of translating it, because v1 rows cannot be re-derived. Accounts,
+devices, and groups are kept, and clients upload their history again after
+upgrading. A destructive migration must say so in its header comment and in
+the release notes.
+
 Do not add deployment state before its roadmap stage. Server migrations must
 never introduce columns for raw local records or prohibited source material.
