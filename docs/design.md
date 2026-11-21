@@ -1,198 +1,235 @@
-# TUI design direction
+# Design direction
 
-Status: local and private-group application views implemented
-Last updated: November 18, 2026
+Status: MVP views implemented; retro-terminal revamp (M8) and website (M9) accepted
+Last updated: November 20, 2026
 
 ## Intent
 
-The tokenholic TUI should feel calm, compact, and deliberate. It is a metrics application, not a simulated hacker console.
+tokenholic should feel like a polished retro terminal: dark, dense, precise,
+and a little playful, with one warm coral accent doing the work that
+decoration would otherwise do. It is a metrics application with a scoreboard
+attitude, not a simulated hacker console.
 
-The supplied Tokenboard reference is useful for its hierarchy, warm accent, restrained dark surfaces, clear table rows, selected-user emphasis, and compact summary cards. tokenholic should adapt those principles to terminal constraints without reproducing the web layout or branding.
+The supplied reference is a coral-on-navy, pixel-type leaderboard dashboard.
+tokenholic follows it closely in hierarchy and mood: uppercase spaced labels,
+titled panels with dashed rules, solid coral chips for selection and primary
+actions, a highlighted current-user row, a standing rail, and ▲▼ rank
+movement. tokenholic keeps its own name, wordmark, copy, and assets; nothing
+is copied from the reference product's code, text, or images.
 
-The presentation layer begins after local persistence and model resolution.
-`tokenholic doctor` remains plain diagnostic output. The TUI consumes
-presentation-ready application snapshots and must not absorb discovery,
-collection, persistence, or future synchronization responsibilities.
+Presentation begins after local persistence and model resolution. The TUI and
+website consume presentation-ready snapshots and never own discovery,
+collection, persistence, synchronization, or pricing. `tokenholic doctor`
+remains plain diagnostic output.
 
-## Visual principles
+## Visual language
 
-- Prefer the terminal's background rather than painting the entire viewport.
-- Use one warm accent for selection and primary actions.
-- Use muted foreground colors for metadata and separators.
-- Reserve green, amber, and red for semantic status.
-- Use whitespace and alignment before adding borders.
-- Keep border styles consistent and sparse.
-- Avoid neon, cyberpunk motifs, gradients, glow effects, ASCII art backgrounds, and decorative animation.
-- Keep text readable in monochrome and high-contrast environments.
+### Principles
 
-### Initial adaptive palette
+- One coral accent for selection, primary actions, the current user, and the
+  wordmark caret. Everything else is foreground, muted gray, or a semantic
+  status color.
+- Uppercase, letter-spaced labels for navigation, chips, panel titles, and
+  table headers. Values use normal case and tabular alignment.
+- Rounded titled panels with a thin muted border; section labels followed by
+  a dashed rule that fills the panel width.
+- Selection is shown by a solid coral chip, never by color alone: selected
+  items are also bracketed in no-color mode.
+- The TUI uses the terminal's own background; it never paints the full
+  viewport. The website is dark-only.
+- No neon palettes, gradients, glow, ASCII-art backgrounds, or idle animation.
 
-The exact Lip Gloss colors should be tested across light and dark terminals.
+### Palette
+
+Exact values are tuned in the design-system PR and must keep readable contrast
+on dark and light terminal backgrounds through adaptive colors.
 
 | Role | Direction |
 | --- | --- |
-| Primary text | Terminal foreground or soft off-white |
-| Muted text | Neutral gray |
-| Accent | Warm coral/terracotta |
-| Success | Muted teal/green |
-| Warning | Muted amber |
-| Error | Restrained red |
-| Selected row | Accent edge plus subtle adaptive background |
+| Accent | Coral/terracotta (about `#D9805F`; 256-color fallback 209) |
+| Accent text on chip | Near-black on coral |
+| Primary text | Terminal foreground / off-white on the web |
+| Muted text and rules | Neutral gray |
+| Panel border | Dim gray |
+| Rank 1–3 | Muted gold, silver, bronze |
+| Up / positive | Muted teal |
+| Down / negative | Coral-red |
+| Warning / error | Muted amber / restrained red |
+| Web background | Deep navy with slightly lighter panels |
 
-Color is never the only carrier of meaning. Pair status colors with text, symbols, or labels.
+### Wordmark
 
-## Information architecture
+`>_ TOKENHOLIC` in bold, with the `>_` caret in the accent. Wide Home views may
+show a three-line block-letter version; it always falls back to the one-line
+mark on narrow terminals and without Unicode.
 
-The native MVP has five TUI areas:
+## Number and money formatting
 
-1. **Overview** — personal totals, recent periods, and collection freshness.
-2. **Sources** — local adapter coverage, source health, and availability.
-3. **Models** — model usage, token categories, and attribution quality.
-4. **Settings** — keyboard help, local settings, privacy, and diagnostics.
-5. **Groups** — authenticated private-group selection and leaderboards.
+- Token counts are compact with at most three significant digits and trailing
+  zeros removed: `987`, `1K`, `111K`, `1.35M`, `2.1B`, `4.27T`. Rounding never
+  produces `1000K`; it promotes to the next unit (`999,950` → `1M`).
+- Exact counts remain available in category detail and `show-data`.
+- Money uses two decimals with grouping: `$1,180.00`. Non-zero values below
+  one cent display `<$0.01`.
+- Every cost carries an `EST` label or the metric chip `$ EST`. Never write
+  "spent".
+- Lower bounds display `≥$640.00` with the priced share (`92% priced`).
+  Unavailable values display `—` (ASCII `-`) with a reason, never `$0.00`.
 
-Authentication and synchronization are available through the explicit
-`claim`/`login`, `logout`, `sync`, offline `show-data`/`sync --dry-run`, and
-opt-in `autosync` CLI commands. The Groups area
-appears alongside local mode and uses the native multiplayer client boundary;
-it does not own credentials, HTTP, or multi-device queries. With no API origin
-configured, the first four views remain fully functional.
+## TUI information architecture
 
-## Responsive layout
+| Key | Area | Purpose |
+| --- | --- | --- |
+| `1` | HOME | Personal headline totals, sparkline, breakdowns, freshness, claim prompt |
+| `2` | BOARDS | Group and global standings, standing rail, group panel |
+| `3` | MODELS | Per-model tokens, estimate, attribution quality, category detail |
+| `4` | SOURCES | Coding-agent coverage and adapter health |
+| `5` | SETTINGS | Account, devices, visibility, global opt-in, autosync, privacy, help |
 
-### Wide terminals
+### HOME
 
-At 88 columns or more:
+- Period chips: `TODAY | THIS WEEK | 30 DAYS | ALL-TIME`.
+- Headline: total tokens and the API-equivalent estimate for the period.
+- A 30-day sparkline of daily tokens (`▁▂▃▄▅▆▇█`, ASCII fallback `_.-=#`).
+- Breakdown by source and by model, each with tokens, estimate, and share.
+- Category detail on demand: uncached input, cache read, cache write 5m and
+  1h, output, and reasoning (shown as part of output).
+- Freshness (`synced 4m ago`, `3 buckets pending`) and coverage warnings.
+- When signed out, a primary chip: `[ c  CLAIM YOUR SPOT ]`.
 
-```text
-tokenholic · local usage
-[1 Overview]    2 Sources    3 Models    4 Settings    5 Groups
+### BOARDS
 
-Overview
-[ready] Local data loaded
-Today ...
-
-1–5 views · tab navigate · r refresh · ? help · q quit
-```
-
-Whitespace and short rows provide hierarchy without surrounding the screen in
-borders. Data-heavy views may add a second column only when it leaves readable
-room for both columns.
-
-### Narrow terminals
-
-From 48 through 87 columns:
-
-- keep navigation on one compact row;
-- stack summary information;
-- remove decorative columns before truncating labels or totals;
-- abbreviate large values consistently; and
-- preserve every action through keyboard shortcuts.
-
-The minimum supported width is 48 columns. Below it, the application presents
-a resize instruction while preserving help and quit controls.
-
-## Group leaderboard behavior
-
-Each row should prioritize:
+Wide layout (120 columns or more):
 
 ```text
-rank  display name  primary metric  model/source mix
+>_ TOKENHOLIC   HOME  [BOARDS]  MODELS  SOURCES  SETTINGS              synced 4m ago
+
+╭─ NIGHT-SHIFT ──────────────────────────────────────╮ ╭─ YOUR STANDING ──────────╮
+│  TODAY [THIS WEEK] 30 DAYS ALL-TIME   [$ EST] TOKENS │ │ @you            RANK #5  │
+│                                                      │ │ $640.00 EST        ▲ 2   │
+│ STANDINGS - - - - - - - - - - - - -  ▲▼ VS LAST WEEK │ ╰──────────────────────────╯
+│   1  @dana                 $1,180.00          ▲ 1    │ ╭─ NIGHT-SHIFT ────────────╮
+│   2  @kai                  $1,090.00          ▼ 1    │ │ MEMBERS               12 │
+│   3  @rio                    $840.50          –      │ │ INVITE  Q7M2KX   y copy  │
+│ ▌ 5  @you  ★ YOU             $640.00          ▲ 2    │ │ RESETS MON 00:00 LOCAL   │
+│   6  @sam                ≥$560.75  71% priced        │ ╰──────────────────────────╯
+│                                                      │  [ s  SHARE ]
+│ 1–6 OF 12 · RESETS MON 00:00 America/Vancouver       │
+╰──────────────────────────────────────────────────────╯
+1–5 views · g scope · p period · m metric · j/k move · y copy · s share · ? help · q quit
 ```
 
-Optional trend data appears only when the comparison window is meaningful and space permits.
+- Scope switcher cycles the user's groups and `GLOBAL` (opt-in).
+- Metric chips: `$ EST | TOKENS`.
+- Trend legend names its comparison: `VS YESTERDAY`, `VS LAST WEEK`,
+  `VS PRIOR 30 DAYS`, or `VS 24H AGO`. Comparisons use the previous period
+  at the same elapsed time; help text explains this.
+- Movement: `▲ 2`, `▼ 1`, `–`, `NEW`; ASCII fallback `+2`, `-1`, `=`, `new`.
+- The current-user row has an accent edge (`▌`), a `★ YOU` tag, a subtle
+  adaptive background, and accent text. If it falls outside the visible page,
+  it is pinned after the list.
+- Rows below the cost-coverage threshold show a lower bound and coverage
+  without a rank. Scopes with fewer than three ranked users show values
+  without ranks.
+- The group panel shows members, the invite code (owners), the reset
+  boundary, and copy via OSC 52 where supported, otherwise prints the code.
 
-The current user row uses an accent edge and `you` label. Do not rely on a full-row bright background.
+From 88 to 119 columns the rail stacks below the standings. From 48 to 87
+columns the view is one column: chips wrap, the trend column shortens, and
+the rail collapses to one summary line.
 
-The period selector contains:
+### Onboarding
+
+The first launch scans with a single spinner, then reveals the headline:
 
 ```text
-Today | This week | 30 days | All time
+>_ TOKENHOLIC
+
+SCANNING  claude code ✓   claude desktop ✓   codex ✓
+
+YOU BURNED 4.2B TOKENS · ~$1,180.00 EST · LAST 30 DAYS
+
+[ c  CLAIM YOUR SPOT ]    r refresh · 1–5 views · q quit
 ```
 
-The metric selector contains:
+Claiming runs the GitHub device flow inside the TUI: it shows the user code,
+offers to open the verification page, and returns to BOARDS after the first
+sync. Nothing uploads before the user claims.
 
-```text
-Tokens | Output | API estimate
-```
+### Primary actions
 
-Use `API estimate`, not `spent`, to avoid presenting subscription usage as actual billing.
+Primary actions are coral chips that include their key: `[ c  CLAIM YOUR
+SPOT ]`, `[ y  COPY INVITE ]`, `[ s  SHARE ]`. At most one primary chip is
+visible per panel. Destructive actions require an inline typed confirmation.
 
-## Overview and health
+## Responsive rules
 
-The overview should answer these questions without navigation:
-
-- How much have I used in the selected period?
-- Which coding agents and models contributed?
-- When did this device last collect?
-- Is any source partial, unsupported, or unhealthy?
-
-Warnings are concise and actionable:
-
-```text
-Codex model unavailable for 2 legacy sessions
-Claude Desktop source changed; run `tokenholic doctor`
-3 buckets pending locally
-```
-
-Do not turn missing coverage into a zero-value chart.
-
-After a completed scan finds no supported coding-agent data, Overview and
-Models use an empty state rather than a warning. The message names the current
-supported agents, asks the user to install or use one before refreshing, and
-points to `tokenholic doctor` for path-redacted source detection. A fresh local
-database still asks for the first manual refresh because no scan has run yet.
+- Minimum width is 48 columns. Below it, show a resize instruction with help
+  and quit still available.
+- Remove decorative columns and letter spacing before truncating labels or
+  values. Abbreviate consistently.
+- Never scroll horizontally in a primary view.
 
 ## Interaction
 
-Initial keyboard conventions:
-
 | Key | Action |
 | --- | --- |
-| `1`–`5` | Switch main area |
+| `1`–`5` | Switch area |
 | `tab` / `shift+tab` | Move between controls |
-| `j` / `k`, arrows | Move selection |
-| `r` | Refresh current view |
+| `j` / `k`, arrows | Move selection or scroll |
+| `p` / `m` / `g` | Period / metric / scope |
+| `c` | Claim when signed out; create group in BOARDS |
+| `i` | Join with an invite code (input masked) |
+| `y` | Copy invite |
+| `s` | Share (prints an `x.com/intent/post` link) |
+| `r` | Refresh |
 | `?` | Help |
 | `q` | Quit |
 
-Inside Groups, `j`/`k` switches private groups, `p` changes period, `m`
-changes metric, `c` creates a group, and `i` joins with an invite. Invite input
-is masked. Group creation uses the device's resolved IANA timezone. Owners use
-the explicit CLI invite command so a returned plaintext code is shown once in
-a conventional terminal output stream rather than retained in TUI state.
-
-Avoid modal dialogs when a focused inline confirmation is sufficient. Destructive actions require explicit confirmation.
+Never block navigation on background work. Keep the last stable data visible
+while refreshing.
 
 ## Motion and feedback
 
-- Use a small spinner only for active collection or refresh.
-- Avoid continuous animations while idle.
-- Preserve the last stable data while refreshing.
-- Show success briefly, then return to freshness/status text.
-- Never block navigation on a background refresh.
+- One small spinner only during collection, sync, or network loads.
+- No continuous animation while idle.
+- Show success briefly, then return to freshness text.
 
 ## Content style
 
-- Use short labels and plain language.
-- Prefer `Last synced 4m ago` over protocol terminology.
-- Say `Could not read Codex sessions` before showing a technical cause.
-- Label inferred and unavailable values explicitly.
-- Keep help text one line where possible.
+- Short uppercase labels; plain-language messages.
+- `synced 4m ago`, not protocol terms.
+- Name what failed before the technical cause: `Could not read Codex sessions`.
+- Label inferred, partial, and unavailable values explicitly.
+
+## Website
+
+The website (M9) shares the TUI's tokens and voice and stays read-only.
+
+- Pages: landing (copy-able `npx @tokenholic/cli`, what is collected and
+  what never leaves the machine), public profile, public board, and invite
+  landing.
+- Dark-only navy background, the coral accent, solid coral primary buttons,
+  chip tabs, titled panels with dashed rules, rank tables with GitHub
+  avatars, the standing rail, and `★ YOU` when viewing one's own public page.
+- Type: an OFL-licensed pixel display face for the wordmark and titles and an
+  OFL-licensed monospace for everything else, self-hosted.
+- While the API wakes, show an explicit loading state rather than empty data.
+- Share cards (1200×630 PNG) use the same palette: wordmark, scope, the
+  headline value with `EST`, rank, and period.
+- Accessibility: WCAG AA contrast, visible focus rings, reduced-motion
+  support, and layouts that work at phone width.
 
 ## Accessibility
 
-- Support `NO_COLOR`.
+- Support `NO_COLOR`: brackets mark selection, text labels carry status.
 - Test light and dark terminal backgrounds.
-- Maintain usable contrast for selected and muted states.
-- Do not use color alone for rank movement or errors.
-- Avoid Unicode-only meaning; provide ASCII-safe fallbacks.
-- Respect terminal width and avoid horizontal scrolling in primary views.
+- Do not use color alone for rank movement, coverage, or errors.
+- Provide ASCII fallbacks for every Unicode glyph used for meaning.
 
 ## Non-goals
 
-- Pixel-perfect reproduction of the supplied web reference.
-- Avatars or image protocols in the MVP.
-- Dense charts when a number, bar, or table communicates the same result.
-- Theme customization before the default experience is stable.
+- Images or terminal image protocols in the TUI (avatars are web-only).
 - Mouse-first interaction.
+- Theme customization before the default experience is stable.
+- A web dashboard that duplicates TUI functionality or accepts writes.

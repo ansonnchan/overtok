@@ -201,7 +201,7 @@ Package-level navigation and ownership are documented in [internal/README.md](./
 - [Free demo deployment](./docs/deployment.md)
 - [Roadmap](./ROADMAP.md)
 - [Architecture](./docs/architecture.md)
-- [TUI design direction](./docs/design.md)
+- [TUI and website design direction](./docs/design.md)
 - [Contributor and agent guidance](./AGENTS.md)
 
 ## Contributing
