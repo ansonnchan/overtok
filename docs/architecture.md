@@ -1,7 +1,7 @@
 # Architecture
 
-Status: M3 implementation complete; real-machine journey validation pending
-Last updated: November 18, 2026
+Status: MVP implemented; M6–M10 target design accepted (see "Planned target design")
+Last updated: November 20, 2026
 
 ## System goals
 
@@ -13,7 +13,13 @@ tokenholic must:
 - aggregate multiple devices into one account;
 - retry collection and synchronization without inflating totals;
 - expose private-group leaderboards without uploading source content;
+- expose public data only after an explicit user or owner opt-in;
 - stay simple enough to operate for a small beta.
+
+Sections below describe the implemented system unless marked planned. The
+"Planned target design" section records accepted M6–M10 decisions; where it
+conflicts with an implemented description, the planned design wins for new
+work.
 
 ## Repository shape
 
@@ -41,9 +47,12 @@ server/
   httpapi/                 Bounded JSON routing and protocol errors
   postgres/                Hosted connection and migration boundary
   sync/                    Authenticated absolute-revision application
+  pricing/                 Server-owned model resolution and LiteLLM pricing (planned)
+  web/                     Public JSON, share pages, and PNG cards (planned)
 migrations/                Embedded hosted PostgreSQL schema history
 fixtures/                  Sanitized compatibility fixtures
-packages/                  npm-distribution workspace (planned)
+packages/                  npm-distribution workspace
+web/                       Static GitHub Pages website (planned)
 docs/                      Architecture and product design
 ```
 
@@ -323,13 +332,18 @@ not prove the applicable tier.
 
 Unknown models retain token totals and display unavailable cost. Historical values do not change silently when the upstream catalog changes.
 
+The bundled registry currently covers only a handful of models, prices all
+cache writes at the 5-minute rate, and requires the client and server catalogs
+to agree exactly. M6 replaces it; see "Planned target design".
+
 ## Deployment
 
 The optional demo environment uses one stateless Go API deployment on Render
 and one Supabase PostgreSQL database. A root Blueprint and a production
 container make that environment reproducible without introducing application
 dependencies on either provider. Local collection remains the primary product
-and does not require the hosted service.
+and does not require the hosted service. The planned static website is served
+separately by GitHub Pages and depends on the API only for public JSON.
 
 The free environment exists for end-to-end personal testing and interviews,
 not for a production availability or durability claim. Free-tier sleeping,
@@ -348,6 +362,95 @@ The MVP does not require:
 - horizontal scaling.
 
 Polling on TUI entry and explicit refresh is sufficient. Add infrastructure only after measurement identifies a bottleneck or reliability requirement.
+
+## Planned target design (M6–M10)
+
+These decisions are accepted and drive the roadmap's M6–M10 milestones.
+
+### Server-authoritative models and pricing
+
+```text
+client: observed model ID + token categories (protocol v2)
+  -> server/pricing: alias rules -> canonical model -> price entry
+  -> estimate + priced/unpriced token counts + pricing revision
+  -> usage_buckets (raw tokens retained for repricing)
+```
+
+- Clients stop sending canonical model, provider, pricing key, resolution
+  quality derived from the catalog, and estimates. They still send source
+  evidence quality (reported or inferred) and nullable token categories.
+- The client resolver remains only for offline TUI and `show-data` previews,
+  labelled as a preview. Server and client catalog versions may differ
+  without rejecting uploads.
+- Prices come from a pinned LiteLLM `model_prices` snapshot, vendored by a Go
+  generator that verifies the upstream commit and SHA-256 and keeps only
+  token-priced fields. A reviewed overrides file covers models newer than
+  the snapshot; each entry cites an official provider URL and retrieval date.
+- Alias rules are explicit, reviewed, and tested. They may strip documented
+  date suffixes or context markers such as `[1m]`; they never map ambiguous
+  routing aliases. Each match records its kind (exact, alias, reviewed).
+- Five priced categories: uncached input, cache read, 5-minute cache write,
+  1-hour cache write, and output. A combined cache write without a time-to-live
+  is priced at the 5-minute rate and marks the estimate partial.
+- Context-length or service-tier price tiers that local evidence cannot prove
+  stay unpriced.
+- Estimates use integer micro-dollars with exact big-integer arithmetic.
+- When the active pricing revision changes, startup reprices every stored
+  bucket from raw tokens inside one advisory-locked transaction.
+- `/v1/sync/buckets` returns `426 Upgrade Required`. The v2 migration replaces
+  demo usage data rather than translating it.
+
+### Leaderboard v2
+
+- Scopes: a private group (membership-authorized), a public group (by slug,
+  read-only), and the opt-in global board.
+- Metrics: total tokens and API-equivalent estimate. Output-only ranking is
+  removed; category detail stays in personal views.
+- Cost ranks require at least 95% of the window's tokens to be priced. Rows
+  below the threshold show a lower bound and coverage without a rank.
+- Periods keep their existing boundaries: Today, This week (Monday start), 30
+  local dates, and All time, in the group timezone; the global board uses UTC.
+- Trends compare each user's rank and value with the previous period
+  truncated to the same elapsed time, computed in the same snapshot query.
+  All-time compares with the state 24 hours earlier. First-period entrants
+  are marked new.
+- A scope with fewer than three ranked users shows values without ranks.
+- No Redis or materialized rollup: indexed minute buckets are sufficient until
+  a measured query shows otherwise.
+
+### Identity, visibility, and integrity
+
+- Login stores the GitHub avatar URL alongside the stable numeric identity.
+- `users.profile_visibility` and `groups.visibility` default to private;
+  `users.global_opt_in` defaults to false. Public endpoints must return the
+  same not-found result for private and nonexistent users or groups.
+- Group lifecycle adds invite links, owner deletion, and ownership transfer.
+- An in-memory token-bucket limiter protects every route per credential and per
+  IP. It is correct for the single demo instance and documented as such.
+- Implausible daily totals are flagged, not capped or silently dropped.
+
+### Public web surface
+
+```text
+GitHub Pages (static web/)  --fetch-->  API public JSON (origin allowlist)
+X crawler  -->  API share page (/s/...) with Open Graph tags + PNG card
+                 -> browsers redirect to the GitHub Pages page
+```
+
+- The website is static HTML, CSS, and minimal JavaScript with no framework or
+  build step. It never writes and never signs in.
+- Share pages and 1200×630 PNG cards are rendered by the Go API because
+  crawlers do not execute JavaScript. Cards are cacheable and content-hashed.
+- Render free-tier cold starts can delay pages and cards; that is an accepted
+  demo limitation, and pages show an explicit wake-up state.
+
+### Platforms
+
+- Linux: XDG-aware discovery and a user-level systemd timer for autosync.
+- Windows: discovery under the user profile, Windows Credential Manager,
+  ACL-restricted private files, a Windows-compatible single-instance lock,
+  and Task Scheduler autosync. CI runs on Windows; release validation needs
+  one manual run on a real Windows machine or VM.
 
 ## Distribution architecture
 
