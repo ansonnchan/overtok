@@ -164,6 +164,7 @@ contents, or expose persisted observations.
 | Path | Responsibility |
 | --- | --- |
 | `cmd/tokenholic` | Native executable entry point |
+| `cmd/pricegen` | Generator that vendors the pinned, checksum-verified price snapshot |
 | `internal/adapters` | Source discovery, source-specific parsers, and the ccusage compatibility contract |
 | `internal/normalize` | Provider-neutral observations, capabilities, and invariants |
 | `internal/collect` | Parsing orchestration, deduplication, and cumulative reduction |
@@ -171,7 +172,7 @@ contents, or expose persisted observations.
 | `internal/account` | Device login, rotation, revocation, account deletion, and OS credential-vault storage |
 | `internal/doctor` | Privacy-safe source and storage diagnostic reporting |
 | `internal/fixturecheck` | Automated fixture privacy validation |
-| `internal/modelcatalog` | Versioned model aliases and API-equivalent pricing resolution |
+| `internal/modelcatalog` | Vendored price snapshot, model resolution, and API-equivalent estimates |
 | `internal/store` | Local SQLite lifecycle, observations, aggregates, and diagnostics |
 | `internal/tui` | Bubble Tea application shell and local presentation boundary |
 | `internal/sync` | Privacy-allowlisted protocol, bounded batching, retry, and dry-run serialization |

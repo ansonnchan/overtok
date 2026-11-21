@@ -1,4 +1,4 @@
-.PHONY: build check fmt release test test-postgres test-race vet
+.PHONY: build check fmt prices release test test-postgres test-race vet
 
 # Keep build artifacts out of user-global caches so clean-checkout verification
 # behaves consistently in local sandboxes and CI.
@@ -13,6 +13,11 @@ build:
 release:
 	test -n "$(VERSION)"
 	go run ./cmd/release -version "$(VERSION)" -output dist
+
+# Regenerate the vendored price snapshot from the commit pinned in
+# internal/modelcatalog/data/litellm.lock.json. Needs network access.
+prices:
+	go run ./cmd/pricegen
 
 fmt:
 	test -z "$$(gofmt -l .)"

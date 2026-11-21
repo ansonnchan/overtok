@@ -1,0 +1,1037 @@
+{
+  "source": {
+    "repository": "BerriAI/litellm",
+    "path": "model_prices_and_context_window.json",
+    "commit": "ac7674625ceed298d6c411cc964f23aded63989d",
+    "sha256": "f410a08e6d566829e3a858b00e8b23f5a796fd2360f056a69cab43526f908864",
+    "retrieved": "2026-11-21",
+    "providers": [
+      "anthropic",
+      "openai"
+    ],
+    "modes": [
+      "chat",
+      "responses"
+    ]
+  },
+  "models": [
+    {
+      "id": "chat-latest",
+      "provider": "openai",
+      "input": 5000000,
+      "cache_read": 500000,
+      "output": 30000000
+    },
+    {
+      "id": "claude-fable-5",
+      "provider": "anthropic",
+      "input": 10000000,
+      "cache_read": 1000000,
+      "cache_write": 12500000,
+      "cache_write_1h": 20000000,
+      "output": 50000000
+    },
+    {
+      "id": "claude-fable-5-1",
+      "provider": "anthropic",
+      "input": 10000000,
+      "cache_read": 250000,
+      "cache_write": 12500000,
+      "cache_write_1h": 20000000,
+      "output": 50000000
+    },
+    {
+      "id": "claude-fable-5-2",
+      "provider": "anthropic",
+      "input": 8000000,
+      "cache_read": 200000,
+      "cache_write": 10000000,
+      "cache_write_1h": 16000000,
+      "output": 40000000
+    },
+    {
+      "id": "claude-haiku-4-5",
+      "provider": "anthropic",
+      "input": 1000000,
+      "cache_read": 100000,
+      "cache_write": 1250000,
+      "cache_write_1h": 2000000,
+      "output": 5000000
+    },
+    {
+      "id": "claude-haiku-4-5-20251001",
+      "provider": "anthropic",
+      "input": 1000000,
+      "cache_read": 100000,
+      "cache_write": 1250000,
+      "cache_write_1h": 2000000,
+      "output": 5000000
+    },
+    {
+      "id": "claude-haiku-5-5",
+      "provider": "anthropic",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "claude-mythos-5",
+      "provider": "anthropic",
+      "input": 10000000,
+      "cache_read": 1000000,
+      "cache_write": 12500000,
+      "cache_write_1h": 20000000,
+      "output": 50000000
+    },
+    {
+      "id": "claude-mythos-5-1",
+      "provider": "anthropic",
+      "input": 10000000,
+      "cache_read": 250000,
+      "cache_write": 12500000,
+      "cache_write_1h": 20000000,
+      "output": 50000000
+    },
+    {
+      "id": "claude-mythos-5-2",
+      "provider": "anthropic",
+      "input": 8000000,
+      "cache_read": 200000,
+      "cache_write": 10000000,
+      "cache_write_1h": 16000000,
+      "output": 40000000
+    },
+    {
+      "id": "claude-mythos-preview",
+      "provider": "anthropic",
+      "input": 10000000,
+      "cache_read": 1000000,
+      "cache_write": 12500000,
+      "cache_write_1h": 20000000,
+      "output": 50000000
+    },
+    {
+      "id": "claude-opus-4-5",
+      "provider": "anthropic",
+      "input": 5000000,
+      "cache_read": 500000,
+      "cache_write": 6250000,
+      "cache_write_1h": 10000000,
+      "output": 25000000
+    },
+    {
+      "id": "claude-opus-4-5-20251101",
+      "provider": "anthropic",
+      "input": 5000000,
+      "cache_read": 500000,
+      "cache_write": 6250000,
+      "cache_write_1h": 10000000,
+      "output": 25000000
+    },
+    {
+      "id": "claude-opus-4-6",
+      "provider": "anthropic",
+      "input": 5000000,
+      "cache_read": 500000,
+      "cache_write": 6250000,
+      "cache_write_1h": 10000000,
+      "output": 25000000
+    },
+    {
+      "id": "claude-opus-4-6-20260205",
+      "provider": "anthropic",
+      "input": 5000000,
+      "cache_read": 500000,
+      "cache_write": 6250000,
+      "cache_write_1h": 10000000,
+      "output": 25000000
+    },
+    {
+      "id": "claude-opus-4-7",
+      "provider": "anthropic",
+      "input": 5000000,
+      "cache_read": 500000,
+      "cache_write": 6250000,
+      "cache_write_1h": 10000000,
+      "output": 25000000
+    },
+    {
+      "id": "claude-opus-4-7-20260416",
+      "provider": "anthropic",
+      "input": 5000000,
+      "cache_read": 500000,
+      "cache_write": 6250000,
+      "cache_write_1h": 10000000,
+      "output": 25000000
+    },
+    {
+      "id": "claude-opus-4-8",
+      "provider": "anthropic",
+      "input": 5000000,
+      "cache_read": 500000,
+      "cache_write": 6250000,
+      "cache_write_1h": 10000000,
+      "output": 25000000
+    },
+    {
+      "id": "claude-opus-5",
+      "provider": "anthropic",
+      "input": 5000000,
+      "cache_read": 500000,
+      "cache_write": 6250000,
+      "cache_write_1h": 10000000,
+      "output": 25000000
+    },
+    {
+      "id": "claude-opus-5-5",
+      "provider": "anthropic",
+      "input": 4000000,
+      "cache_read": 200000,
+      "cache_write": 5000000,
+      "cache_write_1h": 8000000,
+      "output": 20000000
+    },
+    {
+      "id": "claude-sonnet-4-5",
+      "provider": "anthropic",
+      "input": 3000000,
+      "cache_read": 300000,
+      "cache_write": 3750000,
+      "cache_write_1h": 6000000,
+      "output": 15000000
+    },
+    {
+      "id": "claude-sonnet-4-5-20250929",
+      "provider": "anthropic",
+      "input": 3000000,
+      "cache_read": 300000,
+      "cache_write": 3750000,
+      "cache_write_1h": 6000000,
+      "output": 15000000
+    },
+    {
+      "id": "claude-sonnet-4-6",
+      "provider": "anthropic",
+      "input": 3000000,
+      "cache_read": 300000,
+      "cache_write": 3750000,
+      "cache_write_1h": 6000000,
+      "output": 15000000
+    },
+    {
+      "id": "claude-sonnet-5",
+      "provider": "anthropic",
+      "input": 2000000,
+      "cache_read": 200000,
+      "cache_write": 2500000,
+      "cache_write_1h": 4000000,
+      "output": 10000000
+    },
+    {
+      "id": "claude-sonnet-5-5",
+      "provider": "anthropic",
+      "input": 2000000,
+      "cache_read": 100000,
+      "cache_write": 2500000,
+      "cache_write_1h": 4000000,
+      "output": 10000000
+    },
+    {
+      "id": "computer-use-preview",
+      "provider": "openai",
+      "input": 3000000,
+      "output": 12000000
+    },
+    {
+      "id": "computer-use-preview-2025-03-11",
+      "provider": "openai",
+      "input": 3000000,
+      "output": 12000000
+    },
+    {
+      "id": "daybreak-blue-latest",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "daybreak-red-latest",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "ft:gpt-3.5-turbo",
+      "provider": "openai",
+      "input": 3000000,
+      "output": 6000000
+    },
+    {
+      "id": "ft:gpt-3.5-turbo-0125",
+      "provider": "openai",
+      "input": 3000000,
+      "output": 6000000
+    },
+    {
+      "id": "ft:gpt-3.5-turbo-0613",
+      "provider": "openai",
+      "input": 3000000,
+      "output": 6000000
+    },
+    {
+      "id": "ft:gpt-3.5-turbo-1106",
+      "provider": "openai",
+      "input": 3000000,
+      "output": 6000000
+    },
+    {
+      "id": "ft:gpt-4-0613",
+      "provider": "openai",
+      "input": 30000000,
+      "output": 60000000
+    },
+    {
+      "id": "ft:gpt-4.1-2025-04-14",
+      "provider": "openai",
+      "input": 3000000,
+      "cache_read": 750000,
+      "output": 12000000
+    },
+    {
+      "id": "ft:gpt-4.1-mini-2025-04-14",
+      "provider": "openai",
+      "input": 800000,
+      "cache_read": 200000,
+      "output": 3200000
+    },
+    {
+      "id": "ft:gpt-4.1-nano-2025-04-14",
+      "provider": "openai",
+      "input": 200000,
+      "cache_read": 50000,
+      "output": 800000
+    },
+    {
+      "id": "ft:gpt-4o-2024-08-06",
+      "provider": "openai",
+      "input": 3750000,
+      "cache_read": 1875000,
+      "output": 15000000
+    },
+    {
+      "id": "ft:gpt-4o-2024-11-20",
+      "provider": "openai",
+      "input": 3750000,
+      "cache_write": 1875000,
+      "output": 15000000
+    },
+    {
+      "id": "ft:gpt-4o-mini-2024-07-18",
+      "provider": "openai",
+      "input": 300000,
+      "cache_read": 150000,
+      "output": 1200000
+    },
+    {
+      "id": "ft:o4-mini-2025-04-16",
+      "provider": "openai",
+      "input": 4000000,
+      "cache_read": 1000000,
+      "output": 16000000
+    },
+    {
+      "id": "gpt-3.5-turbo",
+      "provider": "openai",
+      "input": 500000,
+      "output": 1500000
+    },
+    {
+      "id": "gpt-3.5-turbo-0125",
+      "provider": "openai",
+      "input": 500000,
+      "output": 1500000
+    },
+    {
+      "id": "gpt-3.5-turbo-1106",
+      "provider": "openai",
+      "input": 1000000,
+      "output": 2000000
+    },
+    {
+      "id": "gpt-3.5-turbo-16k",
+      "provider": "openai",
+      "input": 3000000,
+      "output": 4000000
+    },
+    {
+      "id": "gpt-4",
+      "provider": "openai",
+      "input": 30000000,
+      "output": 60000000
+    },
+    {
+      "id": "gpt-4-0613",
+      "provider": "openai",
+      "input": 30000000,
+      "output": 60000000
+    },
+    {
+      "id": "gpt-4-1106-preview",
+      "provider": "openai",
+      "input": 10000000,
+      "output": 30000000
+    },
+    {
+      "id": "gpt-4-turbo",
+      "provider": "openai",
+      "input": 10000000,
+      "output": 30000000
+    },
+    {
+      "id": "gpt-4-turbo-2024-04-09",
+      "provider": "openai",
+      "input": 10000000,
+      "output": 30000000
+    },
+    {
+      "id": "gpt-4.1",
+      "provider": "openai",
+      "input": 2000000,
+      "cache_read": 500000,
+      "output": 8000000
+    },
+    {
+      "id": "gpt-4.1-2025-04-14",
+      "provider": "openai",
+      "input": 2000000,
+      "cache_read": 500000,
+      "output": 8000000
+    },
+    {
+      "id": "gpt-4.1-mini",
+      "provider": "openai",
+      "input": 400000,
+      "cache_read": 100000,
+      "output": 1600000
+    },
+    {
+      "id": "gpt-4.1-mini-2025-04-14",
+      "provider": "openai",
+      "input": 400000,
+      "cache_read": 100000,
+      "output": 1600000
+    },
+    {
+      "id": "gpt-4.1-nano",
+      "provider": "openai",
+      "input": 100000,
+      "cache_read": 25000,
+      "output": 400000
+    },
+    {
+      "id": "gpt-4.1-nano-2025-04-14",
+      "provider": "openai",
+      "input": 100000,
+      "cache_read": 25000,
+      "output": 400000
+    },
+    {
+      "id": "gpt-4o",
+      "provider": "openai",
+      "input": 2500000,
+      "cache_read": 1250000,
+      "output": 10000000
+    },
+    {
+      "id": "gpt-4o-2024-05-13",
+      "provider": "openai",
+      "input": 5000000,
+      "output": 15000000
+    },
+    {
+      "id": "gpt-4o-2024-08-06",
+      "provider": "openai",
+      "input": 2500000,
+      "cache_read": 1250000,
+      "output": 10000000
+    },
+    {
+      "id": "gpt-4o-2024-11-20",
+      "provider": "openai",
+      "input": 2500000,
+      "cache_read": 1250000,
+      "output": 10000000
+    },
+    {
+      "id": "gpt-4o-audio-preview-2024-12-17",
+      "provider": "openai",
+      "input": 2500000,
+      "output": 10000000
+    },
+    {
+      "id": "gpt-4o-audio-preview-2025-06-03",
+      "provider": "openai",
+      "input": 2500000,
+      "output": 10000000
+    },
+    {
+      "id": "gpt-4o-mini",
+      "provider": "openai",
+      "input": 150000,
+      "cache_read": 75000,
+      "output": 600000
+    },
+    {
+      "id": "gpt-4o-mini-2024-07-18",
+      "provider": "openai",
+      "input": 150000,
+      "cache_read": 75000,
+      "output": 600000
+    },
+    {
+      "id": "gpt-4o-mini-audio-preview-2024-12-17",
+      "provider": "openai",
+      "input": 150000,
+      "output": 600000
+    },
+    {
+      "id": "gpt-4o-mini-search-preview",
+      "provider": "openai",
+      "input": 150000,
+      "cache_read": 75000,
+      "output": 600000
+    },
+    {
+      "id": "gpt-4o-mini-search-preview-2025-03-11",
+      "provider": "openai",
+      "input": 150000,
+      "cache_read": 75000,
+      "output": 600000
+    },
+    {
+      "id": "gpt-4o-search-preview",
+      "provider": "openai",
+      "input": 2500000,
+      "cache_read": 1250000,
+      "output": 10000000
+    },
+    {
+      "id": "gpt-4o-search-preview-2025-03-11",
+      "provider": "openai",
+      "input": 2500000,
+      "cache_read": 1250000,
+      "output": 10000000
+    },
+    {
+      "id": "gpt-5",
+      "provider": "openai",
+      "input": 1250000,
+      "cache_read": 125000,
+      "output": 10000000
+    },
+    {
+      "id": "gpt-5-2025-08-07",
+      "provider": "openai",
+      "input": 1250000,
+      "cache_read": 125000,
+      "output": 10000000
+    },
+    {
+      "id": "gpt-5-chat",
+      "provider": "openai",
+      "input": 1250000,
+      "cache_read": 125000,
+      "output": 10000000
+    },
+    {
+      "id": "gpt-5-chat-latest",
+      "provider": "openai",
+      "input": 1250000,
+      "cache_read": 125000,
+      "output": 10000000
+    },
+    {
+      "id": "gpt-5-codex",
+      "provider": "openai",
+      "input": 1250000,
+      "cache_read": 125000,
+      "output": 10000000
+    },
+    {
+      "id": "gpt-5-mini",
+      "provider": "openai",
+      "input": 250000,
+      "cache_read": 25000,
+      "output": 2000000
+    },
+    {
+      "id": "gpt-5-mini-2025-08-07",
+      "provider": "openai",
+      "input": 250000,
+      "cache_read": 25000,
+      "output": 2000000
+    },
+    {
+      "id": "gpt-5-nano",
+      "provider": "openai",
+      "input": 50000,
+      "cache_read": 5000,
+      "output": 400000
+    },
+    {
+      "id": "gpt-5-nano-2025-08-07",
+      "provider": "openai",
+      "input": 50000,
+      "cache_read": 5000,
+      "output": 400000
+    },
+    {
+      "id": "gpt-5-pro",
+      "provider": "openai",
+      "input": 15000000,
+      "output": 120000000
+    },
+    {
+      "id": "gpt-5-pro-2025-10-06",
+      "provider": "openai",
+      "input": 15000000,
+      "output": 120000000
+    },
+    {
+      "id": "gpt-5-search-api",
+      "provider": "openai",
+      "input": 1250000,
+      "cache_read": 125000,
+      "output": 10000000
+    },
+    {
+      "id": "gpt-5-search-api-2025-10-14",
+      "provider": "openai",
+      "input": 1250000,
+      "cache_read": 125000,
+      "output": 10000000
+    },
+    {
+      "id": "gpt-5.1",
+      "provider": "openai",
+      "input": 1250000,
+      "cache_read": 125000,
+      "output": 10000000
+    },
+    {
+      "id": "gpt-5.1-2025-11-13",
+      "provider": "openai",
+      "input": 1250000,
+      "cache_read": 125000,
+      "output": 10000000
+    },
+    {
+      "id": "gpt-5.1-chat-latest",
+      "provider": "openai",
+      "input": 1250000,
+      "cache_read": 125000,
+      "output": 10000000
+    },
+    {
+      "id": "gpt-5.1-codex",
+      "provider": "openai",
+      "input": 1250000,
+      "cache_read": 125000,
+      "output": 10000000
+    },
+    {
+      "id": "gpt-5.1-codex-max",
+      "provider": "openai",
+      "input": 1250000,
+      "cache_read": 125000,
+      "output": 10000000
+    },
+    {
+      "id": "gpt-5.1-codex-mini",
+      "provider": "openai",
+      "input": 250000,
+      "cache_read": 25000,
+      "output": 2000000
+    },
+    {
+      "id": "gpt-5.2",
+      "provider": "openai",
+      "input": 1750000,
+      "cache_read": 175000,
+      "output": 14000000
+    },
+    {
+      "id": "gpt-5.2-2025-12-11",
+      "provider": "openai",
+      "input": 1750000,
+      "cache_read": 175000,
+      "output": 14000000
+    },
+    {
+      "id": "gpt-5.2-chat-latest",
+      "provider": "openai",
+      "input": 1750000,
+      "cache_read": 175000,
+      "output": 14000000
+    },
+    {
+      "id": "gpt-5.2-codex",
+      "provider": "openai",
+      "input": 1750000,
+      "cache_read": 175000,
+      "output": 14000000
+    },
+    {
+      "id": "gpt-5.2-pro",
+      "provider": "openai",
+      "input": 21000000,
+      "output": 168000000
+    },
+    {
+      "id": "gpt-5.2-pro-2025-12-11",
+      "provider": "openai",
+      "input": 21000000,
+      "output": 168000000
+    },
+    {
+      "id": "gpt-5.3-chat-latest",
+      "provider": "openai",
+      "input": 1750000,
+      "cache_read": 175000,
+      "output": 14000000
+    },
+    {
+      "id": "gpt-5.3-codex",
+      "provider": "openai",
+      "input": 1750000,
+      "cache_read": 175000,
+      "output": 14000000
+    },
+    {
+      "id": "gpt-5.4",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-5.4-2026-03-05",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-5.4-mini",
+      "provider": "openai",
+      "input": 750000,
+      "cache_read": 75000,
+      "output": 4500000
+    },
+    {
+      "id": "gpt-5.4-mini-2026-03-17",
+      "provider": "openai",
+      "input": 750000,
+      "cache_read": 75000,
+      "output": 4500000
+    },
+    {
+      "id": "gpt-5.4-nano",
+      "provider": "openai",
+      "input": 200000,
+      "cache_read": 20000,
+      "output": 1250000
+    },
+    {
+      "id": "gpt-5.4-nano-2026-03-17",
+      "provider": "openai",
+      "input": 200000,
+      "cache_read": 20000,
+      "output": 1250000
+    },
+    {
+      "id": "gpt-5.4-pro",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-5.4-pro-2026-03-05",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-5.5",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-5.5-2026-04-23",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-5.5-cyber",
+      "provider": "openai",
+      "input": 12500000,
+      "cache_read": 1250000,
+      "output": 75000000
+    },
+    {
+      "id": "gpt-5.5-cyber-preview",
+      "provider": "openai",
+      "input": 12500000,
+      "cache_read": 1250000,
+      "output": 75000000
+    },
+    {
+      "id": "gpt-5.5-pro",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-5.5-pro-2026-04-23",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-5.6",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-5.6-cyber",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-5.6-luna",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-5.6-sol",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-5.6-terra",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-6-astra",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-6-astra-law",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-6-cyber",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-6-luna",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-6-rosalind",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-6-sol",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-6.1-sol",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-6.1-terra",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-6.2-astra",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-6.2-astra-law",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-6.2-sol",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-audio",
+      "provider": "openai",
+      "input": 2500000,
+      "output": 10000000
+    },
+    {
+      "id": "gpt-audio-1.5",
+      "provider": "openai",
+      "input": 2500000,
+      "output": 10000000
+    },
+    {
+      "id": "gpt-audio-2025-08-28",
+      "provider": "openai",
+      "input": 2500000,
+      "output": 10000000
+    },
+    {
+      "id": "gpt-audio-mini",
+      "provider": "openai",
+      "input": 600000,
+      "output": 2400000
+    },
+    {
+      "id": "gpt-audio-mini-2025-10-06",
+      "provider": "openai",
+      "input": 600000,
+      "output": 2400000
+    },
+    {
+      "id": "gpt-audio-mini-2025-12-15",
+      "provider": "openai",
+      "input": 600000,
+      "output": 2400000
+    },
+    {
+      "id": "gpt-daybreak-blue-latest",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-daybreak-red-latest",
+      "provider": "openai",
+      "unpriced_reason": "context_tiered"
+    },
+    {
+      "id": "gpt-rosalind-discovery",
+      "provider": "openai",
+      "input": 5000000,
+      "cache_read": 500000,
+      "output": 25000000
+    },
+    {
+      "id": "gpt-rosalind-research",
+      "provider": "openai",
+      "input": 5000000,
+      "cache_read": 500000,
+      "output": 25000000
+    },
+    {
+      "id": "o1",
+      "provider": "openai",
+      "input": 15000000,
+      "cache_read": 7500000,
+      "output": 60000000
+    },
+    {
+      "id": "o1-2024-12-17",
+      "provider": "openai",
+      "input": 15000000,
+      "cache_read": 7500000,
+      "output": 60000000
+    },
+    {
+      "id": "o1-pro",
+      "provider": "openai",
+      "input": 150000000,
+      "output": 600000000
+    },
+    {
+      "id": "o1-pro-2025-03-19",
+      "provider": "openai",
+      "input": 150000000,
+      "output": 600000000
+    },
+    {
+      "id": "o3",
+      "provider": "openai",
+      "input": 2000000,
+      "cache_read": 500000,
+      "output": 8000000
+    },
+    {
+      "id": "o3-2025-04-16",
+      "provider": "openai",
+      "input": 2000000,
+      "cache_read": 500000,
+      "output": 8000000
+    },
+    {
+      "id": "o3-deep-research",
+      "provider": "openai",
+      "input": 10000000,
+      "cache_read": 2500000,
+      "output": 40000000
+    },
+    {
+      "id": "o3-deep-research-2025-06-26",
+      "provider": "openai",
+      "input": 10000000,
+      "cache_read": 2500000,
+      "output": 40000000
+    },
+    {
+      "id": "o3-mini",
+      "provider": "openai",
+      "input": 1100000,
+      "cache_read": 550000,
+      "output": 4400000
+    },
+    {
+      "id": "o3-mini-2025-01-31",
+      "provider": "openai",
+      "input": 1100000,
+      "cache_read": 550000,
+      "output": 4400000
+    },
+    {
+      "id": "o3-pro",
+      "provider": "openai",
+      "input": 20000000,
+      "output": 80000000
+    },
+    {
+      "id": "o3-pro-2025-06-10",
+      "provider": "openai",
+      "input": 20000000,
+      "output": 80000000
+    },
+    {
+      "id": "o4-mini",
+      "provider": "openai",
+      "input": 1100000,
+      "cache_read": 275000,
+      "output": 4400000
+    },
+    {
+      "id": "o4-mini-2025-04-16",
+      "provider": "openai",
+      "input": 1100000,
+      "cache_read": 275000,
+      "output": 4400000
+    },
+    {
+      "id": "o4-mini-deep-research",
+      "provider": "openai",
+      "input": 2000000,
+      "cache_read": 500000,
+      "output": 8000000
+    },
+    {
+      "id": "o4-mini-deep-research-2025-06-26",
+      "provider": "openai",
+      "input": 2000000,
+      "cache_read": 500000,
+      "output": 8000000
+    }
+  ]
+}

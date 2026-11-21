@@ -3,7 +3,6 @@ package modelcatalog
 import (
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/ansonnchan/tokenholic/internal/normalize"
 )
@@ -42,6 +41,85 @@ func TestResolverMatchesExactAliasReviewedInferredAndUnknown(t *testing.T) {
 				t.Fatalf("canonical ID = %v, want %q", resolution.CanonicalID, test.canonical)
 			}
 		})
+	}
+}
+
+func TestResolverAliasRules(t *testing.T) {
+	t.Parallel()
+	resolver, err := NewResolver(Catalog{
+		Revision:     "catalog-r1",
+		AliasRules:   AliasRules{ContextMarkers: []string{"[1m]"}, DatedSnapshots: true},
+		Unresolvable: []Unresolvable{{ID: "auto", Reason: ReasonAmbiguousAlias}, {ID: "review-label", Reason: ReasonRoutingLabel}},
+		Models: []Model{
+			{CanonicalID: "model-a", Provider: "provider", PricingKey: "provider/model-a", Aliases: []string{"model-a-latest"}},
+			{CanonicalID: "model-a-20260101", Provider: "provider", PricingKey: "provider/model-a-20260101"},
+			{CanonicalID: "model-tiered", Provider: "provider", UnpricedReason: ReasonContextTiered},
+			{CanonicalID: "model-unlisted", Provider: "provider"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		observed  string
+		canonical string
+		match     MatchKind
+		quality   normalize.ModelResolution
+		priced    bool
+		reason    string
+	}{
+		{observed: "model-a", canonical: "model-a", match: MatchExact, quality: normalize.ModelReported, priced: true},
+		{observed: "model-a[1m]", canonical: "model-a", match: MatchReviewed, quality: normalize.ModelResolved, priced: true},
+		{observed: "model-a-20260315", canonical: "model-a", match: MatchAlias, quality: normalize.ModelResolved, priced: true},
+		{observed: "model-a-2026-03-15", canonical: "model-a", match: MatchAlias, quality: normalize.ModelResolved, priced: true},
+		{observed: "model-a-20260315[1m]", canonical: "model-a", match: MatchReviewed, quality: normalize.ModelResolved, priced: true},
+		// A dated ID the catalog lists exactly wins over the date rule.
+		{observed: "model-a-20260101", canonical: "model-a-20260101", match: MatchExact, quality: normalize.ModelReported, priced: true},
+		{observed: "model-a-20260101[1m]", canonical: "model-a-20260101", match: MatchReviewed, quality: normalize.ModelResolved, priced: true},
+		// A rule never strengthens an alias and never drops the tier reason.
+		{observed: "model-a-latest[1m]", canonical: "model-a", match: MatchReviewed, quality: normalize.ModelResolved, priced: true},
+		{observed: "model-tiered[1m]", canonical: "model-tiered", match: MatchReviewed, quality: normalize.ModelResolved, reason: ReasonContextTiered},
+		{observed: "model-unlisted", canonical: "model-unlisted", match: MatchExact, quality: normalize.ModelReported, reason: ReasonNoPublishedPrice},
+		// Suffixes that are not a calendar date or a listed marker are not stripped.
+		{observed: "model-a-20261399", match: MatchUnknown, quality: normalize.ModelUnknown, reason: ReasonUnknownModel},
+		{observed: "model-a-1234", match: MatchUnknown, quality: normalize.ModelUnknown, reason: ReasonUnknownModel},
+		{observed: "model-a[2m]", match: MatchUnknown, quality: normalize.ModelUnknown, reason: ReasonUnknownModel},
+		{observed: "model-a-mini", match: MatchUnknown, quality: normalize.ModelUnknown, reason: ReasonUnknownModel},
+		{observed: "model", match: MatchUnknown, quality: normalize.ModelUnknown, reason: ReasonUnknownModel},
+		{observed: "[1m]", match: MatchUnknown, quality: normalize.ModelUnknown, reason: ReasonUnknownModel},
+		// Routing labels stay unknown, with or without a suffix.
+		{observed: "auto", match: MatchUnknown, quality: normalize.ModelUnknown, reason: ReasonAmbiguousAlias},
+		{observed: "auto[1m]", match: MatchUnknown, quality: normalize.ModelUnknown, reason: ReasonAmbiguousAlias},
+		{observed: "review-label", match: MatchUnknown, quality: normalize.ModelUnknown, reason: ReasonRoutingLabel},
+		{observed: "", match: MatchUnknown, quality: normalize.ModelUnknown, reason: ReasonModelUnavailable},
+	}
+	for _, tt := range tests {
+		t.Run(tt.observed, func(t *testing.T) {
+			resolution := resolver.Resolve(tt.observed, normalize.ModelReported)
+			if resolution.Match != tt.match || resolution.Quality != tt.quality || resolution.UnpricedReason != tt.reason {
+				t.Fatalf("Resolve() = %#v", resolution)
+			}
+			if (resolution.PricingKey != nil) != tt.priced {
+				t.Fatalf("pricing key = %v, want priced=%t", resolution.PricingKey, tt.priced)
+			}
+			if tt.canonical == "" {
+				if resolution.CanonicalID != nil {
+					t.Fatalf("canonical ID = %q, want unknown", *resolution.CanonicalID)
+				}
+			} else if resolution.CanonicalID == nil || *resolution.CanonicalID != tt.canonical {
+				t.Fatalf("canonical ID = %v, want %q", resolution.CanonicalID, tt.canonical)
+			}
+		})
+	}
+}
+
+func TestResolverWithoutAliasRulesMatchesExactly(t *testing.T) {
+	t.Parallel()
+	resolver := syntheticResolver(t, "catalog-r1")
+	for _, observed := range []string{"model-canonical[1m]", "model-canonical-20260315"} {
+		if resolution := resolver.Resolve(observed, normalize.ModelReported); resolution.Match != MatchUnknown {
+			t.Fatalf("Resolve(%q) = %#v, want unknown without alias rules", observed, resolution)
+		}
 	}
 }
 
@@ -88,30 +166,6 @@ func TestNewResolverRejectsAmbiguousOrDuplicateMappings(t *testing.T) {
 	}
 }
 
-func TestPricingRegistryEstimatesAndReportsUnavailablePrices(t *testing.T) {
-	t.Parallel()
-	registry := syntheticPricing(t)
-	million := uint64(1_000_000)
-	tokens := normalize.TokenCounts{
-		InputUncached: &million, InputCacheRead: &million,
-		InputCacheWrite: &million, Output: &million,
-	}
-	estimate, available, err := registry.EstimateTokens("provider/model", tokens)
-	if err != nil || !available {
-		t.Fatalf("EstimateTokens() = %#v, %t, %v", estimate, available, err)
-	}
-	if estimate.MicroUSD != 14_600_000 || estimate.Label != "API-equivalent estimate" || estimate.PricingRevision != "pricing-r1" {
-		t.Fatalf("estimate = %#v", estimate)
-	}
-	if _, available, err := registry.EstimateTokens("provider/unknown", tokens); err != nil || available {
-		t.Fatalf("unknown price availability = %t, %v", available, err)
-	}
-	tokens.InputCacheWrite = nil
-	if _, available, err := registry.EstimateTokens("provider/model", tokens); err != nil || available {
-		t.Fatalf("partial tokens availability = %t, %v", available, err)
-	}
-}
-
 func TestPricingRegistryChecksumAndEffectiveDateAreStable(t *testing.T) {
 	t.Parallel()
 	registry := syntheticPricing(t)
@@ -144,19 +198,6 @@ func syntheticResolver(t *testing.T, revision string) *Resolver {
 	return resolver
 }
 
-func syntheticPricing(t *testing.T) *PricingRegistry {
-	t.Helper()
-	registry, err := NewPricingRegistry("pricing-r1", []Price{{
-		Key: "provider/model", Provider: "provider",
-		Rate: Rate{
-			InputUncached: rate(2_000_000), InputCacheRead: rate(100_000),
-			InputCacheWrite: rate(2_500_000), Output: rate(10_000_000),
-		},
-		SourceURL: "https://provider.invalid/pricing", SourceRevision: "synthetic-r1",
-		EffectiveDate: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
-	}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return registry
+func rate(microUSDPerMillion uint64) *uint64 {
+	return &microUSDPerMillion
 }

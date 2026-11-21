@@ -553,7 +553,7 @@ before any presentation work depends on them.
     change totals; combined-only records report an unknown time-to-live.
   - Depends on: TKH-060.
 
-- [ ] **TKH-062: Adopt a pinned LiteLLM price snapshot** (`feat/litellm-pricing`)
+- [x] **TKH-062: Adopt a pinned LiteLLM price snapshot** (`feat/litellm-pricing`)
   - A Go generator vendors a pinned LiteLLM commit verified by SHA-256 and
     keeps only token-priced fields, including the 1-hour cache-write price.
   - A reviewed overrides file adds models newer than the snapshot. Every

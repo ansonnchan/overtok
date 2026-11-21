@@ -30,10 +30,12 @@ func TestApplyUsesServerCatalogAndPricing(t *testing.T) {
 		t.Fatalf("response/repository = %#v/%#v", response, repository.buckets)
 	}
 	stored := repository.buckets[0].Bucket
-	if stored.APIEstimate.Value == nil || *stored.APIEstimate.Value != 14_600_000 || stored.APIEstimate.State != "complete" {
+	// The million cache-write tokens have no lifetime in the v1 payload, so
+	// they are priced at the base rate and the estimate is a lower bound.
+	if stored.APIEstimate.Value == nil || *stored.APIEstimate.Value != 14_600_000 || stored.APIEstimate.State != "partial" {
 		t.Fatalf("authoritative estimate = %#v", stored.APIEstimate)
 	}
-	if stored.PricingRevision == nil || *stored.PricingRevision != modelcatalog.PricingRevision {
+	if stored.PricingRevision == nil || *stored.PricingRevision != "synthetic-pricing-r1" {
 		t.Fatalf("authoritative pricing revision = %#v", stored.PricingRevision)
 	}
 }
@@ -90,11 +92,22 @@ func TestApplyRejectsClientModelMetadataThatDisagreesWithServer(t *testing.T) {
 
 func testService(t *testing.T) (*Service, *fakeRepository) {
 	t.Helper()
-	models, err := modelcatalog.NewResolver(modelcatalog.DefaultCatalog())
+	// A synthetic catalog keeps these protocol tests independent of the
+	// bundled price snapshot.
+	models, err := modelcatalog.NewResolver(modelcatalog.Catalog{
+		Revision: "synthetic-catalog-r1",
+		Models:   []modelcatalog.Model{{CanonicalID: "gpt-6.2-sol", Provider: "openai", PricingKey: "openai/gpt-6.2-sol"}},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	pricing, err := modelcatalog.DefaultPricingRegistry()
+	input, read, write, output := uint64(2_000_000), uint64(100_000), uint64(2_500_000), uint64(10_000_000)
+	pricing, err := modelcatalog.NewPricingRegistry("synthetic-pricing-r1", []modelcatalog.Price{{
+		Key: "openai/gpt-6.2-sol", Provider: "openai",
+		Rate:      modelcatalog.Rate{InputUncached: &input, InputCacheRead: &read, InputCacheWrite: &write, Output: &output},
+		SourceURL: "https://provider.invalid/pricing", SourceRevision: "synthetic-r1",
+		EffectiveDate: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+	}})
 	if err != nil {
 		t.Fatal(err)
 	}

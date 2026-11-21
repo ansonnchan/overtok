@@ -89,7 +89,9 @@ func (s *Service) authoritativeEnvelope(envelope protocol.Envelope) (protocol.En
 			}
 			if priced {
 				state := "complete"
-				if hasPartialBillableTokens(bucket.Tokens) {
+				// The v1 payload carries no cache-write lifetime, so any
+				// cache write makes the estimate a lower bound.
+				if estimate.LowerBound || hasPartialBillableTokens(bucket.Tokens) {
 					state = "partial"
 				}
 				bucket.APIEstimate = protocol.Value{Value: uint64Pointer(estimate.MicroUSD), State: state}

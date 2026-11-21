@@ -468,6 +468,10 @@ func (a *bucketAccumulator) addObservation(observation StoredObservation, estima
 	}
 	a.pricingRevision = estimate.PricingRevision
 	value := estimate.MicroUSD
+	if estimate.LowerBound {
+		// The bucket estimate is then partial: a floor, not the full value.
+		a.estimate.missing = true
+	}
 	return a.estimate.add(&value)
 }
 

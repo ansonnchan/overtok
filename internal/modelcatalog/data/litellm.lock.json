@@ -1,0 +1,9 @@
+{
+  "repository": "BerriAI/litellm",
+  "path": "model_prices_and_context_window.json",
+  "commit": "ac7674625ceed298d6c411cc964f23aded63989d",
+  "sha256": "f410a08e6d566829e3a858b00e8b23f5a796fd2360f056a69cab43526f908864",
+  "retrieved": "2026-11-21",
+  "providers": ["anthropic", "openai"],
+  "modes": ["chat", "responses"]
+}
