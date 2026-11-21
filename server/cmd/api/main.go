@@ -67,6 +67,15 @@ func run() error {
 	if err := postgres.EnsurePricingRevision(ctx, pool, pricing); err != nil {
 		return err
 	}
+	// Bring stored history to this build's prices before serving any request,
+	// so no response ever mixes two pricing revisions.
+	repriced, err := postgres.RepriceUsage(ctx, pool, pricer)
+	if err != nil {
+		return fmt.Errorf("reprice stored usage: %w", err)
+	}
+	if repriced.Repriced > 0 {
+		fmt.Fprintf(os.Stderr, "tokenholic api: repriced %d usage buckets to pricing revision %s\n", repriced.Repriced, repriced.Revision)
+	}
 	repository, err := postgres.NewAuthRepository(pool)
 	if err != nil {
 		return err
