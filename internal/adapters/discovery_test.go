@@ -54,8 +54,89 @@ func TestDistinctCodexHomesRemainSeparate(t *testing.T) {
 	home := t.TempDir()
 	custom := filepath.Join(t.TempDir(), "codex")
 	roots := DefaultMacRoots(home, custom)
-	if len(roots) != 6 || roots[4].Kind != RootCodexCLI || roots[5].Kind != RootCodexDesktop {
-		t.Fatalf("distinct Codex roots = %#v", roots)
+	// Each Codex home contributes its sessions root and an optional archive.
+	if len(roots) != 8 {
+		t.Fatalf("distinct Codex roots = %d, want 8", len(roots))
+	}
+	for index, want := range []struct {
+		kind     RootKind
+		path     string
+		optional bool
+	}{
+		{RootCodexCLI, filepath.Join(custom, "sessions"), false},
+		{RootCodexCLI, filepath.Join(custom, "archived_sessions"), true},
+		{RootCodexDesktop, filepath.Join(home, ".codex", "sessions"), false},
+		{RootCodexDesktop, filepath.Join(home, ".codex", "archived_sessions"), true},
+	} {
+		root := roots[4+index]
+		if root.Kind != want.kind || root.Path != want.path || root.Optional != want.optional {
+			t.Fatalf("Codex root %d = %s optional=%t, want %s optional=%t", index, root.Kind, root.Optional, want.kind, want.optional)
+		}
+	}
+}
+
+func TestArchivedCodexSessionsAreDiscoveredOnlyWhenTheyHoldRecords(t *testing.T) {
+	t.Parallel()
+
+	codexFindings := func(home string) []Finding {
+		var findings []Finding
+		for _, finding := range (Discoverer{Roots: DefaultMacRoots(home, "")}).Discover(context.Background()) {
+			if finding.Source == normalize.SourceCodex {
+				findings = append(findings, finding)
+			}
+		}
+		return findings
+	}
+	home := t.TempDir()
+	writeSyntheticFile(t, filepath.Join(home, ".codex", "sessions", "2026", "01", "02", "rollout-synthetic.jsonl"))
+
+	// No archive directory: one finding, and the source is not degraded by it.
+	if findings := codexFindings(home); len(findings) != 1 || findings[0].Status != normalize.HealthDetected {
+		t.Fatalf("without an archive: %#v", findings)
+	}
+	// An empty archive is equally silent.
+	archive := filepath.Join(home, ".codex", "archived_sessions")
+	if err := os.MkdirAll(archive, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if findings := codexFindings(home); len(findings) != 1 || findings[0].Status != normalize.HealthDetected {
+		t.Fatalf("with an empty archive: %#v", findings)
+	}
+	// Archived rollouts are usage too.
+	writeSyntheticFile(t, filepath.Join(archive, "rollout-archived.jsonl"))
+	findings := codexFindings(home)
+	if len(findings) != 2 {
+		t.Fatalf("with an archived rollout: %d findings, want 2", len(findings))
+	}
+	for _, finding := range findings {
+		if finding.Kind != RootCodexShared || finding.Surface != normalize.SurfaceSharedLocal ||
+			finding.Status != normalize.HealthDetected || finding.RecordCount != 1 {
+			t.Fatalf("finding = %s/%s %s count=%d", finding.Kind, finding.Surface, finding.Status, finding.RecordCount)
+		}
+	}
+	// Other files beside the rollouts are never candidates.
+	writeSyntheticFile(t, filepath.Join(home, ".codex", "config.toml"))
+	writeSyntheticFile(t, filepath.Join(home, ".codex", "auth.json"))
+	for _, finding := range codexFindings(home) {
+		for _, candidate := range finding.Candidates {
+			if filepath.Ext(candidate.Path) != ".jsonl" {
+				t.Fatalf("discovered a non-rollout file with extension %q", filepath.Ext(candidate.Path))
+			}
+		}
+	}
+}
+
+func TestUnreadableOptionalRootIsStillReported(t *testing.T) {
+	t.Parallel()
+
+	root := filepath.Join(t.TempDir(), "archive-is-a-file")
+	writeSyntheticFile(t, root)
+	findings := (Discoverer{Roots: []RootSpec{{
+		Kind: RootCodexShared, Source: normalize.SourceCodex, Surface: normalize.SurfaceSharedLocal,
+		Path: root, Extensions: []string{".jsonl"}, Optional: true,
+	}}}).Discover(context.Background())
+	if len(findings) != 1 || findings[0].Status != normalize.HealthUnsupported {
+		t.Fatalf("findings = %#v, want the unusable optional root reported", findings)
 	}
 }
 
