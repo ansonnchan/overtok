@@ -58,6 +58,14 @@ never rejected, so a client with a different catalog always syncs.
 `POST /v1/sync/buckets` returns `426 Upgrade Required` with an upgrade
 instruction.
 
+At startup, after migrations and before serving, `postgres.RepriceUsage`
+re-derives every stored bucket whose pricing revision differs from the bundled
+one. The pass runs in one advisory-locked transaction, rewrites only
+server-derived columns, and is a no-op when nothing is stale. A failure rolls
+back and stops startup rather than serving a mix of revisions. Moving the
+price pin or editing an override therefore reprices history on the next
+deploy with no manual step.
+
 Run the disposable-schema integration suite with `make test-postgres` and an
 `TOKENHOLIC_TEST_DATABASE_URL`. Do not target production. Do not add distributed
 infrastructure, background queues, caches, or deployment configuration before

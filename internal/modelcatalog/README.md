@@ -43,7 +43,8 @@ instead of being rounded.
 3. Review the diff of `data/litellm_prices.json`.
 4. Update `bundledRevision` in `bundled_test.go` to the new value the failing
    test prints. The revision is derived from the content, so it cannot be
-   forgotten, and the server reprices stored usage when it changes.
+   forgotten. The next API start reprices every stored bucket to it in one
+   transaction; see [the server guide](../../server/README.md).
 
 ### Overrides
 

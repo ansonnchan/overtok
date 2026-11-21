@@ -246,6 +246,21 @@ plus unpriced tokens always equal the bucket's known total.
 instruction for every caller. The v2 route rejects a body that carries v1's
 client-resolved fields.
 
+Because derived values are a pure function of stored evidence and a pricing
+revision, the API re-derives history at startup. After migrations and before
+it serves a request, it takes an advisory lock and, in one transaction, rewrites
+the derived columns of every bucket whose revision differs from the bundled
+one. Readers see the previous consistent values until that commit; a failure
+rolls the whole pass back and aborts startup. Rows already at the active
+revision are skipped, so a restart with unchanged prices does nothing. Client
+evidence, bucket revisions, payload hashes, and receipt times are never
+modified.
+
+This is correct for the single demo instance. During a deploy overlap, an
+older instance can still write rows at its own revision; they are repriced at
+the next start. The pass holds one transaction over all stale rows, which is
+acceptable at demo scale and should be measured before the table grows large.
+
 Account usage is read as one repeatable PostgreSQL snapshot. Normalized token
 categories, non-overlapping total tokens, and API-equivalent estimates preserve
 complete, partial, unavailable, and empty coverage. Numeric sums remain decimal
@@ -358,7 +373,9 @@ is priced at the 5-minute rate and makes the estimate a lower bound. Unknown
 models retain token totals and display unavailable cost.
 
 The catalog and pricing share one revision derived from their content, so any
-price or rule change produces a new revision.
+price or rule change produces a new revision. Stored history follows the
+active revision: when it changes, the server reprices every bucket from its raw
+token counts.
 
 The CLI and API build the same catalog code. The server's derivation is stored
 and authoritative; the CLI's is a preview labelled as such. Their revisions may
@@ -397,8 +414,8 @@ These decisions are accepted and drive the roadmap's M6–M10 milestones.
 
 ### Server-authoritative models and pricing
 
-Implemented except startup repricing, which is the next workstream. The
-sections above describe the shipped behavior; this list records the decisions.
+Implemented. The sections above describe the shipped behavior; this list
+records the decisions behind it.
 
 ```text
 client: observed model ID + token categories (protocol v2)

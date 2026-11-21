@@ -114,6 +114,11 @@ groups, and memberships are kept. Clients older than 0.2 receive
 `426 Upgrade Required` and must upgrade, after which they rebuild their local
 buckets and upload their full history again. Nothing local is lost.
 
+A deploy that changes the bundled prices reprices stored usage while the
+service starts. The log line `repriced N usage buckets to pricing revision R`
+confirms it. Startup takes longer in proportion to the stored buckets, and the
+service does not answer `/healthz` until the pass commits.
+
 Free Supabase projects have no automatic backups. Treat synchronized records as
 disposable copies of local aggregates. The source evidence and local SQLite
 database remain authoritative; deleting the Render service and Supabase project
