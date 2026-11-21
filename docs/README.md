@@ -5,7 +5,7 @@ This directory owns decisions that cross package boundaries. Package-specific im
 ## Documents
 
 - [Architecture](./architecture.md) defines system boundaries, data flow, persistence and synchronization direction, deployment constraints, and privacy invariants.
-- [TUI design direction](./design.md) defines interaction, responsive layout, visual restraint, accessibility, and content language for the future terminal interface.
+- [Design direction](./design.md) defines the retro-terminal visual language, TUI interaction and responsive layout, the read-only website, accessibility, and content style.
 - [Development guide](./development.md) explains prerequisites, commands, test boundaries, CI, and contribution workflow.
 - [Free demo deployment](./deployment.md) explains the optional Render and Supabase environment, secret setup, validation, limitations, and removal.
 - [Release artifacts](./releasing.md) defines reproducible native packaging, checksums, and tag publication.
