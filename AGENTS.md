@@ -4,7 +4,7 @@ Read these documents before changing the project:
 
 1. [ROADMAP.md](./ROADMAP.md) for scope, milestones, and delivery order.
 2. [docs/architecture.md](./docs/architecture.md) for boundaries and data flow.
-3. [docs/design.md](./docs/design.md) for TUI behavior and visual direction.
+3. [docs/design.md](./docs/design.md) for TUI and website behavior and visual direction.
 
 ## Product boundaries
 
@@ -14,10 +14,16 @@ Ordinary desktop/web chat is outside the product. Claude Desktop local Code/Agen
 
 Unknown and unavailable values are not zero. Preserve the distinction between reported, resolved, inferred, estimated, and unsupported data.
 
+The terminal is the primary product. The website is read-only and never signs users in or accepts writes. Profiles, groups, and global-board participation are private until the user or owner opts in; public endpoints must treat private and nonexistent records identically. Uploading always requires a claimed account. Sharing uses client-side `x.com/intent/post` links, never the paid X API.
+
+Costs are API-equivalent estimates, never spending.
+
 ## Architecture rules
 
 - Keep source discovery, parsing, normalization, persistence, synchronization, and presentation separate.
 - Keep observed model IDs separate from canonical model IDs and pricing keys.
+- Model resolution and pricing are server-authoritative. Client resolution is an offline preview and must never cause an upload to be rejected.
+- Vendor external price data from a pinned, checksum-verified source. Every manual price override cites an official provider URL and retrieval date; never guess a price.
 - Normalize and commit local state before attempting network upload.
 - Make collection and synchronization safe to repeat.
 - Prefer absolute versioned buckets over additive upload commands.
@@ -27,7 +33,8 @@ Unknown and unavailable values are not zero. Preserve the distinction between re
 
 ## Implementation style
 
-- Use Go for the native CLI, collector, TUI, and API.
+- Use Go for the native CLI, collector, TUI, API, share pages, and share-card rendering.
+- Build the static website in `web/` with plain HTML, CSS, and minimal JavaScript; no framework or build step.
 - Use pnpm only for the npm distribution workspace and release tooling.
 - Prefer the standard library until a dependency materially reduces complexity.
 - Keep packages small and named after one responsibility.
@@ -52,12 +59,12 @@ Unknown and unavailable values are not zero. Preserve the distinction between re
 
 ## TUI direction
 
-- Keep the interface restrained, readable, and keyboard-first.
-- Use terminal defaults plus one warm accent and muted status colors.
-- Avoid neon palettes, cyberpunk styling, gradients, excessive borders, and decorative animation.
-- Prefer whitespace, alignment, typography, and a small number of panels.
-- Preserve meaning without color and on narrow terminals.
-- Do not let presentation own collection or synchronization logic.
+- Follow the retro-terminal direction in `docs/design.md`: one coral accent, uppercase spaced labels, titled panels with dashed rules, solid coral chips for selection and primary actions, and a highlighted current-user row.
+- Keep the interface keyboard-first, dense, and aligned; use the terminal's own background.
+- Avoid neon palettes, gradients, glow, ASCII-art backgrounds, and idle animation.
+- Preserve meaning without color and on narrow terminals; every glyph used for meaning needs an ASCII fallback.
+- Cover layout changes with golden snapshots at the documented widths, with and without color.
+- Do not let presentation own collection, synchronization, or pricing logic.
 
 ## Git workflow
 
@@ -89,6 +96,7 @@ Unknown and unavailable values are not zero. Preserve the distinction between re
 - Are missing capabilities visible instead of reported as zero?
 - Can the payload contain private source material?
 - Are model aliases and inferred mappings labelled honestly?
+- Can a public endpoint reveal a private user, group, or opt-out?
 - Does the change work without color and at the documented minimum width?
 - Is the behavior covered by unit tests or sanitized fixtures?
 - Did the change add complexity that belongs in a later milestone?
