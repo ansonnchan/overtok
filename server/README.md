@@ -4,7 +4,8 @@ The hosted PostgreSQL persistence foundation is implemented in `postgres`. It
 opens a pgx connection pool and applies the embedded, checksummed migrations in
 one advisory-locked transaction. `auth` and `httpapi` implement GitHub device
 authorization, tokenholic credential rotation/revocation, and bounded JSON routes.
-`sync` authenticates privacy-limited uploads and `postgres` applies absolute
+`sync` authenticates privacy-limited uploads, `pricing` derives the
+server-owned model and estimate columns, and `postgres` applies absolute
 revisions transactionally.
 
 `account` exposes one authenticated usage row across active devices. Its
@@ -49,9 +50,13 @@ The upload route accepts at most 100 buckets and one MiB of JSON. Equal
 revisions are no-ops only when their canonical payload hashes match; stale
 revisions cannot replace newer state, and a different equal-revision payload
 rolls back the whole batch. Token counts remain self-reported local evidence.
-The API validates model metadata against its bundled catalog and derives the
-API-equivalent estimate and pricing revision itself; it never stores the
-client-provided calculation as authoritative.
+Uploads use sync protocol v2 at `POST /v2/sync/buckets` and carry observed
+evidence only. `pricing` resolves each observed model with the bundled catalog
+and derives the API-equivalent estimate, priced and unpriced token counts, and
+the pricing revision. An unrecognized model is stored as unknown and unpriced,
+never rejected, so a client with a different catalog always syncs.
+`POST /v1/sync/buckets` returns `426 Upgrade Required` with an upgrade
+instruction.
 
 Run the disposable-schema integration suite with `make test-postgres` and an
 `TOKENHOLIC_TEST_DATABASE_URL`. Do not target production. Do not add distributed

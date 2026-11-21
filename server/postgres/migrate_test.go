@@ -134,23 +134,31 @@ func TestPostgresMigrationsAndOwnershipConstraints(t *testing.T) {
 	}
 }
 
+// insertSyntheticBucket writes one unpriced v2 bucket: 7 output tokens plus
+// the given uncached input, all unpriced because the model is unknown.
 func insertSyntheticBucket(ctx context.Context, pool *pgxpool.Pool, deviceID, key string, input any, inputState string) error {
 	_, err := pool.Exec(ctx, `
 		INSERT INTO usage_buckets(
 			device_id, bucket_key, bucket_start, interval_seconds, source, surface,
-			observed_model_id, model_resolution, measurement, normalization_version,
+			observed_model_id, model_evidence, measurement, normalization_version,
 			input_uncached_tokens, input_uncached_state,
 			input_cache_read_tokens, input_cache_read_state,
 			input_cache_write_tokens, input_cache_write_state,
+			input_cache_write_5m_tokens, input_cache_write_5m_state,
+			input_cache_write_1h_tokens, input_cache_write_1h_state,
 			output_tokens, output_state,
 			reasoning_output_tokens, reasoning_output_state,
-			api_estimate_microusd, api_estimate_state, pricing_revision,
-			revision, payload_hash
+			revision, payload_hash,
+			model_resolution, model_match, unpriced_reason, priced_tokens, unpriced_tokens,
+			api_estimate_microusd, api_estimate_state, pricing_revision
 		) VALUES (
 			$1::uuid, $2, $3, 60, 'claude', 'cli',
-			'synthetic-model', 'unknown', 'reported', '1',
-			$4, $5, NULL, 'unavailable', 0, 'complete', 7, 'complete', 3, 'complete',
-			100, 'complete', 'synthetic-r1', 1, $6
+			'synthetic-model', 'reported', 'reported', '1',
+			$4, $5, NULL, 'unavailable', 0, 'complete', 0, 'complete', 0, 'complete',
+			7, 'complete', 3, 'complete',
+			1, $6,
+			'unknown', 'unknown', 'unknown_model', 0, COALESCE($4::numeric, 0) + 7,
+			NULL, 'unavailable', 'synthetic-r1'
 		)
 	`, deviceID, key, time.Date(2026, 11, 18, 7, 0, 0, 0, time.UTC), input, inputState, bytes.Repeat([]byte{0x33}, 32))
 	return err

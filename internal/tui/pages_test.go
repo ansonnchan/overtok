@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ansonnchan/tokenholic/internal/application"
+	"github.com/ansonnchan/tokenholic/internal/modelcatalog"
 	"github.com/ansonnchan/tokenholic/internal/multiplayer"
 	"github.com/ansonnchan/tokenholic/internal/normalize"
 	"github.com/ansonnchan/tokenholic/internal/store"
@@ -24,6 +25,9 @@ func TestOverviewPageLabelsPartialUnknownAndEstimates(t *testing.T) {
 	for _, want := range []string{
 		"Total tokens: 42 (partial)",
 		"API-equivalent estimate: unavailable",
+		"  5-minute: unavailable",
+		"  1-hour: unavailable",
+		"Estimates here are a local preview",
 		"Today includes partial or unavailable values",
 		"Pending local buckets: 3",
 	} {
@@ -56,6 +60,41 @@ func TestModelsPagePreservesAttributionQuality(t *testing.T) {
 	}
 	if page.Warning == "" {
 		t.Fatal("unknown attribution did not produce a warning")
+	}
+}
+
+func TestModelsPageExplainsMissingEstimates(t *testing.T) {
+	t.Parallel()
+	value := uint64(10)
+	canonical := "model-tiered"
+	tokens := store.TokenBreakdown{InputUncached: store.AggregateValue{Value: &value, State: store.AvailabilityComplete}}
+	unavailable := store.AggregateValue{State: store.AvailabilityUnavailable}
+	tests := []struct {
+		reason string
+		want   string
+	}{
+		{reason: modelcatalog.ReasonContextTiered, want: "no estimate: price depends on prompt length"},
+		{reason: modelcatalog.ReasonUnknownModel, want: "no estimate: model is not in this version's price list"},
+		{reason: modelcatalog.ReasonRoutingLabel, want: "no estimate: a routing label"},
+		{reason: "reason_from_a_newer_catalog", want: "no estimate: reason_from_a_newer_catalog"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.reason, func(t *testing.T) {
+			page := modelsPage(application.Dashboard{AllTime: store.UsageSummary{Models: []store.ModelBreakdown{{
+				ObservedModelID: "model-tiered", CanonicalModelID: &canonical, Resolution: normalize.ModelReported,
+				UnpricedReason: tt.reason, Tokens: tokens, APIEstimate: unavailable,
+			}}}})
+			if joined := strings.Join(page.Lines, "\n"); !strings.Contains(joined, tt.want) {
+				t.Fatalf("models page = %q, want %q", joined, tt.want)
+			}
+		})
+	}
+	priced := modelsPage(application.Dashboard{AllTime: store.UsageSummary{Models: []store.ModelBreakdown{{
+		ObservedModelID: "model-a", CanonicalModelID: &canonical, Resolution: normalize.ModelReported,
+		Tokens: tokens, APIEstimate: store.AggregateValue{Value: &value, State: store.AvailabilityComplete},
+	}}}})
+	if strings.Contains(strings.Join(priced.Lines, "\n"), "no estimate") {
+		t.Fatalf("priced model shows a missing-estimate reason: %#v", priced.Lines)
 	}
 }
 

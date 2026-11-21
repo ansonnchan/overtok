@@ -1,7 +1,6 @@
 package modelcatalog
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/ansonnchan/tokenholic/internal/normalize"
@@ -120,26 +119,6 @@ func TestResolverWithoutAliasRulesMatchesExactly(t *testing.T) {
 		if resolution := resolver.Resolve(observed, normalize.ModelReported); resolution.Match != MatchUnknown {
 			t.Fatalf("Resolve(%q) = %#v, want unknown without alias rules", observed, resolution)
 		}
-	}
-}
-
-func TestResolveObservationKeepsUnknownTokensAndClearsPrice(t *testing.T) {
-	t.Parallel()
-	resolver := syntheticResolver(t, "catalog-r1")
-	input, output := uint64(7), uint64(11)
-	observation := normalize.Observation{
-		ObservedModelID: "new-model", ModelResolution: normalize.ModelReported,
-		Tokens: normalize.TokenCounts{InputUncached: &input, Output: &output},
-	}
-	resolved := resolver.ResolveObservation(observation)
-	if !reflect.DeepEqual(resolved.Tokens, observation.Tokens) {
-		t.Fatalf("tokens changed: got %#v want %#v", resolved.Tokens, observation.Tokens)
-	}
-	if resolved.ModelResolution != normalize.ModelUnknown || resolved.CanonicalModelID != nil || resolved.PricingKey != nil {
-		t.Fatalf("unknown resolution = %#v", resolved)
-	}
-	if len(resolved.Warnings) != 1 || resolved.Warnings[0].Code != "model_unresolved" {
-		t.Fatalf("warnings = %#v", resolved.Warnings)
 	}
 }
 

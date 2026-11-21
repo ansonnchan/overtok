@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ansonnchan/tokenholic/internal/application"
+	"github.com/ansonnchan/tokenholic/internal/modelcatalog"
 	"github.com/ansonnchan/tokenholic/internal/multiplayer"
 	"github.com/ansonnchan/tokenholic/internal/normalize"
 	"github.com/ansonnchan/tokenholic/internal/store"
@@ -44,9 +45,12 @@ func overviewPage(dashboard application.Dashboard) Page {
 		"Input uncached: " + formatValue(dashboard.Today.Tokens.InputUncached),
 		"Cache read: " + formatValue(dashboard.Today.Tokens.InputCacheRead),
 		"Cache write: " + formatValue(dashboard.Today.Tokens.InputCacheWrite),
+		"  5-minute: " + formatValue(dashboard.Today.Tokens.InputCacheWrite5m),
+		"  1-hour: " + formatValue(dashboard.Today.Tokens.InputCacheWrite1h),
 		"Output: " + formatValue(dashboard.Today.Tokens.Output),
 		"Reasoning output: " + formatValue(dashboard.Today.Tokens.ReasoningOutput),
 		"API-equivalent estimate: " + formatEstimate(dashboard.Today.APIEstimate),
+		"Estimates here are a local preview; the server derives its own.",
 		"",
 		"Recent periods",
 		periodLine("Today", dashboard.Today),
@@ -122,11 +126,35 @@ func modelsPage(dashboard application.Dashboard) Page {
 			fmt.Sprintf("%s · attribution %s", name, model.Resolution),
 			fmt.Sprintf("  %s tokens · API-equivalent estimate %s", totalTokens(model.Tokens), formatEstimate(model.APIEstimate)),
 		)
+		if reason := unpricedReasonText(model.UnpricedReason); reason != "" {
+			page.Lines = append(page.Lines, "  no estimate: "+reason)
+		}
 		if model.Resolution == normalize.ModelUnknown || model.Resolution == normalize.ModelInferred {
 			page.Warning = "Some model attribution is inferred or unavailable"
 		}
 	}
 	return page
+}
+
+// unpricedReasonText explains a missing estimate in plain language. Unknown
+// codes fall back to the code so a newer catalog reason is still visible.
+func unpricedReasonText(reason string) string {
+	switch reason {
+	case "":
+		return ""
+	case modelcatalog.ReasonUnknownModel:
+		return "model is not in this version's price list"
+	case modelcatalog.ReasonModelUnavailable:
+		return "the source did not record a model"
+	case modelcatalog.ReasonAmbiguousAlias, modelcatalog.ReasonRoutingLabel:
+		return "a routing label that names no single model"
+	case modelcatalog.ReasonContextTiered:
+		return "price depends on prompt length, which usage totals cannot prove"
+	case modelcatalog.ReasonNoPublishedPrice:
+		return "no reviewed price for this model"
+	default:
+		return reason
+	}
 }
 
 func noSupportedSources(dashboard application.Dashboard) bool {

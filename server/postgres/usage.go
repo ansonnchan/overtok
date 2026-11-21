@@ -30,7 +30,9 @@ func NewUsageRepository(pool *pgxpool.Pool) (*UsageRepository, error) {
 
 // ApplyUsageBuckets applies a batch atomically. Equal revisions are no-ops,
 // older revisions are stale, and only newer absolute values replace storage.
-func (r *UsageRepository) ApplyUsageBuckets(ctx context.Context, principal serverauth.Principal, buckets []protocol.Envelope) (acknowledgements []protocol.Acknowledgement, err error) {
+// Conflict detection compares client evidence alone, so a catalog update on
+// the server can never turn a retry into a conflict.
+func (r *UsageRepository) ApplyUsageBuckets(ctx context.Context, principal serverauth.Principal, buckets []serversync.Bucket) (acknowledgements []protocol.Acknowledgement, err error) {
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("begin usage synchronization: %w", err)
@@ -52,10 +54,11 @@ func (r *UsageRepository) ApplyUsageBuckets(ctx context.Context, principal serve
 	} else if err != nil {
 		return nil, fmt.Errorf("verify active usage device: %w", err)
 	}
-	ordered := append([]protocol.Envelope(nil), buckets...)
-	sort.Slice(ordered, func(i, j int) bool { return ordered[i].BucketKey < ordered[j].BucketKey })
+	ordered := append([]serversync.Bucket(nil), buckets...)
+	sort.Slice(ordered, func(i, j int) bool { return ordered[i].Envelope.BucketKey < ordered[j].Envelope.BucketKey })
 	acknowledgements = make([]protocol.Acknowledgement, 0, len(ordered))
-	for _, envelope := range ordered {
+	for _, bucket := range ordered {
+		envelope := bucket.Envelope
 		_, payloadHash, hashErr := protocol.CanonicalEnvelope(envelope)
 		if hashErr != nil {
 			return nil, hashErr
@@ -71,7 +74,7 @@ func (r *UsageRepository) ApplyUsageBuckets(ctx context.Context, principal serve
 		status := protocol.AckApplied
 		switch {
 		case errors.Is(readErr, pgx.ErrNoRows):
-			if err = insertUsageBucket(ctx, tx, principal.DeviceID, envelope, payloadHash); err != nil {
+			if err = upsertUsageBucket(ctx, tx, principal.DeviceID, bucket, payloadHash); err != nil {
 				return nil, err
 			}
 		case readErr != nil:
@@ -90,7 +93,7 @@ func (r *UsageRepository) ApplyUsageBuckets(ctx context.Context, principal serve
 				}
 				status = protocol.AckUnchanged
 			default:
-				if err = updateUsageBucket(ctx, tx, principal.DeviceID, envelope, payloadHash); err != nil {
+				if err = upsertUsageBucket(ctx, tx, principal.DeviceID, bucket, payloadHash); err != nil {
 					return nil, err
 				}
 			}
@@ -105,70 +108,77 @@ func (r *UsageRepository) ApplyUsageBuckets(ctx context.Context, principal serve
 	return acknowledgements, nil
 }
 
-func insertUsageBucket(ctx context.Context, tx pgx.Tx, deviceID string, envelope protocol.Envelope, payloadHash [32]byte) error {
-	arguments := usageBucketArguments(deviceID, envelope, payloadHash)
+// upsertUsageBucket writes one absolute bucket. The caller holds the row lock
+// and has already decided that this revision replaces any stored one.
+func upsertUsageBucket(ctx context.Context, tx pgx.Tx, deviceID string, bucket serversync.Bucket, payloadHash [32]byte) error {
+	envelope, derived := bucket.Envelope, bucket.Derived
+	tokens := envelope.Bucket.Tokens
 	_, err := tx.Exec(ctx, `
 		INSERT INTO usage_buckets(
 			device_id, bucket_key, bucket_start, interval_seconds, source, surface,
-			observed_model_id, canonical_model_id, model_provider, pricing_key,
-			model_resolution, measurement, normalization_version,
+			observed_model_id, model_evidence, measurement, normalization_version,
 			input_uncached_tokens, input_uncached_state,
 			input_cache_read_tokens, input_cache_read_state,
 			input_cache_write_tokens, input_cache_write_state,
-			output_tokens, output_state, reasoning_output_tokens, reasoning_output_state,
-			api_estimate_microusd, api_estimate_state, pricing_revision, revision, payload_hash
+			input_cache_write_5m_tokens, input_cache_write_5m_state,
+			input_cache_write_1h_tokens, input_cache_write_1h_state,
+			output_tokens, output_state,
+			reasoning_output_tokens, reasoning_output_state,
+			revision, payload_hash,
+			canonical_model_id, model_provider, pricing_key, model_resolution, model_match,
+			unpriced_reason, priced_tokens, unpriced_tokens,
+			api_estimate_microusd, api_estimate_state, pricing_revision
 		) VALUES (
-			$1::uuid,$2,$3,60,$4,$5,$6,$7,$8,$9,$10,$11,$12,
-			$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27
+			$1::uuid,$2,$3,60,$4,$5,$6,$7,$8,$9,
+			$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,
+			$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36
 		)
-	`, arguments...)
+		ON CONFLICT (device_id, bucket_key) DO UPDATE SET
+			bucket_start=excluded.bucket_start, source=excluded.source, surface=excluded.surface,
+			observed_model_id=excluded.observed_model_id, model_evidence=excluded.model_evidence,
+			measurement=excluded.measurement, normalization_version=excluded.normalization_version,
+			input_uncached_tokens=excluded.input_uncached_tokens, input_uncached_state=excluded.input_uncached_state,
+			input_cache_read_tokens=excluded.input_cache_read_tokens, input_cache_read_state=excluded.input_cache_read_state,
+			input_cache_write_tokens=excluded.input_cache_write_tokens, input_cache_write_state=excluded.input_cache_write_state,
+			input_cache_write_5m_tokens=excluded.input_cache_write_5m_tokens, input_cache_write_5m_state=excluded.input_cache_write_5m_state,
+			input_cache_write_1h_tokens=excluded.input_cache_write_1h_tokens, input_cache_write_1h_state=excluded.input_cache_write_1h_state,
+			output_tokens=excluded.output_tokens, output_state=excluded.output_state,
+			reasoning_output_tokens=excluded.reasoning_output_tokens, reasoning_output_state=excluded.reasoning_output_state,
+			revision=excluded.revision, payload_hash=excluded.payload_hash, received_at=CURRENT_TIMESTAMP,
+			canonical_model_id=excluded.canonical_model_id, model_provider=excluded.model_provider,
+			pricing_key=excluded.pricing_key, model_resolution=excluded.model_resolution,
+			model_match=excluded.model_match, unpriced_reason=excluded.unpriced_reason,
+			priced_tokens=excluded.priced_tokens, unpriced_tokens=excluded.unpriced_tokens,
+			api_estimate_microusd=excluded.api_estimate_microusd, api_estimate_state=excluded.api_estimate_state,
+			pricing_revision=excluded.pricing_revision
+	`,
+		deviceID, envelope.BucketKey, envelope.Bucket.Start, envelope.Bucket.Source, envelope.Bucket.Surface,
+		envelope.Bucket.ObservedModelID, envelope.Bucket.ModelEvidence, envelope.Bucket.Measurement, envelope.Bucket.NormalizationVersion,
+		numericValue(tokens.InputUncached), tokens.InputUncached.State,
+		numericValue(tokens.InputCacheRead), tokens.InputCacheRead.State,
+		numericValue(tokens.InputCacheWrite), tokens.InputCacheWrite.State,
+		numericValue(tokens.InputCacheWrite5m), tokens.InputCacheWrite5m.State,
+		numericValue(tokens.InputCacheWrite1h), tokens.InputCacheWrite1h.State,
+		numericValue(tokens.Output), tokens.Output.State,
+		numericValue(tokens.ReasoningOutput), tokens.ReasoningOutput.State,
+		strconv.FormatUint(envelope.Bucket.Revision, 10), payloadHash[:],
+		derived.CanonicalModelID, derived.ModelProvider, derived.PricingKey, derived.ModelResolution, derived.ModelMatch,
+		derived.UnpricedReason, strconv.FormatUint(derived.PricedTokens, 10), strconv.FormatUint(derived.UnpricedTokens, 10),
+		numericPointer(derived.EstimateMicroUSD), derived.EstimateState, derived.PricingRevision,
+	)
 	if err != nil {
-		return fmt.Errorf("insert server usage bucket: %w", err)
+		return fmt.Errorf("write server usage bucket: %w", err)
 	}
 	return nil
-}
-
-func updateUsageBucket(ctx context.Context, tx pgx.Tx, deviceID string, envelope protocol.Envelope, payloadHash [32]byte) error {
-	arguments := usageBucketArguments(deviceID, envelope, payloadHash)
-	_, err := tx.Exec(ctx, `
-		UPDATE usage_buckets SET
-			bucket_start=$3, interval_seconds=60, source=$4, surface=$5,
-			observed_model_id=$6, canonical_model_id=$7, model_provider=$8, pricing_key=$9,
-			model_resolution=$10, measurement=$11, normalization_version=$12,
-			input_uncached_tokens=$13, input_uncached_state=$14,
-			input_cache_read_tokens=$15, input_cache_read_state=$16,
-			input_cache_write_tokens=$17, input_cache_write_state=$18,
-			output_tokens=$19, output_state=$20,
-			reasoning_output_tokens=$21, reasoning_output_state=$22,
-			api_estimate_microusd=$23, api_estimate_state=$24,
-			pricing_revision=$25, revision=$26, payload_hash=$27, received_at=CURRENT_TIMESTAMP
-		WHERE device_id=$1::uuid AND bucket_key=$2
-	`, arguments...)
-	if err != nil {
-		return fmt.Errorf("replace server usage bucket: %w", err)
-	}
-	return nil
-}
-
-func usageBucketArguments(deviceID string, envelope protocol.Envelope, payloadHash [32]byte) []any {
-	bucket := envelope.Bucket
-	return []any{
-		deviceID, envelope.BucketKey, bucket.Start, bucket.Source, bucket.Surface,
-		bucket.ObservedModelID, bucket.CanonicalModelID, bucket.ModelProvider, bucket.PricingKey,
-		bucket.ModelResolution, bucket.Measurement, bucket.NormalizationVersion,
-		numericValue(bucket.Tokens.InputUncached), bucket.Tokens.InputUncached.State,
-		numericValue(bucket.Tokens.InputCacheRead), bucket.Tokens.InputCacheRead.State,
-		numericValue(bucket.Tokens.InputCacheWrite), bucket.Tokens.InputCacheWrite.State,
-		numericValue(bucket.Tokens.Output), bucket.Tokens.Output.State,
-		numericValue(bucket.Tokens.ReasoningOutput), bucket.Tokens.ReasoningOutput.State,
-		numericValue(bucket.APIEstimate), bucket.APIEstimate.State, bucket.PricingRevision,
-		strconv.FormatUint(bucket.Revision, 10), payloadHash[:],
-	}
 }
 
 func numericValue(value protocol.Value) any {
-	if value.Value == nil {
+	return numericPointer(value.Value)
+}
+
+func numericPointer(value *uint64) any {
+	if value == nil {
 		return nil
 	}
-	return strconv.FormatUint(*value.Value, 10)
+	return strconv.FormatUint(*value, 10)
 }

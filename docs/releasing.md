@@ -32,3 +32,19 @@ publish access to the `@tokenholic` scope before creating a release tag.
 The publisher is restart-safe and skips exact package versions that an earlier
 attempt completed. Verify a published version from a clean macOS account with
 `npx --yes @tokenholic/cli@VERSION --version`.
+
+## Notes to include in the next release
+
+GitHub generates release notes from merged pull requests. Add these by hand,
+because users must act on them:
+
+- **Demo-data reset.** Sync protocol v2 replaces the server's uploaded usage.
+  Every bucket uploaded before this release is discarded; accounts, devices,
+  groups, and memberships are kept. After upgrading, each device rebuilds its
+  local buckets and uploads its full history again on the next sync.
+- **Upgrade required to sync.** Clients older than this release receive
+  `426 Upgrade Required`. Upgrade with `npx @tokenholic/cli@latest`. Local
+  usage is not affected.
+- **Local estimates are a preview.** The server now resolves models and derives
+  estimates. The values the CLI shows before a server reply come from its own
+  bundled catalog and can differ from the server's.

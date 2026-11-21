@@ -27,7 +27,7 @@ type Storage interface {
 	QueryUsage(context.Context, store.Period, time.Time, *time.Location) (store.UsageSummary, error)
 	Diagnostics(context.Context) (store.DiagnosticSnapshot, error)
 	NextUsageBucketRevision(context.Context) (uint64, error)
-	RebuildUsageBuckets(context.Context, uint64, store.PriceEstimator) (store.BucketApplyResult, error)
+	RebuildUsageBuckets(context.Context, uint64, store.Previewer) (store.BucketApplyResult, error)
 }
 
 // Collector owns discovery, parsing, normalization, and atomic persistence.
@@ -40,13 +40,14 @@ type Service struct {
 	mu        sync.RWMutex
 	storage   Storage
 	collector Collector
-	estimator store.PriceEstimator
+	previewer store.Previewer
 	location  *time.Location
 	now       func() time.Time
 }
 
-// NewService constructs a local-only application service.
-func NewService(storage Storage, collector Collector, estimator store.PriceEstimator, location *time.Location, now func() time.Time) (*Service, error) {
+// NewService constructs a local-only application service. previewer supplies
+// the offline model resolution and estimate shown before any server reply.
+func NewService(storage Storage, collector Collector, previewer store.Previewer, location *time.Location, now func() time.Time) (*Service, error) {
 	if storage == nil || collector == nil {
 		return nil, errors.New("application service requires storage and collection")
 	}
@@ -56,7 +57,7 @@ func NewService(storage Storage, collector Collector, estimator store.PriceEstim
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{storage: storage, collector: collector, estimator: estimator, location: location, now: now}, nil
+	return &Service{storage: storage, collector: collector, previewer: previewer, location: location, now: now}, nil
 }
 
 // Load reads usage periods and health from already committed local state.
@@ -105,7 +106,7 @@ func (s *Service) Refresh(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := s.storage.RebuildUsageBuckets(ctx, revision, s.estimator); err != nil {
+	if _, err := s.storage.RebuildUsageBuckets(ctx, revision, s.previewer); err != nil {
 		return fmt.Errorf("rebuild local usage: %w", err)
 	}
 	return nil

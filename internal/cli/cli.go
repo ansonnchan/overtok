@@ -17,6 +17,7 @@ import (
 	"github.com/ansonnchan/tokenholic/internal/doctor"
 	"github.com/ansonnchan/tokenholic/internal/multiplayer"
 	"github.com/ansonnchan/tokenholic/internal/store"
+	usageSync "github.com/ansonnchan/tokenholic/internal/sync"
 )
 
 // version is replaced at link time for release artifacts.
@@ -192,6 +193,12 @@ func runSynchronization(dryRun bool, stdout, stderr io.Writer, deps dependencies
 	if err := deps.sync(ctx, home, codexHome, apiURL, dryRun, stdout); err != nil {
 		if errors.Is(err, autosync.ErrAlreadyRunning) {
 			fmt.Fprintln(stderr, "synchronization is already running")
+			return 1
+		}
+		if errors.Is(err, usageSync.ErrUpgradeRequired) {
+			// Stable text with no payload detail, so it is safe to show as is.
+			fmt.Fprintln(stderr, "this tokenholic version is too old to sync; upgrade with `npx @tokenholic/cli@latest`")
+			fmt.Fprintln(stderr, "local usage was preserved and will upload after the upgrade")
 			return 1
 		}
 		if dryRun {

@@ -40,40 +40,61 @@ type AggregateValue struct {
 	State Availability `json:"state"`
 }
 
-// TokenBreakdown holds billing categories plus reasoning subset metadata.
-// ReasoningOutput must not be added to Output when calculating total tokens.
+// TokenBreakdown holds the six token categories plus reasoning subset
+// metadata. InputCacheWrite is the total across lifetimes; the 5m and 1h
+// values split it and must not be added to it. ReasoningOutput is already
+// inside Output.
 type TokenBreakdown struct {
-	InputUncached   AggregateValue `json:"input_uncached"`
-	InputCacheRead  AggregateValue `json:"input_cache_read"`
-	InputCacheWrite AggregateValue `json:"input_cache_write"`
-	Output          AggregateValue `json:"output"`
-	ReasoningOutput AggregateValue `json:"reasoning_output"`
+	InputUncached     AggregateValue `json:"input_uncached"`
+	InputCacheRead    AggregateValue `json:"input_cache_read"`
+	InputCacheWrite   AggregateValue `json:"input_cache_write"`
+	InputCacheWrite5m AggregateValue `json:"input_cache_write_5m"`
+	InputCacheWrite1h AggregateValue `json:"input_cache_write_1h"`
+	Output            AggregateValue `json:"output"`
+	ReasoningOutput   AggregateValue `json:"reasoning_output"`
 }
 
-// UsageBucket is an absolute one-minute UTC usage snapshot.
+// UsageBucket is an absolute one-minute UTC usage snapshot. Its JSON form is
+// exactly the upload payload: observed evidence only, with no canonical
+// model, price, or estimate.
 type UsageBucket struct {
-	Start                time.Time                 `json:"start"`
-	Source               normalize.Source          `json:"source"`
-	Surface              normalize.Surface         `json:"surface"`
-	ObservedModelID      string                    `json:"observed_model_id"`
-	CanonicalModelID     *string                   `json:"canonical_model_id"`
-	ModelProvider        *string                   `json:"model_provider"`
-	PricingKey           *string                   `json:"pricing_key"`
-	ModelResolution      normalize.ModelResolution `json:"model_resolution"`
+	Start           time.Time         `json:"start"`
+	Source          normalize.Source  `json:"source"`
+	Surface         normalize.Surface `json:"surface"`
+	ObservedModelID string            `json:"observed_model_id"`
+	// ModelEvidence is how the source attributed the model: reported,
+	// inferred, or unknown. It is evidence quality, not a catalog result.
+	ModelEvidence        normalize.ModelResolution `json:"model_evidence"`
 	Measurement          normalize.Measurement     `json:"measurement"`
 	NormalizationVersion string                    `json:"normalization_version"`
 	Tokens               TokenBreakdown            `json:"tokens"`
-	APIEstimate          AggregateValue            `json:"api_equivalent_estimate_microusd"`
-	PricingRevision      *string                   `json:"pricing_revision"`
 	Revision             uint64                    `json:"revision"`
+	// Preview never leaves the machine; the server derives its own values.
+	Preview Preview `json:"-"`
 }
 
-// PriceEstimator provides versioned API-equivalent estimates.
-type PriceEstimator interface {
-	EstimateTokens(string, normalize.TokenCounts) (modelcatalog.Estimate, bool, error)
+// Preview is this build's offline model resolution and estimate for one
+// bucket. A newer server catalog may resolve or price the same bucket
+// differently, and that difference never blocks an upload.
+type Preview struct {
+	CanonicalModelID *string                   `json:"canonical_model_id"`
+	ModelProvider    *string                   `json:"model_provider"`
+	Resolution       normalize.ModelResolution `json:"model_resolution"`
+	UnpricedReason   string                    `json:"unpriced_reason,omitempty"`
+	APIEstimate      AggregateValue            `json:"api_equivalent_estimate_microusd"`
+	PricedTokens     uint64                    `json:"priced_tokens"`
+	UnpricedTokens   uint64                    `json:"unpriced_tokens"`
+	CatalogRevision  string                    `json:"catalog_revision,omitempty"`
 }
 
-// BucketApplyResult reports newer replacements and ignored replays.
+// Previewer derives the local preview with the bundled catalog.
+type Previewer interface {
+	Derive(string, normalize.ModelResolution, normalize.TokenCounts, bool) (modelcatalog.Derivation, error)
+}
+
+// BucketApplyResult reports replaced buckets and ignored ones. A bucket whose
+// uploaded content is unchanged is ignored and keeps its revision, so a
+// refresh does not re-upload history.
 type BucketApplyResult struct {
 	Applied int
 	Ignored int
@@ -106,11 +127,13 @@ const (
 	PeriodAllTime Period = "all_time"
 )
 
-// ModelBreakdown preserves observed and canonical attribution quality.
+// ModelBreakdown preserves observed and previewed canonical attribution.
+// UnpricedReason explains a missing estimate.
 type ModelBreakdown struct {
 	ObservedModelID  string
 	CanonicalModelID *string
 	Resolution       normalize.ModelResolution
+	UnpricedReason   string
 	Tokens           TokenBreakdown
 	APIEstimate      AggregateValue
 }
@@ -135,7 +158,7 @@ type UsageSummary struct {
 }
 
 // BuildUsageBuckets deterministically reduces observations to absolute UTC buckets.
-func BuildUsageBuckets(observations []StoredObservation, revision uint64, estimator PriceEstimator) ([]UsageBucket, error) {
+func BuildUsageBuckets(observations []StoredObservation, revision uint64, previewer Previewer) ([]UsageBucket, error) {
 	if revision == 0 {
 		return nil, errors.New("usage bucket revision must be positive")
 	}
@@ -148,7 +171,7 @@ func BuildUsageBuckets(observations []StoredObservation, revision uint64, estima
 			accumulator = newBucketAccumulator(start, observation, revision)
 			groups[key] = accumulator
 		}
-		if err := accumulator.addObservation(observation, estimator); err != nil {
+		if err := accumulator.tokens.add(observation.Tokens); err != nil {
 			return nil, err
 		}
 	}
@@ -159,12 +182,17 @@ func BuildUsageBuckets(observations []StoredObservation, revision uint64, estima
 	sort.Strings(keys)
 	buckets := make([]UsageBucket, 0, len(keys))
 	for _, key := range keys {
-		buckets = append(buckets, groups[key].bucket())
+		bucket, err := groups[key].bucket(previewer)
+		if err != nil {
+			return nil, err
+		}
+		buckets = append(buckets, bucket)
 	}
 	return buckets, nil
 }
 
-// ApplyBucketRevisions replaces older absolute values and enqueues only the newest revision.
+// ApplyBucketRevisions replaces changed absolute values and enqueues only the
+// newest revision. Unchanged buckets refresh their local preview in place.
 func (db *DB) ApplyBucketRevisions(ctx context.Context, buckets []UsageBucket) (BucketApplyResult, error) {
 	tx, err := db.sql.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
@@ -204,12 +232,12 @@ func (db *DB) ApplyBucketRevisions(ctx context.Context, buckets []UsageBucket) (
 }
 
 // RebuildUsageBuckets reads committed observations and applies one absolute revision.
-func (db *DB) RebuildUsageBuckets(ctx context.Context, revision uint64, estimator PriceEstimator) (BucketApplyResult, error) {
+func (db *DB) RebuildUsageBuckets(ctx context.Context, revision uint64, previewer Previewer) (BucketApplyResult, error) {
 	observations, err := db.Observations(ctx)
 	if err != nil {
 		return BucketApplyResult{}, err
 	}
-	buckets, err := BuildUsageBuckets(observations, revision, estimator)
+	buckets, err := BuildUsageBuckets(observations, revision, previewer)
 	if err != nil {
 		return BucketApplyResult{}, err
 	}
@@ -328,7 +356,7 @@ func (db *DB) QueryUsage(ctx context.Context, period Period, now time.Time, loca
 	if err != nil {
 		return UsageSummary{}, err
 	}
-	query := `SELECT payload_json FROM usage_buckets WHERE bucket_start < ?`
+	query := `SELECT payload_json, preview_json FROM usage_buckets WHERE bucket_start < ?`
 	args := []any{formatTime(end)}
 	if start != nil {
 		query += ` AND bucket_start >= ?`
@@ -342,13 +370,16 @@ func (db *DB) QueryUsage(ctx context.Context, period Period, now time.Time, loca
 	defer rows.Close()
 	accumulator := newSummaryAccumulator(period, start, end)
 	for rows.Next() {
-		var payload []byte
-		if err := rows.Scan(&payload); err != nil {
+		var payload, preview []byte
+		if err := rows.Scan(&payload, &preview); err != nil {
 			return UsageSummary{}, fmt.Errorf("decode usage bucket row: %w", err)
 		}
 		var stored bucketPayload
 		if err := json.Unmarshal(payload, &stored); err != nil {
 			return UsageSummary{}, fmt.Errorf("decode usage bucket payload: %w", err)
+		}
+		if err := json.Unmarshal(preview, &stored.Bucket.Preview); err != nil {
+			return UsageSummary{}, fmt.Errorf("decode usage bucket preview: %w", err)
 		}
 		if err := accumulator.add(stored.Bucket); err != nil {
 			return UsageSummary{}, err
@@ -411,13 +442,19 @@ func (a valueAccumulator) value() AggregateValue {
 	return AggregateValue{Value: &value, State: AvailabilityComplete}
 }
 
-type tokenAccumulator struct{ input, read, write, output, reasoning valueAccumulator }
+type tokenAccumulator struct {
+	input, read, write, writeFiveMinute, writeOneHour, output, reasoning valueAccumulator
+}
 
 func (a *tokenAccumulator) add(tokens normalize.TokenCounts) error {
 	for _, pair := range []struct {
 		accumulator *valueAccumulator
 		value       *uint64
-	}{{&a.input, tokens.InputUncached}, {&a.read, tokens.InputCacheRead}, {&a.write, tokens.InputCacheWrite}, {&a.output, tokens.Output}, {&a.reasoning, tokens.ReasoningOutput}} {
+	}{
+		{&a.input, tokens.InputUncached}, {&a.read, tokens.InputCacheRead}, {&a.write, tokens.InputCacheWrite},
+		{&a.writeFiveMinute, tokens.InputCacheWrite5m}, {&a.writeOneHour, tokens.InputCacheWrite1h},
+		{&a.output, tokens.Output}, {&a.reasoning, tokens.ReasoningOutput},
+	} {
 		if err := pair.accumulator.add(pair.value); err != nil {
 			return err
 		}
@@ -429,7 +466,11 @@ func (a *tokenAccumulator) addBreakdown(tokens TokenBreakdown) error {
 	for _, pair := range []struct {
 		accumulator *valueAccumulator
 		value       AggregateValue
-	}{{&a.input, tokens.InputUncached}, {&a.read, tokens.InputCacheRead}, {&a.write, tokens.InputCacheWrite}, {&a.output, tokens.Output}, {&a.reasoning, tokens.ReasoningOutput}} {
+	}{
+		{&a.input, tokens.InputUncached}, {&a.read, tokens.InputCacheRead}, {&a.write, tokens.InputCacheWrite},
+		{&a.writeFiveMinute, tokens.InputCacheWrite5m}, {&a.writeOneHour, tokens.InputCacheWrite1h},
+		{&a.output, tokens.Output}, {&a.reasoning, tokens.ReasoningOutput},
+	} {
 		if err := pair.accumulator.addAggregate(pair.value); err != nil {
 			return err
 		}
@@ -438,52 +479,81 @@ func (a *tokenAccumulator) addBreakdown(tokens TokenBreakdown) error {
 }
 
 func (a tokenAccumulator) value() TokenBreakdown {
-	return TokenBreakdown{a.input.value(), a.read.value(), a.write.value(), a.output.value(), a.reasoning.value()}
+	return TokenBreakdown{
+		InputUncached: a.input.value(), InputCacheRead: a.read.value(), InputCacheWrite: a.write.value(),
+		InputCacheWrite5m: a.writeFiveMinute.value(), InputCacheWrite1h: a.writeOneHour.value(),
+		Output: a.output.value(), ReasoningOutput: a.reasoning.value(),
+	}
 }
 
 type bucketAccumulator struct {
-	template        UsageBucket
-	tokens          tokenAccumulator
-	estimate        valueAccumulator
-	pricingRevision string
+	template UsageBucket
+	tokens   tokenAccumulator
 }
 
 func newBucketAccumulator(start time.Time, observation StoredObservation, revision uint64) *bucketAccumulator {
-	return &bucketAccumulator{template: UsageBucket{Start: start, Source: observation.Source, Surface: observation.Surface, ObservedModelID: observation.ObservedModelID, CanonicalModelID: cloneString(observation.CanonicalModelID), ModelProvider: cloneString(observation.ModelProvider), PricingKey: cloneString(observation.PricingKey), ModelResolution: observation.ModelResolution, Measurement: observation.Measurement, NormalizationVersion: observation.NormalizationVersion, Revision: revision}}
+	return &bucketAccumulator{template: UsageBucket{
+		Start: start, Source: observation.Source, Surface: observation.Surface,
+		ObservedModelID: observation.ObservedModelID, ModelEvidence: modelEvidence(observation),
+		Measurement: observation.Measurement, NormalizationVersion: observation.NormalizationVersion, Revision: revision,
+	}}
 }
 
-func (a *bucketAccumulator) addObservation(observation StoredObservation, estimator PriceEstimator) error {
-	if err := a.tokens.add(observation.Tokens); err != nil {
-		return err
-	}
-	if estimator == nil || observation.PricingKey == nil {
-		return a.estimate.add(nil)
-	}
-	estimate, available, err := estimator.EstimateTokens(*observation.PricingKey, observation.Tokens)
-	if err != nil {
-		return err
-	}
-	if !available {
-		return a.estimate.add(nil)
-	}
-	a.pricingRevision = estimate.PricingRevision
-	value := estimate.MicroUSD
-	if estimate.LowerBound {
-		// The bucket estimate is then partial: a floor, not the full value.
-		a.estimate.missing = true
-	}
-	return a.estimate.add(&value)
-}
-
-func (a bucketAccumulator) bucket() UsageBucket {
+func (a bucketAccumulator) bucket(previewer Previewer) (UsageBucket, error) {
 	bucket := a.template
 	bucket.Tokens = a.tokens.value()
-	bucket.APIEstimate = a.estimate.value()
-	if a.pricingRevision != "" {
-		revision := a.pricingRevision
-		bucket.PricingRevision = &revision
+	preview, err := previewBucket(bucket, previewer)
+	if err != nil {
+		return UsageBucket{}, err
 	}
-	return bucket
+	bucket.Preview = preview
+	return bucket, nil
+}
+
+// modelEvidence reduces a stored resolution to source evidence. Catalog
+// results are derived per bucket and never stored on an observation.
+func modelEvidence(observation StoredObservation) normalize.ModelResolution {
+	switch {
+	case observation.ObservedModelID == "":
+		return normalize.ModelUnknown
+	case observation.ModelResolution == normalize.ModelInferred:
+		return normalize.ModelInferred
+	default:
+		return normalize.ModelReported
+	}
+}
+
+// previewBucket prices the bucket totals exactly as the server will, so the
+// preview matches the server whenever both bundle the same catalog revision.
+func previewBucket(bucket UsageBucket, previewer Previewer) (Preview, error) {
+	preview := Preview{Resolution: normalize.ModelUnknown, APIEstimate: AggregateValue{State: AvailabilityUnavailable}}
+	if previewer == nil {
+		return preview, nil
+	}
+	tokens := bucket.Tokens
+	partial := false
+	for _, value := range []AggregateValue{tokens.InputUncached, tokens.InputCacheRead, tokens.InputCacheWrite, tokens.Output} {
+		partial = partial || value.State == AvailabilityPartial
+	}
+	derivation, err := previewer.Derive(bucket.ObservedModelID, bucket.ModelEvidence, normalize.TokenCounts{
+		InputUncached: tokens.InputUncached.Value, InputCacheRead: tokens.InputCacheRead.Value,
+		InputCacheWrite: tokens.InputCacheWrite.Value, InputCacheWrite5m: tokens.InputCacheWrite5m.Value,
+		InputCacheWrite1h: tokens.InputCacheWrite1h.Value, Output: tokens.Output.Value,
+	}, partial)
+	if err != nil {
+		return Preview{}, fmt.Errorf("preview usage bucket: %w", err)
+	}
+	preview.CanonicalModelID = cloneString(derivation.Resolution.CanonicalID)
+	preview.ModelProvider = cloneString(derivation.Resolution.Provider)
+	preview.Resolution = derivation.Resolution.Quality
+	preview.UnpricedReason = derivation.Resolution.UnpricedReason
+	preview.PricedTokens, preview.UnpricedTokens = derivation.PricedTokens, derivation.UnpricedTokens
+	preview.CatalogRevision = derivation.Revision
+	if derivation.EstimateMicroUSD != nil {
+		value := *derivation.EstimateMicroUSD
+		preview.APIEstimate = AggregateValue{Value: &value, State: Availability(derivation.EstimateCoverage)}
+	}
+	return preview, nil
 }
 
 type bucketPayload struct {
@@ -503,8 +573,16 @@ func applyBucket(ctx context.Context, tx *sql.Tx, bucket UsageBucket) (bool, err
 	if err != nil {
 		return false, fmt.Errorf("encode usage bucket: %w", err)
 	}
-	var currentRevision, currentPayload string
-	err = tx.QueryRowContext(ctx, `SELECT revision, payload_json FROM usage_buckets WHERE bucket_key = ?`, key).Scan(&currentRevision, &currentPayload)
+	preview, err := json.Marshal(bucket.Preview)
+	if err != nil {
+		return false, fmt.Errorf("encode usage bucket preview: %w", err)
+	}
+	content, err := bucketContentHash(bucket)
+	if err != nil {
+		return false, err
+	}
+	var currentRevision, currentContent string
+	err = tx.QueryRowContext(ctx, `SELECT revision, content_hash FROM usage_buckets WHERE bucket_key = ?`, key).Scan(&currentRevision, &currentContent)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return false, fmt.Errorf("read usage bucket revision: %w", err)
 	}
@@ -516,26 +594,24 @@ func applyBucket(ctx context.Context, tx *sql.Tx, bucket UsageBucket) (bool, err
 		if bucket.Revision < current {
 			return false, nil
 		}
-		if bucket.Revision == current {
-			if currentPayload != string(payload) {
-				return false, ErrBucketRevisionConflict
+		if currentContent == content {
+			// Nothing uploadable changed. Only the local preview may differ,
+			// for example after a build with a newer bundled catalog.
+			if _, err := tx.ExecContext(ctx, `UPDATE usage_buckets SET preview_json = ? WHERE bucket_key = ? AND preview_json <> ?`, string(preview), key, string(preview)); err != nil {
+				return false, fmt.Errorf("refresh usage bucket preview: %w", err)
 			}
 			return false, nil
 		}
+		if bucket.Revision == current {
+			return false, ErrBucketRevisionConflict
+		}
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO usage_buckets(
-		bucket_key,bucket_start,interval_seconds,source,surface,observed_model_id,canonical_model_id,model_provider,pricing_key,model_resolution,measurement,normalization_version,
-		input_uncached_tokens,input_uncached_state,input_cache_read_tokens,input_cache_read_state,input_cache_write_tokens,input_cache_write_state,output_tokens,output_state,reasoning_output_tokens,reasoning_output_state,
-		api_estimate_microusd,api_estimate_state,pricing_revision,revision,payload_json
-	) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-	ON CONFLICT(bucket_key) DO UPDATE SET
-		input_uncached_tokens=excluded.input_uncached_tokens,input_uncached_state=excluded.input_uncached_state,input_cache_read_tokens=excluded.input_cache_read_tokens,input_cache_read_state=excluded.input_cache_read_state,
-		input_cache_write_tokens=excluded.input_cache_write_tokens,input_cache_write_state=excluded.input_cache_write_state,output_tokens=excluded.output_tokens,output_state=excluded.output_state,
-		reasoning_output_tokens=excluded.reasoning_output_tokens,reasoning_output_state=excluded.reasoning_output_state,api_estimate_microusd=excluded.api_estimate_microusd,api_estimate_state=excluded.api_estimate_state,
-		pricing_revision=excluded.pricing_revision,revision=excluded.revision,payload_json=excluded.payload_json,updated_at=CURRENT_TIMESTAMP`,
-		key, formatTime(bucket.Start), 60, bucket.Source, bucket.Surface, bucket.ObservedModelID, bucket.CanonicalModelID, bucket.ModelProvider, bucket.PricingKey, bucket.ModelResolution, bucket.Measurement, bucket.NormalizationVersion,
-		aggregateSQL(bucket.Tokens.InputUncached), bucket.Tokens.InputUncached.State, aggregateSQL(bucket.Tokens.InputCacheRead), bucket.Tokens.InputCacheRead.State, aggregateSQL(bucket.Tokens.InputCacheWrite), bucket.Tokens.InputCacheWrite.State,
-		aggregateSQL(bucket.Tokens.Output), bucket.Tokens.Output.State, aggregateSQL(bucket.Tokens.ReasoningOutput), bucket.Tokens.ReasoningOutput.State, aggregateSQL(bucket.APIEstimate), bucket.APIEstimate.State, bucket.PricingRevision, strconv.FormatUint(bucket.Revision, 10), string(payload))
+	_, err = tx.ExecContext(ctx, `INSERT INTO usage_buckets(bucket_key,bucket_start,revision,content_hash,payload_json,preview_json)
+		VALUES (?,?,?,?,?,?)
+		ON CONFLICT(bucket_key) DO UPDATE SET
+			revision=excluded.revision,content_hash=excluded.content_hash,payload_json=excluded.payload_json,
+			preview_json=excluded.preview_json,updated_at=CURRENT_TIMESTAMP`,
+		key, formatTime(bucket.Start), strconv.FormatUint(bucket.Revision, 10), content, string(payload), string(preview))
 	if err != nil {
 		return false, fmt.Errorf("write usage bucket: %w", err)
 	}
@@ -546,11 +622,27 @@ func applyBucket(ctx context.Context, tx *sql.Tx, bucket UsageBucket) (bool, err
 	return true, nil
 }
 
+// bucketContentHash identifies the uploadable content apart from its
+// revision, so an unchanged bucket is neither bumped nor re-enqueued.
+func bucketContentHash(bucket UsageBucket) (string, error) {
+	bucket.Revision = 0
+	encoded, err := json.Marshal(bucket)
+	if err != nil {
+		return "", fmt.Errorf("encode usage bucket content: %w", err)
+	}
+	sum := sha256.Sum256(encoded)
+	return hex.EncodeToString(sum[:]), nil
+}
+
 func validateBucket(bucket UsageBucket) error {
 	if bucket.Revision == 0 || bucket.Start.Location() != time.UTC || !bucket.Start.Equal(bucket.Start.Truncate(bucketInterval)) {
 		return errors.New("usage bucket requires a positive revision and aligned UTC start")
 	}
-	for _, value := range []AggregateValue{bucket.Tokens.InputUncached, bucket.Tokens.InputCacheRead, bucket.Tokens.InputCacheWrite, bucket.Tokens.Output, bucket.Tokens.ReasoningOutput, bucket.APIEstimate} {
+	tokens := bucket.Tokens
+	for _, value := range []AggregateValue{
+		tokens.InputUncached, tokens.InputCacheRead, tokens.InputCacheWrite, tokens.InputCacheWrite5m,
+		tokens.InputCacheWrite1h, tokens.Output, tokens.ReasoningOutput, bucket.Preview.APIEstimate,
+	} {
 		if value.State != AvailabilityComplete && value.State != AvailabilityPartial && value.State != AvailabilityUnavailable {
 			return errors.New("usage bucket has invalid availability")
 		}
@@ -568,14 +660,22 @@ func aggregateSQL(value AggregateValue) any {
 	return strconv.FormatUint(*value.Value, 10)
 }
 
+// usageBucketKey identifies a bucket by observed evidence only. Catalog
+// results are excluded so a catalog update never moves a bucket.
 func usageBucketKey(bucket UsageBucket) string {
-	parts := []string{formatTime(bucket.Start), string(bucket.Source), string(bucket.Surface), bucket.ObservedModelID, pointerText(bucket.CanonicalModelID), pointerText(bucket.ModelProvider), pointerText(bucket.PricingKey), string(bucket.ModelResolution), string(bucket.Measurement), bucket.NormalizationVersion}
+	parts := []string{
+		formatTime(bucket.Start), string(bucket.Source), string(bucket.Surface), bucket.ObservedModelID,
+		string(bucket.ModelEvidence), string(bucket.Measurement), bucket.NormalizationVersion,
+	}
 	sum := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
 	return hex.EncodeToString(sum[:])
 }
 
 func bucketGroupKey(start time.Time, observation StoredObservation) string {
-	return strings.Join([]string{formatTime(start), string(observation.Source), string(observation.Surface), observation.ObservedModelID, pointerText(observation.CanonicalModelID), pointerText(observation.ModelProvider), pointerText(observation.PricingKey), string(observation.ModelResolution), string(observation.Measurement), observation.NormalizationVersion}, "\x00")
+	return strings.Join([]string{
+		formatTime(start), string(observation.Source), string(observation.Surface), observation.ObservedModelID,
+		string(modelEvidence(observation)), string(observation.Measurement), observation.NormalizationVersion,
+	}, "\x00")
 }
 func pointerText(value *string) string {
 	if value == nil {
@@ -640,10 +740,14 @@ func (a *summaryAccumulator) add(bucket UsageBucket) error {
 	if err := addSummaryValues(&a.all, bucket); err != nil {
 		return err
 	}
-	mkey := strings.Join([]string{bucket.ObservedModelID, pointerText(bucket.CanonicalModelID), string(bucket.ModelResolution)}, "\x00")
+	preview := bucket.Preview
+	mkey := strings.Join([]string{bucket.ObservedModelID, pointerText(preview.CanonicalModelID), string(preview.Resolution)}, "\x00")
 	model := a.models[mkey]
 	if model == nil {
-		model = &modelSummaryAccumulator{key: ModelBreakdown{ObservedModelID: bucket.ObservedModelID, CanonicalModelID: cloneString(bucket.CanonicalModelID), Resolution: bucket.ModelResolution}}
+		model = &modelSummaryAccumulator{key: ModelBreakdown{
+			ObservedModelID: bucket.ObservedModelID, CanonicalModelID: cloneString(preview.CanonicalModelID),
+			Resolution: preview.Resolution, UnpricedReason: preview.UnpricedReason,
+		}}
 		a.models[mkey] = model
 	}
 	if err := addSummaryValues(&model.values, bucket); err != nil {
@@ -665,7 +769,7 @@ func addSummaryValues(values *summaryValues, bucket UsageBucket) error {
 	if err := values.tokens.addBreakdown(bucket.Tokens); err != nil {
 		return err
 	}
-	return values.estimate.addAggregate(bucket.APIEstimate)
+	return values.estimate.addAggregate(bucket.Preview.APIEstimate)
 }
 func (a *summaryAccumulator) summary() UsageSummary {
 	result := UsageSummary{Period: a.period, Start: a.start, End: a.end, Tokens: a.all.tokens.value(), APIEstimate: a.all.estimate.value()}

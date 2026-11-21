@@ -44,7 +44,7 @@ func (s *fakeStorage) NextUsageBucketRevision(context.Context) (uint64, error) {
 	return s.nextRevision, s.nextErr
 }
 
-func (s *fakeStorage) RebuildUsageBuckets(_ context.Context, revision uint64, _ store.PriceEstimator) (store.BucketApplyResult, error) {
+func (s *fakeStorage) RebuildUsageBuckets(_ context.Context, revision uint64, _ store.Previewer) (store.BucketApplyResult, error) {
 	if s.events != nil {
 		*s.events = append(*s.events, "rebuild")
 	}
