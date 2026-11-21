@@ -1,0 +1,12 @@
+{
+  "prices": [],
+  "unpriced": [
+    {
+      "id": "codex-auto-review",
+      "reason": "routing_label",
+      "note": "Codex writes this label for automatic review turns. Neither local records nor the provider price list identify the model behind it.",
+      "source_url": "https://developers.openai.com/api/docs/pricing",
+      "retrieved": "2026-11-21"
+    }
+  ]
+}

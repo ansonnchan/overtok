@@ -28,6 +28,7 @@ The repository uses the following current and planned boundaries:
 ```text
 cmd/
   tokenholic/                 Native CLI entry point
+  pricegen/                Generator that vendors the pinned price snapshot
 internal/
   account/                 Native login and OS credential-vault storage
   adapters/                Source-specific discovery and parsing
@@ -322,21 +323,33 @@ estimates. Revoked devices and inactive memberships do not contribute.
 
 ### Pricing
 
-Pricing is a versioned registry derived from official provider model catalogs
-plus small reviewed overrides. The local registry records source URLs,
-effective or retrieval dates, and its applied revision. It provides standard
-API-equivalent estimates only; it does not claim subscription usage was billed.
+Pricing is a versioned registry built from a pinned LiteLLM `model_prices`
+snapshot plus small reviewed overrides. `cmd/pricegen` vendors the pinned
+commit, verifies its SHA-256, and keeps only first-party token prices. Every
+override cites an official provider pricing page and retrieval date. The
+registry provides standard API-equivalent estimates only; it does not claim
+subscription usage was billed. The
+[model catalog guide](../internal/modelcatalog/README.md) is authoritative for
+the data files and rules.
 
-Resolution uses exact identifiers and reviewed mappings. Ambiguous routing
-aliases remain unknown instead of selecting a backend model. Models with
-context-dependent prices remain resolved but unpriced when local evidence does
-not prove the applicable tier.
+Resolution uses exact identifiers plus two explicit suffix rules: a client
+context-window marker such as `[1m]`, and a trailing snapshot date. Ambiguous
+routing aliases remain unknown instead of selecting a backend model. Models
+whose price changes with prompt length remain resolved but unpriced, because a
+usage bucket does not prove the applicable tier. Every unpriced resolution
+carries a reason.
 
-Unknown models retain token totals and display unavailable cost. Historical values do not change silently when the upstream catalog changes.
+Estimates price five categories: uncached input, cache read, 5-minute cache
+write, 1-hour cache write, and output. A cache write with an unknown lifetime
+is priced at the 5-minute rate and makes the estimate a lower bound. Unknown
+models retain token totals and display unavailable cost.
 
-The bundled registry currently covers only a handful of models, prices all
-cache writes at the 5-minute rate even though observations now record the
-lifetime, and requires the client and server catalogs to agree exactly. M6 replaces it; see "Planned target design".
+The catalog and pricing share one revision derived from their content, so any
+price or rule change produces a new revision.
+
+Until sync v2 lands, the upload payload carries no cache-write lifetime and the
+server still requires the client and server catalogs to agree exactly. See
+"Planned target design".
 
 ## Deployment
 

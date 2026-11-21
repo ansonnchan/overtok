@@ -48,6 +48,40 @@ func TestBuildUsageBucketsPreservesPartialAndUnknownPricing(t *testing.T) {
 	}
 }
 
+func TestBucketEstimateUsesCacheWriteLifetimes(t *testing.T) {
+	t.Parallel()
+	start := time.Date(2026, 11, 17, 20, 1, 0, 0, time.UTC)
+	value := func(v uint64) *uint64 { return &v }
+	// Synthetic rates per million: $2 input, $0.10 read, $2.50 base write,
+	// $4 one-hour write, $10 output. Each case writes a million cache tokens.
+	tests := []struct {
+		name                string
+		fiveMinute, oneHour *uint64
+		wantMicroUSD        uint64
+		wantState           Availability
+	}{
+		{name: "one-hour writes", fiveMinute: value(0), oneHour: value(1_000_000), wantMicroUSD: 4_000_000, wantState: AvailabilityComplete},
+		{name: "five-minute writes", fiveMinute: value(1_000_000), oneHour: value(0), wantMicroUSD: 2_500_000, wantState: AvailabilityComplete},
+		{name: "unknown lifetime is a lower bound", wantMicroUSD: 2_500_000, wantState: AvailabilityPartial},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			observation := storedObservation(start, normalize.SourceClaude, normalize.SurfaceCLI, "model-a", 0, 0)
+			observation.Tokens.InputCacheRead = value(0)
+			observation.Tokens.InputCacheWrite = value(1_000_000)
+			observation.Tokens.InputCacheWrite5m, observation.Tokens.InputCacheWrite1h = tt.fiveMinute, tt.oneHour
+			buckets, err := BuildUsageBuckets([]StoredObservation{observation}, 1, syntheticEstimator(t))
+			if err != nil {
+				t.Fatal(err)
+			}
+			estimate := buckets[0].APIEstimate
+			if estimate.Value == nil || *estimate.Value != tt.wantMicroUSD || estimate.State != tt.wantState {
+				t.Fatalf("estimate = %#v, want %d micro-USD %s", estimate, tt.wantMicroUSD, tt.wantState)
+			}
+		})
+	}
+}
+
 func TestBucketReplayReplacementAndOutOfOrderRevision(t *testing.T) {
 	t.Parallel()
 	db := openStoreForTest(t)
@@ -215,8 +249,8 @@ func storedObservation(at time.Time, source normalize.Source, surface normalize.
 
 func syntheticEstimator(t *testing.T) *modelcatalog.PricingRegistry {
 	t.Helper()
-	input, read, write, output := uint64(2_000_000), uint64(100_000), uint64(2_500_000), uint64(10_000_000)
-	registry, err := modelcatalog.NewPricingRegistry("synthetic-pricing-r1", []modelcatalog.Price{{Key: "synthetic/model", Provider: "synthetic", Rate: modelcatalog.Rate{InputUncached: &input, InputCacheRead: &read, InputCacheWrite: &write, Output: &output}, SourceURL: "https://synthetic.invalid/pricing", SourceRevision: "synthetic-r1", EffectiveDate: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)}})
+	input, read, write, writeHour, output := uint64(2_000_000), uint64(100_000), uint64(2_500_000), uint64(4_000_000), uint64(10_000_000)
+	registry, err := modelcatalog.NewPricingRegistry("synthetic-pricing-r1", []modelcatalog.Price{{Key: "synthetic/model", Provider: "synthetic", Rate: modelcatalog.Rate{InputUncached: &input, InputCacheRead: &read, InputCacheWrite: &write, InputCacheWrite1h: &writeHour, Output: &output}, SourceURL: "https://synthetic.invalid/pricing", SourceRevision: "synthetic-r1", EffectiveDate: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)}})
 	if err != nil {
 		t.Fatal(err)
 	}

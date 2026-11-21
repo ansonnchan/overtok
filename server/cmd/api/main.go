@@ -51,11 +51,11 @@ func run() error {
 	if err := postgres.Migrate(ctx, pool); err != nil {
 		return err
 	}
-	pricing, err := modelcatalog.DefaultPricingRegistry()
+	catalog, pricing, err := modelcatalog.Bundled()
 	if err != nil {
-		return err
+		return fmt.Errorf("load bundled pricing: %w", err)
 	}
-	models, err := modelcatalog.NewResolver(modelcatalog.DefaultCatalog())
+	models, err := modelcatalog.NewResolver(catalog)
 	if err != nil {
 		return err
 	}

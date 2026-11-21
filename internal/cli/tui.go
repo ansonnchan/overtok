@@ -76,15 +76,15 @@ func openLocalApplication(ctx context.Context, home, codexHome string) (*store.D
 	if err != nil {
 		return nil, nil, err
 	}
-	resolver, err := modelcatalog.NewResolver(modelcatalog.DefaultCatalog())
-	if err != nil {
-		_ = database.Close(context.Background())
-		return nil, nil, fmt.Errorf("initialize model catalog: %w", err)
-	}
-	pricing, err := modelcatalog.DefaultPricingRegistry()
+	catalog, pricing, err := modelcatalog.Bundled()
 	if err != nil {
 		_ = database.Close(context.Background())
 		return nil, nil, fmt.Errorf("initialize pricing catalog: %w", err)
+	}
+	resolver, err := modelcatalog.NewResolver(catalog)
+	if err != nil {
+		_ = database.Close(context.Background())
+		return nil, nil, fmt.Errorf("initialize model catalog: %w", err)
 	}
 	orchestrator := collect.Orchestrator{
 		Discovery: adapters.Discoverer{Roots: adapters.DefaultMacRoots(home, codexHome)},
