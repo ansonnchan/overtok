@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"strings"
 	"time"
 
@@ -13,8 +14,13 @@ import (
 	"github.com/ansonnchan/tokenholic/internal/normalize"
 )
 
-// AdapterVersion identifies the Claude-to-normalized mapping contract.
-const AdapterVersion = "1"
+// AdapterVersion identifies the Claude-to-normalized mapping contract. Version
+// 2 excludes locally generated lines and reads cache-write lifetimes.
+const AdapterVersion = "2"
+
+// syntheticModel marks assistant lines Claude Code writes itself, such as
+// interruption and API-failure notices. They never reached a model.
+const syntheticModel = "<synthetic>"
 
 // Result contains valid observations and safe warning codes from one stream.
 type Result struct {
@@ -23,20 +29,29 @@ type Result struct {
 }
 
 type record struct {
-	Type      string    `json:"type"`
-	SessionID string    `json:"sessionId"`
-	RequestID string    `json:"requestId"`
-	Timestamp time.Time `json:"timestamp"`
-	Message   struct {
+	Type              string    `json:"type"`
+	SessionID         string    `json:"sessionId"`
+	RequestID         string    `json:"requestId"`
+	Timestamp         time.Time `json:"timestamp"`
+	IsAPIErrorMessage bool      `json:"isApiErrorMessage"`
+	Message           struct {
 		ID    string `json:"id"`
 		Model string `json:"model"`
 		Usage struct {
-			InputTokens         *uint64 `json:"input_tokens"`
-			CacheReadTokens     *uint64 `json:"cache_read_input_tokens"`
-			CacheCreationTokens *uint64 `json:"cache_creation_input_tokens"`
-			OutputTokens        *uint64 `json:"output_tokens"`
+			InputTokens         *uint64        `json:"input_tokens"`
+			CacheReadTokens     *uint64        `json:"cache_read_input_tokens"`
+			CacheCreationTokens *uint64        `json:"cache_creation_input_tokens"`
+			CacheCreation       *cacheCreation `json:"cache_creation"`
+			OutputTokens        *uint64        `json:"output_tokens"`
 		} `json:"usage"`
 	} `json:"message"`
+}
+
+// cacheCreation is Claude's optional per-lifetime split of the combined
+// cache-creation counter.
+type cacheCreation struct {
+	Ephemeral5m *uint64 `json:"ephemeral_5m_input_tokens"`
+	Ephemeral1h *uint64 `json:"ephemeral_1h_input_tokens"`
 }
 
 // Parse reads Claude assistant usage records and skips all non-usage content.
@@ -58,16 +73,29 @@ func Parse(reader io.Reader, surface normalize.Surface, sourceVersion string) (R
 		if parsed.Type != "assistant" {
 			continue
 		}
+		if parsed.Message.Model == syntheticModel || parsed.IsAPIErrorMessage {
+			// Not model usage: counting these would add a phantom model and
+			// tokens no provider would bill.
+			continue
+		}
 		tokens := normalize.TokenCounts{
 			InputUncached: parsed.Message.Usage.InputTokens, InputCacheRead: parsed.Message.Usage.CacheReadTokens,
-			InputCacheWrite: parsed.Message.Usage.CacheCreationTokens, Output: parsed.Message.Usage.OutputTokens,
+			Output: parsed.Message.Usage.OutputTokens,
+		}
+		warnings := []normalize.Warning(nil)
+		var consistent bool
+		tokens.InputCacheWrite, tokens.InputCacheWrite5m, tokens.InputCacheWrite1h, consistent = cacheWrite(
+			parsed.Message.Usage.CacheCreationTokens, parsed.Message.Usage.CacheCreation)
+		if !consistent {
+			warning := normalize.Warning{Code: "cache_write_split_inconsistent"}
+			warnings = append(warnings, warning)
+			result.Warnings = append(result.Warnings, warning)
 		}
 		if !anyKnown(tokens) || parsed.Timestamp.IsZero() {
 			result.Warnings = append(result.Warnings, normalize.Warning{Code: "unsupported_record"})
 			continue
 		}
 		resolution := normalize.ModelReported
-		warnings := []normalize.Warning(nil)
 		if parsed.Message.Model == "" {
 			resolution = normalize.ModelUnknown
 			warnings = append(warnings, normalize.Warning{Code: "model_unavailable"})
@@ -89,6 +117,39 @@ func Parse(reader io.Reader, surface normalize.Surface, sourceVersion string) (R
 	return result, nil
 }
 
+// cacheWrite maps the combined cache-creation counter and its optional
+// lifetime object to the normalized total and split. A record with only the
+// combined counter keeps a nil split: its time-to-live is unknown. consistent
+// is false when the lifetimes exceed the combined counter; the combined value
+// is then kept alone so an unreliable split cannot inflate the total.
+func cacheWrite(combined *uint64, split *cacheCreation) (total, fiveMinute, oneHour *uint64, consistent bool) {
+	if split == nil || split.Ephemeral5m == nil && split.Ephemeral1h == nil {
+		if combined != nil && *combined == 0 {
+			// Nothing was written, so both lifetimes are known to be zero.
+			return combined, new(uint64), new(uint64), true
+		}
+		return combined, nil, nil, true
+	}
+	var sum uint64
+	for _, lifetime := range []*uint64{split.Ephemeral5m, split.Ephemeral1h} {
+		if lifetime == nil {
+			continue
+		}
+		if math.MaxUint64-sum < *lifetime {
+			return combined, nil, nil, false
+		}
+		sum += *lifetime
+	}
+	if combined == nil {
+		// The total is then the sum of the lifetimes the record does report.
+		return &sum, split.Ephemeral5m, split.Ephemeral1h, true
+	}
+	if sum > *combined {
+		return combined, nil, nil, false
+	}
+	return combined, split.Ephemeral5m, split.Ephemeral1h, true
+}
+
 func recordID(parsed record, ordinal int) string {
 	// Provider identifiers are stable enough for deduplication but are hashed so
 	// normalized state never retains a raw source identifier.
@@ -98,6 +159,8 @@ func recordID(parsed record, ordinal int) string {
 	case parsed.Message.ID != "":
 		return "claude-message-" + safeIdentifier(parsed.Message.ID)
 	default:
+		// Cache-write lifetimes are deliberately absent: adding them would
+		// change the identity of records already stored and count them twice.
 		parts := []string{
 			parsed.SessionID, parsed.Timestamp.UTC().Format(time.RFC3339Nano), parsed.Message.Model,
 			pointerValue(parsed.Message.Usage.InputTokens), pointerValue(parsed.Message.Usage.CacheReadTokens),

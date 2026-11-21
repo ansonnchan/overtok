@@ -20,6 +20,19 @@ Candidate paths are local implementation details. They are needed to open a file
 
 The Claude parser consumes assistant usage records. Claude usage is incremental, and a model directly present in the message is `reported`. Request and message identifiers are hashed before becoming normalized record IDs.
 
+Two kinds of assistant line are not usage and are skipped without a warning: lines whose model is `<synthetic>`, which Claude Code writes itself for interruptions and similar notices, and lines flagged `isApiErrorMessage`. Neither reached a model, so counting them would add a phantom model and unbillable tokens.
+
+Cache writes come from two fields. `cache_creation_input_tokens` is the combined total, and the optional `cache_creation` object splits it into 5-minute and 1-hour lifetimes:
+
+| Record reports | Normalized total | Lifetimes |
+| --- | --- | --- |
+| Combined and a split that fits within it | Combined | As reported; any remainder has an unknown lifetime |
+| Combined only | Combined | Unknown, unless the total is zero |
+| Split only | Sum of the reported lifetimes | As reported |
+| Split larger than combined | Combined | Unknown, with a `cache_write_split_inconsistent` warning |
+
+An unknown lifetime stays nil; it is never assumed to be the 5-minute rate here. Pricing decides how to treat it and marks the estimate partial.
+
 The Codex parser follows `turn_context` records to attribute later token snapshots. That attribution is `inferred`, because the token event does not directly carry the active model. Codex counters are cumulative and are reduced by `internal/collect` only after cross-root deduplication.
 
 Both parsers recover after malformed complete lines and defer an unterminated final line as a partial write. They keep missing token categories nil rather than inventing zeroes.

@@ -92,6 +92,65 @@ func TestMigrateHonorsCancellation(t *testing.T) {
 	}
 }
 
+func TestCacheWriteLifetimeMigrationRemovesLocalNoticeUsage(t *testing.T) {
+	t.Parallel()
+	db := openTestSQLDB(t)
+	if err := migrate(t.Context(), db, applicationMigrations[:3]); err != nil {
+		t.Fatal(err)
+	}
+	const insertObservation = `
+		INSERT INTO observations(
+			identity, source, surface, source_version, occurred_at, observed_model_id,
+			model_resolution, input_cache_write_tokens, count_semantics, measurement,
+			adapter_version, normalization_version, warnings_json
+		) VALUES (?, 'claude', 'cli', 'synthetic-v1', '2026-01-06T03:00:00Z', ?, 'unknown', '40',
+			'incremental', 'reported', '1', '1', '[]')`
+	const insertBucket = `
+		INSERT INTO usage_buckets(
+			bucket_key, bucket_start, interval_seconds, source, surface, observed_model_id,
+			model_resolution, measurement, normalization_version, input_uncached_state,
+			input_cache_read_state, input_cache_write_state, output_state,
+			reasoning_output_state, api_estimate_state, revision, payload_json
+		) VALUES (?, '2026-01-06T03:00:00Z', 60, 'claude', 'cli', ?, 'unknown', 'reported', '1',
+			'unavailable', 'unavailable', 'unavailable', 'unavailable', 'unavailable', 'unavailable', '1', '{}')`
+	for key, model := range map[string]string{"kept": "claude-sonnet-synthetic", "removed": "<synthetic>"} {
+		if _, err := db.ExecContext(t.Context(), insertObservation, key, model); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.ExecContext(t.Context(), insertBucket, key, model); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.ExecContext(t.Context(),
+			`INSERT INTO outbox_records(bucket_key, revision, payload_json) VALUES (?, '1', '{}')`, key); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := migrate(t.Context(), db, applicationMigrations); err != nil {
+		t.Fatal(err)
+	}
+	for _, table := range []string{"observations", "usage_buckets", "outbox_records"} {
+		var count int
+		if err := db.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM "+table).Scan(&count); err != nil {
+			t.Fatal(err)
+		}
+		if count != 1 {
+			t.Fatalf("%s rows after migration = %d, want only the real model", table, count)
+		}
+	}
+	// Existing rows keep their combined total with an unknown time-to-live.
+	var total string
+	var fiveMinute, oneHour sql.NullString
+	if err := db.QueryRowContext(t.Context(), `
+		SELECT input_cache_write_tokens, input_cache_write_5m_tokens, input_cache_write_1h_tokens
+		FROM observations`).Scan(&total, &fiveMinute, &oneHour); err != nil {
+		t.Fatal(err)
+	}
+	if total != "40" || fiveMinute.Valid || oneHour.Valid {
+		t.Fatalf("migrated cache write = %q/%v/%v, want 40 with unknown lifetimes", total, fiveMinute, oneHour)
+	}
+}
+
 func openTestSQLDB(t *testing.T) *sql.DB {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), databaseFileName)

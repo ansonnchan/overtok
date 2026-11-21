@@ -242,8 +242,8 @@ model_resolution: reported | resolved | inferred | unknown
 input_uncached_tokens
 input_cache_read_tokens
 input_cache_write_tokens
-input_cache_write_5m_tokens   (planned, M6)
-input_cache_write_1h_tokens   (planned, M6)
+input_cache_write_5m_tokens
+input_cache_write_1h_tokens
 output_tokens
 reasoning_output_tokens
 count_semantics: incremental | cumulative_snapshot
@@ -540,11 +540,11 @@ contain the identifiers used here.
 Goal: make token totals and API-equivalent estimates match real local usage
 before any presentation work depends on them.
 
-- [ ] **TKH-060: Record the product direction** (`docs/product-direction`)
+- [x] **TKH-060: Record the product direction** (`docs/product-direction`)
   - Update the roadmap, architecture, design direction, and contributor guidance.
   - Acceptance: documents agree with each other and with the product decisions above.
 
-- [ ] **TKH-061: Correct Claude usage semantics** (`fix/claude-usage-semantics`)
+- [x] **TKH-061: Correct Claude usage semantics** (`fix/claude-usage-semantics`)
   - Exclude `<synthetic>` and `isApiErrorMessage` assistant lines.
   - Read the `cache_creation` object into 5-minute and 1-hour cache-write
     categories; keep the combined value when no split exists.

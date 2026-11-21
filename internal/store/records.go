@@ -60,7 +60,8 @@ type ObservationBatch struct {
 	Health       AdapterHealth
 }
 
-// CommitResult reports how many previously unseen observations were inserted.
+// CommitResult reports how many observations were newly inserted or had their
+// usage replaced by a newer adapter revision.
 type CommitResult struct {
 	InsertedObservations int64
 }
@@ -160,7 +161,8 @@ func (db *DB) Observations(ctx context.Context) ([]StoredObservation, error) {
 		SELECT identity, source, surface, source_version, session_fingerprint,
 		       occurred_at, observed_model_id, canonical_model_id, model_provider,
 		       pricing_key, model_resolution, input_uncached_tokens,
-		       input_cache_read_tokens, input_cache_write_tokens, output_tokens,
+		       input_cache_read_tokens, input_cache_write_tokens,
+		       input_cache_write_5m_tokens, input_cache_write_1h_tokens, output_tokens,
 		       reasoning_output_tokens, count_semantics, measurement,
 		       adapter_version, normalization_version, warnings_json
 		FROM observations ORDER BY occurred_at, identity
@@ -269,6 +271,11 @@ func validateBatch(batch ObservationBatch) error {
 	return nil
 }
 
+// insertObservation stores one observation. Rescanning the same evidence is a
+// no-op; only a different adapter revision replaces the usage values, so a
+// corrected parser repairs records whose source files still exist. Model
+// attribution, measurement, and normalization version stay as first stored
+// because they are part of the usage-bucket identity.
 func insertObservation(ctx context.Context, tx *sql.Tx, observation normalize.Observation) (int64, error) {
 	warnings, err := json.Marshal(observation.Warnings)
 	if err != nil {
@@ -279,17 +286,29 @@ func insertObservation(ctx context.Context, tx *sql.Tx, observation normalize.Ob
 			identity, source, surface, source_version, session_fingerprint,
 			occurred_at, observed_model_id, canonical_model_id, model_provider,
 			pricing_key, model_resolution, input_uncached_tokens,
-			input_cache_read_tokens, input_cache_write_tokens, output_tokens,
+			input_cache_read_tokens, input_cache_write_tokens,
+			input_cache_write_5m_tokens, input_cache_write_1h_tokens, output_tokens,
 			reasoning_output_tokens, count_semantics, measurement,
 			adapter_version, normalization_version, warnings_json
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(identity) DO NOTHING
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(identity) DO UPDATE SET
+			input_uncached_tokens = excluded.input_uncached_tokens,
+			input_cache_read_tokens = excluded.input_cache_read_tokens,
+			input_cache_write_tokens = excluded.input_cache_write_tokens,
+			input_cache_write_5m_tokens = excluded.input_cache_write_5m_tokens,
+			input_cache_write_1h_tokens = excluded.input_cache_write_1h_tokens,
+			output_tokens = excluded.output_tokens,
+			reasoning_output_tokens = excluded.reasoning_output_tokens,
+			adapter_version = excluded.adapter_version,
+			warnings_json = excluded.warnings_json
+		WHERE excluded.adapter_version <> observations.adapter_version
 	`,
 		observationIdentity(observation), observation.Source, observation.Surface,
 		observation.SourceVersion, sessionFingerprint(observation), formatTime(observation.OccurredAt),
 		observation.ObservedModelID, observation.CanonicalModelID, observation.ModelProvider,
 		observation.PricingKey, observation.ModelResolution, tokenString(observation.Tokens.InputUncached),
 		tokenString(observation.Tokens.InputCacheRead), tokenString(observation.Tokens.InputCacheWrite),
+		tokenString(observation.Tokens.InputCacheWrite5m), tokenString(observation.Tokens.InputCacheWrite1h),
 		tokenString(observation.Tokens.Output), tokenString(observation.Tokens.ReasoningOutput),
 		observation.CountSemantics, observation.Measurement, observation.AdapterVersion,
 		observation.NormalizationVersion, string(warnings),
@@ -368,12 +387,12 @@ func scanObservation(row rowScanner) (StoredObservation, error) {
 	var observation StoredObservation
 	var session, canonical, provider, pricing sql.NullString
 	var occurred, warnings string
-	var tokens [5]sql.NullString
+	var tokens [7]sql.NullString
 	if err := row.Scan(
 		&observation.Identity, &observation.Source, &observation.Surface,
 		&observation.SourceVersion, &session, &occurred, &observation.ObservedModelID,
 		&canonical, &provider, &pricing, &observation.ModelResolution, &tokens[0],
-		&tokens[1], &tokens[2], &tokens[3], &tokens[4], &observation.CountSemantics,
+		&tokens[1], &tokens[2], &tokens[3], &tokens[4], &tokens[5], &tokens[6], &observation.CountSemantics,
 		&observation.Measurement, &observation.AdapterVersion,
 		&observation.NormalizationVersion, &warnings,
 	); err != nil {
@@ -386,7 +405,8 @@ func scanObservation(row rowScanner) (StoredObservation, error) {
 	}
 	values := []*(*uint64){
 		&observation.Tokens.InputUncached, &observation.Tokens.InputCacheRead,
-		&observation.Tokens.InputCacheWrite, &observation.Tokens.Output,
+		&observation.Tokens.InputCacheWrite, &observation.Tokens.InputCacheWrite5m,
+		&observation.Tokens.InputCacheWrite1h, &observation.Tokens.Output,
 		&observation.Tokens.ReasoningOutput,
 	}
 	for index := range tokens {

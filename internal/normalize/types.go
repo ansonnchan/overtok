@@ -76,12 +76,19 @@ type Warning struct {
 }
 
 // TokenCounts stores independent token categories; nil means unavailable, not zero.
+//
+// InputCacheWrite is the total written at every cache lifetime. The 5m and 1h
+// fields split that total only when the source reports a time-to-live; nil
+// means the lifetime is unknown, never that nothing was written at it. Their
+// sum cannot exceed the total, and any remainder has an unknown lifetime.
 type TokenCounts struct {
-	InputUncached   *uint64 `json:"input_uncached_tokens"`
-	InputCacheRead  *uint64 `json:"input_cache_read_tokens"`
-	InputCacheWrite *uint64 `json:"input_cache_write_tokens"`
-	Output          *uint64 `json:"output_tokens"`
-	ReasoningOutput *uint64 `json:"reasoning_output_tokens"`
+	InputUncached     *uint64 `json:"input_uncached_tokens"`
+	InputCacheRead    *uint64 `json:"input_cache_read_tokens"`
+	InputCacheWrite   *uint64 `json:"input_cache_write_tokens"`
+	InputCacheWrite5m *uint64 `json:"input_cache_write_5m_tokens"`
+	InputCacheWrite1h *uint64 `json:"input_cache_write_1h_tokens"`
+	Output            *uint64 `json:"output_tokens"`
+	ReasoningOutput   *uint64 `json:"reasoning_output_tokens"`
 }
 
 // Observation is one validated, source-neutral unit of local usage evidence.

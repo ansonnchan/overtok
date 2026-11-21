@@ -26,6 +26,8 @@ func TestCheckDirRejectsPrivateMaterial(t *testing.T) {
 		{name: "camel case private key", data: `{"toolInput":"synthetic"}`},
 		{name: "content alias", data: `{"transcript":"synthetic"}`},
 		{name: "unknown key", data: `{"unexpectedMetadata":"synthetic"}`},
+		{name: "error text beside the error flag", data: `{"isApiErrorMessage":true,"error":"synthetic"}`},
+		{name: "unlisted cache lifetime", data: `{"cache_creation":{"ephemeral_24h_input_tokens":1}}`},
 		{name: "home path", data: `{"value":"/Users/example/work"}`},
 		{name: "root path", data: `{"value":"/root/work"}`},
 		{name: "tilde path", data: `{"value":"~/work"}`},

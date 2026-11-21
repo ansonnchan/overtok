@@ -27,6 +27,7 @@ var allowedKeys = normalizedSet(
 	"type", "sessionId", "requestId", "timestamp", "message", "id", "model", "usage",
 	"input_tokens", "cached_input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens",
 	"cache_write_input_tokens", "output_tokens", "reasoning_output_tokens", "synthetic_broken",
+	"cache_creation", "ephemeral_5m_input_tokens", "ephemeral_1h_input_tokens", "isApiErrorMessage",
 	"payload", "session_id", "info", "total_token_usage",
 	"daily", "date", "inputTokens", "outputTokens", "cacheCreationTokens", "cacheReadTokens",
 	"reasoningOutputTokens", "totalTokens", "modelsUsed", "modelBreakdowns", "modelName",
