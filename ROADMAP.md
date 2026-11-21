@@ -1,6 +1,6 @@
 # tokenholic roadmap
 
-Status: MVP complete; product-parity revamp in progress (M6 complete, M7–M10 planned)
+Status: MVP complete; product-parity revamp in progress (M6 complete, M7–M11 planned)
 Last updated: November 20, 2026
 
 ## Product definition
@@ -145,9 +145,11 @@ A newly supported coding client requires a source adapter or a validated ccusage
 | Claude Desktop Code/Agent/Cowork | P0 | Desktop local-agent session discovery plus Claude-compatible JSONL | Keep the desktop surface distinct from CLI; deduplicate shared records |
 | Codex CLI | P0 | Codex rollout JSONL through a pinned parser | Respect cumulative counters and active `turn_context` model |
 | Codex Desktop | P0 | Codex local session/rollout storage | Verify whether it shares or duplicates CLI roots |
-| OpenCode | Extension | ccusage or native SQLite adapter | Add after MVP stability |
-| Gemini CLI | Extension | ccusage or validated local telemetry | Add after MVP stability |
-| Grok Build CLI | Extension | ccusage | Do not claim generic Grok chat support |
+| Gemini CLI | M11 | Pinned ccusage | Day-level rows; no cache-write lifetimes |
+| OpenCode | M11 | Pinned ccusage | Day-level rows; no cache-write lifetimes |
+| GitHub Copilot CLI | M11 | Pinned ccusage | Day-level rows; no cache-write lifetimes |
+| Grok Build CLI | M11 | Pinned ccusage | Do not claim generic Grok chat support |
+| Qwen Code | M11 | Pinned ccusage | Day-level rows; no cache-write lifetimes |
 | Cursor | Research | Unknown | Ship only if model and token evidence is reliable |
 
 ## Target architecture
@@ -607,16 +609,38 @@ M6 exit criteria:
 - Real local usage produces totals and estimates whose coverage is visible.
 - Catalog or price updates never reject an otherwise valid upload.
 
-Open decision after M6: models whose price depends on prompt length, such as
-the current default Codex model, resolve but stay unpriced, because a usage
-bucket cannot prove which tier each request fell in. Local records do carry
-per-request prompt size. Carrying a proven tier from the adapter through the
-protocol would price that usage without guessing; until then such usage lowers
-cost coverage and can keep a user below the cost-ranking threshold in M7.
+Two pricing gaps remain after M6 and open M7 as TKH-074: usage whose price
+depends on prompt length or service tier is not yet priced from proven
+evidence.
 
 ### M7 — Leaderboards, profiles, and integrity
 
 Goal: reach social-product parity with honest ranking rules.
+
+- [ ] **TKH-074: Carry pricing-tier evidence** (`feat/pricing-tier-evidence`)
+  - Ships first in M7, before the protocol is released, because cost ranking
+    depends on it and it changes the upload shape.
+  - Two prices depend on evidence a usage bucket does not carry today:
+    - Prompt length. Models such as the current default Codex model charge
+      more above a prompt-length threshold, so they resolve but stay unpriced.
+      Local records carry each request's prompt size.
+    - Service tier. Codex records the tier in `thread_settings_applied`
+      (`priority` or legacy `fast`, `flex`, and `default` or `standard`), and a
+      settings event without the key keeps the previous tier. Fast usage is
+      billed above the standard rate, and Codex estimates currently ignore it.
+      Claude records carry `service_tier` and `speed` in the same way.
+  - Carry both as evidence from the adapter through the normalized record,
+    bucket identity, sync protocol, and a server column. Buckets without the
+    evidence must serialize exactly as they do now.
+  - Vendor the per-tier rates the price snapshot publishes. Usage in a tier
+    with no vendored rate stays unpriced with a reason.
+  - Decide what an unknown tier means. The cost rule says unproven tiers stay
+    unpriced; short Codex rollouts carry no settings event, so that leaves
+    them unpriced. Do not read the Codex configuration file to guess.
+  - Acceptance: golden cost tests cover each tier and threshold side; a
+    bucket without tier evidence keeps its key and content hash; a fixture
+    proves a settings event without a tier keeps the previous one.
+  - Depends on: TKH-064.
 
 - [ ] **TKH-070: Leaderboard v2** (`feat/leaderboard-v2`)
   - Metrics: total tokens and API-equivalent estimate.
@@ -627,7 +651,7 @@ Goal: reach social-product parity with honest ranking rules.
   - Add an advisory plausibility flag for implausible daily totals.
   - Acceptance: SQL tests cover non-UTC boundaries, ties, coverage, trends,
     and first-period entrants.
-  - Depends on: TKH-064.
+  - Depends on: TKH-074.
 
 - [ ] **TKH-071: Rate-limit the API** (`feat/api-rate-limits`)
   - In-memory token buckets per credential and per IP for the single instance.
@@ -647,6 +671,18 @@ Goal: reach social-product parity with honest ranking rules.
   - Acceptance: public endpoints cannot distinguish private users or groups
     from nonexistent ones; owner-only operations are authorization-tested.
   - Depends on: TKH-072.
+
+- [ ] **TKH-075: Count Codex compaction and compressed rollouts** (`fix/codex-compaction-usage`)
+  - Newer Codex versions record automatic compaction requests as top-level
+    `token_usage_record` lines matched to `compacted` items by response ID,
+    and may store rollouts as `.jsonl.zst`. Neither is read today.
+  - Blocked on evidence: no local rollout contains either. Build the fixture
+    from records written by a Codex version that emits them, not from another
+    tool's description of the format.
+  - A compaction that also advances the running total must not count twice.
+  - Until then, report a rollout the adapter cannot read instead of skipping
+    it silently.
+  - Depends on: TKH-065.
 
 ### M8 — TUI revamp
 
@@ -717,16 +753,80 @@ M6–M10 exit criteria:
   link that unfurls with a card.
 - Totals survive repeated sync, repricing, and device revocation.
 
+### M11 — Long-tail agents through ccusage
+
+Goal: count usage from coding agents tokenholic has no native adapter for by
+running a pinned ccusage and treating its output as an external contract.
+
+Starts after M10. Claude and Codex keep their native adapters and are never
+routed through ccusage: the native path gives minute buckets, cache-write
+lifetimes, and control over what is read, and routing both ways would count
+the same usage twice.
+
+Constraints that shape this milestone:
+
+- ccusage reports one row per day and model, in one timezone. Leaderboard
+  day boundaries for these sources are therefore approximate and must be
+  labelled so.
+- Its rows carry a combined cache-write total with no lifetime, so any cache
+  write is priced at the base rate and marks the estimate a lower bound.
+- It is a Node program. It is available to `npx` installs and absent from a
+  standalone binary; an unavailable runner is reported, never shown as zero.
+- It is third-party code that reads local agent data. Pin an exact version
+  and integrity hash, as `ccusage.lock.json` already pins 20.0.51, and never
+  a floating major.
+
+- [ ] **TKH-110: Run a pinned ccusage** (`feat/ccusage-runner`)
+  - Execute `<agent> daily --json --no-cost --offline --timezone UTC` for the
+    pinned version with an argument array, no shell, a time limit, and no
+    network. Refuse any other version.
+  - Validate output strictly against the pinned contract and ignore
+    ccusage's own cost figures.
+  - One failing agent degrades only that source.
+  - Decide whether running ccusage is on by default or something the user
+    turns on, and document what it reads either way.
+  - Acceptance: contract fixtures validate; a missing runner, an unpinned
+    version, and malformed output each appear in `tokenholic doctor`.
+  - Depends on: TKH-102.
+
+- [ ] **TKH-111: Admit day-level sources** (`feat/day-level-sources`)
+  - Add the sources and their surface to the allowlists that enumerate
+    Claude and Codex today: local SQLite checks, normalized validation, and
+    sync protocol validation. The server schema already checks shape only.
+  - A day's row grows until the day ends. Store it as an absolute value keyed
+    by agent, day, and model that a later scan replaces, not as a new record.
+  - Record that the value is day-level so boards can label the boundary.
+  - Extend the price snapshot's provider list for the models these agents
+    report. A model without a vendored price stays unpriced with a reason.
+  - Acceptance: rescanning a growing day replaces its value without adding
+    to it; totals survive repeated sync; `show-data` still matches the upload.
+  - Depends on: TKH-110.
+
+- [ ] **TKH-112: Enable the first agents** (`feat/ccusage-agents`)
+  - Gemini CLI, OpenCode, GitHub Copilot CLI, Grok Build CLI, and Qwen Code.
+  - Each ships a sanitized contract fixture, hand-computed totals, capability
+    declarations, and documented coverage limits.
+  - Do not claim generic chat support for any of them.
+  - Acceptance: each agent's fixture matches its totals; a machine without
+    an agent shows it as not found; the TUI SOURCES view lists coverage.
+  - Depends on: TKH-111.
+
+M11 exit criteria:
+
+- A user of any listed agent sees its tokens on the board with day-level
+  coverage labelled and no change to Claude or Codex totals.
+
 ## Extensions after MVP
 
 Extensions are gated by evidence, not by the number of tools in the market.
 
 ### Source extensions
 
-1. OpenCode.
-2. Gemini CLI.
-3. Grok Build CLI.
-4. Cursor only after reliable token/model evidence is verified.
+Gemini CLI, OpenCode, GitHub Copilot CLI, Grok Build CLI, and Qwen Code moved
+into M11 and are collected through a pinned ccusage. ccusage ships further
+adapters; add one only with its own fixture.
+
+Cursor remains research until reliable token and model evidence is verified.
 
 Linux and Windows platform support moved into M10.
 
@@ -771,5 +871,5 @@ and `@tokenholic/cli` 0.1.0 is published. M6, usage and cost correctness, is
 complete. The remaining parity revamp continues in order: leaderboards and
 profiles, the TUI revamp, the website and share cards, and finally Linux,
 Windows, and a validated release. The free demo environment's end-to-end
-validation (TKH-043) folds into TKH-102. A measured private beta remains
-optional. Source extensions remain deferred until the revamp is stable.
+validation (TKH-043) folds into TKH-102. Long-tail agents through ccusage
+follow in M11, after the release. A measured private beta remains optional.

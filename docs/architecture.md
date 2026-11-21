@@ -550,7 +550,7 @@ binary, plist, and logs without touching SQLite usage or the OS-vault session.
 
 M0 established these local rules:
 
-- ccusage remains a pinned compatibility contract, not an active collection path.
+- ccusage remains a pinned compatibility contract, not an active collection path, until M11 uses it for agents without a native adapter. Claude and Codex stay native.
 - Claude Desktop coding roots are discovered narrowly and parsed through native compatible-record adapters.
 - Default Codex CLI and Desktop evidence is represented once as `shared_local`; a distinct `CODEX_HOME` permits separate CLI and Desktop roots.
 - Cross-root deduplication happens before cumulative snapshots become deltas.
