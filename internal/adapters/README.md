@@ -10,7 +10,9 @@ Adapters are the only packages that understand provider-owned storage layouts an
 - Claude Desktop Code sessions;
 - Claude Desktop local Agent records under the `rpm` subtree;
 - Claude Desktop Cowork `audit.jsonl` records outside that subtree;
-- Codex session rollouts, represented as shared local storage when CLI and Desktop cannot be distinguished.
+- Codex session rollouts, represented as shared local storage when CLI and Desktop cannot be distinguished. Each Codex home is read from `sessions` and, when it holds rollouts, from `archived_sessions`, where Codex moves a rollout the user archives. No other file in the Codex home is opened.
+
+A root marked optional is a secondary location of a source. It adds records when it has any and reports nothing when it is absent or empty, so a missing archive never degrades a healthy source. An optional root that exists but cannot be used is still reported.
 
 These roots are intentionally narrow. Ordinary Claude Desktop chat and general web/desktop chat storage are out of scope. Discovery is read-only, refuses root symlinks, skips nested symlinks and non-regular files, and records health through stable warning codes.
 

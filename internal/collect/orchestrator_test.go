@@ -162,6 +162,49 @@ func TestOrchestratorRescanKeepsCodexForkTotals(t *testing.T) {
 	}
 }
 
+// Archiving moves a rollout, but a scan can catch it in both places. Whatever
+// the overlap, the usage counts once: the same five requests as the test above.
+func TestOrchestratorCountsArchivedCodexRolloutsOnce(t *testing.T) {
+	t.Parallel()
+	home := t.TempDir()
+	sessions := filepath.Join(home, ".codex", "sessions", "2026", "01", "07")
+	archive := filepath.Join(home, ".codex", "archived_sessions")
+	copyFixture(t, filepath.Join("codex-cli", "fork-parent.jsonl"), filepath.Join(sessions, "rollout-parent.jsonl"))
+	copyFixture(t, filepath.Join("codex-cli", "fork-parent.jsonl"), filepath.Join(archive, "rollout-parent.jsonl"))
+	// The fork exists only in the archive.
+	copyFixture(t, filepath.Join("codex-cli", "fork-child.jsonl"), filepath.Join(archive, "rollout-child.jsonl"))
+	db := openCollectionStore(t)
+	result, err := (Orchestrator{
+		Discovery: adapters.Discoverer{Roots: adapters.DefaultMacRoots(home, "")},
+		Collector: Collector{SourceVersion: "synthetic-v1"}, Store: db,
+		Now: func() time.Time { return time.Date(2026, 11, 21, 20, 0, 0, 0, time.UTC) },
+	}).Scan(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hasWarning(result.Warnings, "duplicate_conflict") || hasWarning(result.Warnings, "counter_reset") {
+		t.Fatalf("warnings = %#v", result.Warnings)
+	}
+	observations, err := db.Observations(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var total uint64
+	for _, observation := range observations {
+		if observation.Source != normalize.SourceCodex || observation.Surface != normalize.SurfaceSharedLocal {
+			t.Fatalf("observation = %s/%s", observation.Source, observation.Surface)
+		}
+		known, err := observation.Tokens.KnownTotal()
+		if err != nil || known == nil {
+			t.Fatalf("KnownTotal() = %v, %v", known, err)
+		}
+		total += *known
+	}
+	if len(observations) != 5 || total != 870 {
+		t.Fatalf("stored %d observations totalling %d tokens, want 5 and 870", len(observations), total)
+	}
+}
+
 func TestOrchestratorPersistsValidSourcesWhenAnotherIsPartial(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

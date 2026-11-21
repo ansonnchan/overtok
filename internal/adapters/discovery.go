@@ -42,6 +42,11 @@ type RootSpec struct {
 	Extensions   []string
 	Match        func(string) bool
 	Capabilities normalize.Capabilities
+	// Optional marks a secondary location of a source whose primary root is
+	// listed separately. It contributes records when it has any; when it is
+	// absent or empty it reports nothing, so the source's health is decided
+	// by its primary root alone. An unreadable optional root is still reported.
+	Optional bool
 }
 
 // Candidate is a local file that matches one supported root contract.
@@ -77,7 +82,12 @@ type Discoverer struct {
 func (d Discoverer) Discover(ctx context.Context) []Finding {
 	findings := make([]Finding, 0, len(d.Roots))
 	for _, root := range d.Roots {
-		findings = append(findings, discoverRoot(ctx, root))
+		finding := discoverRoot(ctx, root)
+		if root.Optional && len(finding.Candidates) == 0 &&
+			(finding.Status == normalize.HealthNotFound || finding.Status == normalize.HealthDegraded) {
+			continue
+		}
+		findings = append(findings, finding)
 	}
 	markSharedCandidates(findings)
 	return findings
@@ -231,24 +241,25 @@ func DefaultMacRoots(home, codexHome string) []RootSpec {
 	if filepath.Clean(codexHome) == filepath.Clean(defaultCodexHome) {
 		// The default Codex home is shared by CLI and Desktop in current installs;
 		// one ambiguous root avoids double discovery and false attribution.
-		return append(roots, RootSpec{
-			Kind: RootCodexShared, Source: normalize.SourceCodex, Surface: normalize.SurfaceSharedLocal,
-			Path: filepath.Join(defaultCodexHome, "sessions"), Format: "codex-rollout-jsonl", Extensions: []string{".jsonl"},
-			Capabilities: codexCapabilities(),
-		})
+		return append(roots, codexRoots(RootCodexShared, normalize.SurfaceSharedLocal, defaultCodexHome)...)
 	}
-	return append(roots,
-		RootSpec{
-			Kind: RootCodexCLI, Source: normalize.SourceCodex, Surface: normalize.SurfaceCLI,
-			Path: filepath.Join(codexHome, "sessions"), Format: "codex-rollout-jsonl", Extensions: []string{".jsonl"},
-			Capabilities: codexCapabilities(),
-		},
-		RootSpec{
-			Kind: RootCodexDesktop, Source: normalize.SourceCodex, Surface: normalize.SurfaceDesktop,
-			Path: filepath.Join(defaultCodexHome, "sessions"), Format: "codex-rollout-jsonl", Extensions: []string{".jsonl"},
-			Capabilities: codexCapabilities(),
-		},
-	)
+	roots = append(roots, codexRoots(RootCodexCLI, normalize.SurfaceCLI, codexHome)...)
+	return append(roots, codexRoots(RootCodexDesktop, normalize.SurfaceDesktop, defaultCodexHome)...)
+}
+
+// codexRoots lists where one Codex home keeps rollouts. Codex moves a rollout
+// from sessions to archived_sessions when the user archives it, and the usage
+// in it is no less real. A rollout present in both is counted once, because a
+// request's identity does not depend on the file it was read from.
+func codexRoots(kind RootKind, surface normalize.Surface, home string) []RootSpec {
+	root := func(directory string, optional bool) RootSpec {
+		return RootSpec{
+			Kind: kind, Source: normalize.SourceCodex, Surface: surface,
+			Path: filepath.Join(home, directory), Format: "codex-rollout-jsonl", Extensions: []string{".jsonl"},
+			Capabilities: codexCapabilities(), Optional: optional,
+		}
+	}
+	return []RootSpec{root("sessions", false), root("archived_sessions", true)}
 }
 
 func matchesExtension(path string, allowed []string) bool {
