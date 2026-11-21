@@ -1,6 +1,6 @@
 # tokenholic roadmap
 
-Status: MVP complete; product-parity revamp in progress (M6 planned work merged with one correctness gap open, M7–M10 planned)
+Status: MVP complete; product-parity revamp in progress (M6 complete, M7–M10 planned)
 Last updated: November 20, 2026
 
 ## Product definition
@@ -585,16 +585,19 @@ before any presentation work depends on them.
     and correct totals after a revision change.
   - Depends on: TKH-063.
 
-- [ ] **TKH-065: Correct Codex cumulative-counter reduction** (`fix/codex-counter-ordering`)
+- [x] **TKH-065: Correct Codex cumulative-counter reduction** (`fix/codex-counter-ordering`)
   - Found while validating M6 against real local logs. Collection sorts
     observations by timestamp and then by record hash before reducing
     cumulative snapshots. A resumed Codex rollout replays earlier snapshots
     under one timestamp, so the hash order scrambles them, each apparent
     decrease is treated as a counter reset, and the full running total is
     counted again. On real logs this inflates Codex totals many times over.
-  - Reduce snapshots in source order within a session, and decide how a
-    resumed rollout's replayed history relates to the session it continues.
-  - Repair stored Codex observations through an adapter-revision change.
+  - A forked rollout also replays its parent's whole history, which was
+    counted again in every fork.
+  - Read per-request usage and identify each request by session, turn, and
+    running total so replays deduplicate; reduce legacy snapshots in source
+    order; retract buckets that no longer have usage.
+  - Stored Codex observations are discarded and collected again.
   - Acceptance: a sanitized fixture with replayed same-timestamp snapshots
     matches hand-computed totals; rescans do not change totals.
   - Depends on: TKH-061.
@@ -764,10 +767,9 @@ Each source must ship with:
 ## Next delivery sequence
 
 The local, multiplayer, packaging, and autosync implementation is complete,
-and `@tokenholic/cli` 0.1.0 is published. The planned M6 workstreams are
-merged; the Codex counter fix found during validation should land before
-leaderboards depend on totals. The remaining parity revamp continues in order:
-leaderboards and profiles, the TUI revamp, the website and share cards, and finally Linux,
+and `@tokenholic/cli` 0.1.0 is published. M6, usage and cost correctness, is
+complete. The remaining parity revamp continues in order: leaderboards and
+profiles, the TUI revamp, the website and share cards, and finally Linux,
 Windows, and a validated release. The free demo environment's end-to-end
 validation (TKH-043) folds into TKH-102. A measured private beta remains
 optional. Source extensions remain deferred until the revamp is stable.

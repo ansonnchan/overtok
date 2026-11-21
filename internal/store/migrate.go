@@ -32,6 +32,7 @@ var applicationMigrations = mustLoadMigrations([]struct {
 	{version: 3, name: "store_usage_buckets", file: "migrations/0003_store_usage_buckets.sql"},
 	{version: 4, name: "cache_write_lifetimes", file: "migrations/0004_cache_write_lifetimes.sql"},
 	{version: 5, name: "sync_v2_buckets", file: "migrations/0005_sync_v2_buckets.sql"},
+	{version: 6, name: "recollect_codex_usage", file: "migrations/0006_recollect_codex_usage.sql"},
 })
 
 func mustLoadMigrations(definitions []struct {

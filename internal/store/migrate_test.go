@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ncruces/go-sqlite3/driver"
@@ -201,7 +202,8 @@ func TestSyncV2MigrationRebuildsBucketsAndKeepsSourceEvidence(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := migrate(t.Context(), db, applicationMigrations); err != nil {
+	// Stop at the sync v2 migration: a later one discards Codex observations.
+	if err := migrate(t.Context(), db, applicationMigrations[:5]); err != nil {
 		t.Fatal(err)
 	}
 	// Buckets are derived state and are rebuilt by the next refresh.
@@ -226,6 +228,51 @@ func TestSyncV2MigrationRebuildsBucketsAndKeepsSourceEvidence(t *testing.T) {
 			t.Errorf("%s: evidence = %q, catalog columns = %v/%v/%v; want %q and none",
 				row.identity, evidence, canonical, provider, pricing, row.wantEvidence)
 		}
+	}
+}
+
+func TestCodexRecollectionMigrationDiscardsOnlyCodexObservations(t *testing.T) {
+	t.Parallel()
+	db := openTestSQLDB(t)
+	if err := migrate(t.Context(), db, applicationMigrations[:5]); err != nil {
+		t.Fatal(err)
+	}
+	const insertObservation = `
+		INSERT INTO observations(
+			identity, source, surface, source_version, occurred_at, observed_model_id, model_resolution,
+			output_tokens, count_semantics, measurement, adapter_version, normalization_version, warnings_json
+		) VALUES (?, ?, 'cli', 'synthetic-v1', '2026-01-06T03:00:00Z', 'model-synthetic', ?, '7',
+			'incremental', ?, '1', '1', ?)`
+	for _, row := range [][]any{
+		{"claude-kept", "claude", "reported", "reported", `[]`},
+		{"codex-delta", "codex", "inferred", "derived", `[{"code":"model_inferred"}]`},
+		{"codex-reset", "codex", "inferred", "derived", `[{"code":"model_inferred"},{"code":"counter_reset"}]`},
+	} {
+		if _, err := db.ExecContext(t.Context(), insertObservation, row...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// A bucket built from the discarded rows stays until the next rebuild
+	// retracts it, so the server is told as well.
+	if _, err := db.ExecContext(t.Context(), `
+		INSERT INTO usage_buckets(bucket_key, bucket_start, revision, content_hash, payload_json, preview_json)
+		VALUES ('codex-bucket', '2026-01-06T03:00:00Z', '1', ?, '{}', '{}')`, strings.Repeat("a", 64)); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := migrate(t.Context(), db, applicationMigrations); err != nil {
+		t.Fatal(err)
+	}
+	var remaining string
+	if err := db.QueryRowContext(t.Context(), `SELECT group_concat(identity) FROM observations`).Scan(&remaining); err != nil {
+		t.Fatal(err)
+	}
+	if remaining != "claude-kept" {
+		t.Fatalf("observations after migration = %q, want only the Claude row", remaining)
+	}
+	var buckets int
+	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM usage_buckets`).Scan(&buckets); err != nil || buckets != 1 {
+		t.Fatalf("usage buckets after migration = %d, %v; want the stored bucket left for retraction", buckets, err)
 	}
 }
 

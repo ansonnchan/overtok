@@ -33,7 +33,22 @@ Cache writes come from two fields. `cache_creation_input_tokens` is the combined
 
 An unknown lifetime stays nil; it is never assumed to be the 5-minute rate here. Pricing decides how to treat it and marks the estimate partial.
 
-The Codex parser follows `turn_context` records to attribute later token snapshots. That attribution is `inferred`, because the token event does not directly carry the active model. Codex counters are cumulative and are reduced by `internal/collect` only after cross-root deduplication.
+The Codex parser follows `turn_context` records to attribute later token events. That attribution is `inferred`, because the token event does not directly carry the active model.
+
+A Codex `token_count` event carries two counters: `last_token_usage`, the request that just finished, and `total_token_usage`, the session's running total. The parser emits the request usage as one incremental observation and uses the running total only to identify it:
+
+| Situation | Handling |
+| --- | --- |
+| Normal request | One observation. Its identity is a hash of the session, the active turn, and the running total after it |
+| Event repeats the previous running total | Skipped. Codex re-emits the last event, sometimes under a new turn; it reports no new usage |
+| Forked or resumed rollout | The file starts with its own `session_meta`, then its parent's, then the parent's whole history rewritten under one timestamp. Each replayed request has the same session, turn, and running total as its original, so it gets the same identity and deduplication keeps one. The earlier copy supplies the time |
+| Fork continues after the replay | Its own requests carry new turns and new running totals, so they stay distinct from what the parent does next |
+| Parent file no longer exists | The replay is then the only record of those requests. They still count once, at the replay time |
+| No `last_token_usage` (older rollouts) | Emitted as a cumulative snapshot and reduced by `internal/collect` after cross-root deduplication |
+
+Neither the event timestamp nor the file takes part in a request's identity, because a replay rewrites the first and changes the second. Only the first `session_meta` in a file names its session; a fork's second header describes the parent and must not rename it.
+
+Reducing the running total instead would count every replayed history again, once per fork, and is why the parser does not do it when request usage is present.
 
 Both parsers recover after malformed complete lines and defer an unterminated final line as a partial write. They keep missing token categories nil rather than inventing zeroes.
 

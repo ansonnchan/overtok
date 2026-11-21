@@ -145,6 +145,15 @@ func Deduplicate(observations []normalize.Observation, warnings []normalize.Warn
 			byID[key] = observation
 			continue
 		}
+		if !existing.OccurredAt.Equal(observation.OccurredAt) && sameUsageAtAnotherTime(existing, observation) {
+			// A replayed or re-read copy of the same usage is not a conflict.
+			// The event happened when it was first recorded, so the earlier
+			// copy wins whatever order the files were read in.
+			if observation.OccurredAt.Before(existing.OccurredAt) {
+				byID[key] = observation
+			}
+			continue
+		}
 		winner := preferred(existing, observation)
 		if !sameUsage(existing, observation) {
 			warning := normalize.Warning{Code: "duplicate_conflict"}
@@ -164,9 +173,27 @@ func Deduplicate(observations []normalize.Observation, warnings []normalize.Warn
 		if result[i].Source != result[j].Source {
 			return result[i].Source < result[j].Source
 		}
+		// Running totals only grow, so ascending magnitude restores the source
+		// order of snapshots written under one timestamp. Ordering them by
+		// record identity would look like counter resets to the reducer.
+		if result[i].CountSemantics == normalize.CountCumulative && result[j].CountSemantics == normalize.CountCumulative {
+			_, left := usageQuality(result[i].Tokens)
+			_, right := usageQuality(result[j].Tokens)
+			if left != right {
+				return left < right
+			}
+		}
 		return result[i].SourceRecordID < result[j].SourceRecordID
 	})
 	return result, warnings
+}
+
+// sameUsageAtAnotherTime reports copies that agree on everything except when
+// they were recorded.
+func sameUsageAtAnotherTime(a, b normalize.Observation) bool {
+	return a.Source == b.Source && a.SourceRecordID == b.SourceRecordID &&
+		a.ObservedModelID == b.ObservedModelID && a.ModelResolution == b.ModelResolution &&
+		a.CountSemantics == b.CountSemantics && a.Measurement == b.Measurement && reflect.DeepEqual(a.Tokens, b.Tokens)
 }
 
 func sameUsage(a, b normalize.Observation) bool {

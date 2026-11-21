@@ -85,10 +85,24 @@ bucket whose content is unchanged keeps its revision and acknowledgement and
 has only its preview refreshed, so repeated refreshes upload nothing. An older
 revision is ignored; the same revision with different content is rejected.
 
+Buckets are absolute, so a rebuild also retracts. A stored bucket that the
+current observations no longer produce is replaced by a known zero in every
+token category at the new revision and enqueued like any other change. Without
+that, usage a corrected adapter stops counting would stay in the local totals
+and on the server indefinitely. A retracted bucket is kept as a zero row;
+retracting it again changes nothing.
+
 Only the newest pending revision for each bucket remains in the local outbox.
 Its JSON is the upload payload and has no source record, session, path, or
 client-derived model or price field. This package does not implement a network
 client.
+
+Migration `0006` discards stored Codex observations. Earlier Codex adapter
+revisions counted replayed history and misordered snapshots, the affected rows
+cannot be told apart from correct ones, and the corrected adapter uses a
+different identity, so the rows are collected again from the rollout files.
+Usage whose rollout file no longer exists is not recovered. The buckets built
+from the old rows are replaced or retracted by the next rebuild.
 
 Migration `0005` drops and recreates these two tables. They are derived state:
 the next refresh rebuilds every bucket from stored observations and enqueues it

@@ -12,7 +12,7 @@ Only synthetic or explicitly approved sanitized source records belong here. Fixt
 | `claude-desktop/code` | Claude Desktop Code records and overlap with CLI-compatible evidence |
 | `claude-desktop/agent` | Claude Desktop local Agent records |
 | `claude-desktop/cowork` | Claude Desktop Cowork audit records |
-| `codex-cli` | Codex context attribution, cumulative snapshots, resets, and malformed-line recovery |
+| `codex-cli` | Codex context attribution, per-request usage, a forked rollout replaying its parent, legacy cumulative snapshots, resets, and malformed-line recovery |
 | `codex-desktop` | Codex Desktop/shared records and full or midstream overlap |
 | `ccusage` | Pinned Claude and Codex daily JSON schemas |
 

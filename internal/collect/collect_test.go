@@ -156,6 +156,104 @@ func TestCumulativeStateIsPerSessionAndKeepsLastKnownCategory(t *testing.T) {
 	}
 }
 
+// A forked Codex rollout replays its parent's history under one timestamp and
+// then continues the parent's running counter. Hand-computed from the two
+// fork fixtures, the five distinct requests total 180 uncached input, 620
+// cache read, and 70 output tokens.
+func TestCodexForkReplayCountsEachRequestOnce(t *testing.T) {
+	t.Parallel()
+
+	root := filepath.Join("..", "..", "fixtures", "codex-cli")
+	parent := candidate(normalize.SourceCodex, normalize.SurfaceCLI, filepath.Join(root, "fork-parent.jsonl"))
+	child := candidate(normalize.SourceCodex, normalize.SurfaceCLI, filepath.Join(root, "fork-child.jsonl"))
+	parent.RelativePath, child.RelativePath = "fork-parent.jsonl", "fork-child.jsonl"
+	tests := []struct {
+		name                     string
+		candidates               []adapters.Candidate
+		wantRecords              int
+		input, cacheRead, output uint64
+	}{
+		{name: "parent then fork", candidates: []adapters.Candidate{parent, child}, wantRecords: 5, input: 180, cacheRead: 620, output: 70},
+		{name: "fork then parent", candidates: []adapters.Candidate{child, parent}, wantRecords: 5, input: 180, cacheRead: 620, output: 70},
+		{name: "the same fork found under two roots", candidates: []adapters.Candidate{parent, child, child}, wantRecords: 5, input: 180, cacheRead: 620, output: 70},
+		// Without the parent file the replay is the only record of its two
+		// requests, and they still count exactly once.
+		{name: "fork alone", candidates: []adapters.Candidate{child}, wantRecords: 4, input: 160, cacheRead: 440, output: 50},
+		{name: "parent alone", candidates: []adapters.Candidate{parent}, wantRecords: 3, input: 150, cacheRead: 300, output: 45},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := (Collector{SourceVersion: "synthetic-v1"}).Collect(context.Background(), tt.candidates)
+			if len(result.Warnings) != 0 {
+				t.Fatalf("warnings = %#v, want none: a replay is neither a counter reset nor a conflict", result.Warnings)
+			}
+			if len(result.Observations) != tt.wantRecords {
+				t.Fatalf("observations = %d, want %d", len(result.Observations), tt.wantRecords)
+			}
+			summaries, err := summarize(result.Observations)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(summaries) != 1 {
+				t.Fatalf("summaries = %#v", summaries)
+			}
+			assertTokens(t, summaries[0], "gpt-5-synthetic", tt.input, tt.cacheRead, tt.output)
+			for _, observation := range result.Observations {
+				if observation.CountSemantics != normalize.CountIncremental || observation.Measurement != normalize.MeasurementReported || observation.ModelResolution != normalize.ModelInferred {
+					t.Fatalf("Codex request = %q/%q/%q", observation.CountSemantics, observation.Measurement, observation.ModelResolution)
+				}
+			}
+		})
+	}
+
+	// A replayed request keeps the time it first happened, not the fork time.
+	both := (Collector{}).Collect(context.Background(), []adapters.Candidate{child, parent})
+	replayedAt := time.Date(2026, 1, 7, 10, 0, 30, 0, time.UTC)
+	firstRequest := time.Date(2026, 1, 7, 10, 0, 5, 0, time.UTC)
+	if !both.Observations[0].OccurredAt.Equal(firstRequest) {
+		t.Fatalf("first request time = %v, want %v", both.Observations[0].OccurredAt, firstRequest)
+	}
+	for _, observation := range both.Observations {
+		if observation.OccurredAt.Equal(replayedAt) {
+			t.Fatalf("a request is attributed to the replay time %v", replayedAt)
+		}
+	}
+}
+
+// Rollouts that carry only running totals are still reduced, and snapshots
+// written under one timestamp must keep their source order: 100, then 160,
+// then 200 input tokens, of which 20, 30, and 40 were cached.
+func TestCumulativeSnapshotsWithOneTimestampKeepSourceOrder(t *testing.T) {
+	t.Parallel()
+
+	const stamp = `"timestamp":"2026-01-04T03:01:00Z"`
+	data := `{"timestamp":"2026-01-04T03:00:00Z","type":"turn_context","payload":{"model":"gpt-5-synthetic","session_id":"synthetic-one-timestamp"}}` + "\n"
+	for _, usage := range []string{
+		`"input_tokens":100,"cached_input_tokens":20,"output_tokens":30`,
+		`"input_tokens":160,"cached_input_tokens":30,"output_tokens":45`,
+		`"input_tokens":200,"cached_input_tokens":40,"output_tokens":60`,
+		`"input_tokens":260,"cached_input_tokens":70,"output_tokens":61`,
+		`"input_tokens":300,"cached_input_tokens":90,"output_tokens":62`,
+		`"input_tokens":310,"cached_input_tokens":95,"output_tokens":63`,
+	} {
+		data += `{` + stamp + `,"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{` + usage + `}}}}` + "\n"
+	}
+	path := filepath.Join(t.TempDir(), "rollout.jsonl")
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	result := (Collector{}).Collect(context.Background(), []adapters.Candidate{candidate(normalize.SourceCodex, normalize.SurfaceCLI, path)})
+	if hasWarning(result.Warnings, "counter_reset") {
+		t.Fatalf("warnings = %#v: rising snapshots were treated as a counter reset", result.Warnings)
+	}
+	summaries, err := summarize(result.Observations)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The final snapshot is the whole usage: 310-95 uncached, 95 cached, 63 output.
+	assertTokens(t, summaries[0], "gpt-5-synthetic", 215, 95, 63)
+}
+
 func TestClaudeConflictKeepsMostCompleteUsage(t *testing.T) {
 	t.Parallel()
 

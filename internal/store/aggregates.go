@@ -241,7 +241,70 @@ func (db *DB) RebuildUsageBuckets(ctx context.Context, revision uint64, previewe
 	if err != nil {
 		return BucketApplyResult{}, err
 	}
-	return db.ApplyBucketRevisions(ctx, buckets)
+	retracted, err := db.retractedBuckets(ctx, buckets, revision, previewer)
+	if err != nil {
+		return BucketApplyResult{}, err
+	}
+	return db.ApplyBucketRevisions(ctx, append(buckets, retracted...))
+}
+
+// retractedBuckets returns a zeroed replacement for every stored bucket the
+// current observations no longer produce. Buckets are absolute values, so
+// usage that disappears, for example when a corrected adapter stops counting
+// a record, must be replaced by zero both here and on the server. Leaving the
+// old bucket in place would keep counting it forever.
+func (db *DB) retractedBuckets(ctx context.Context, produced []UsageBucket, revision uint64, previewer Previewer) ([]UsageBucket, error) {
+	current := make(map[string]struct{}, len(produced))
+	for _, bucket := range produced {
+		current[usageBucketKey(bucket)] = struct{}{}
+	}
+	rows, err := db.sql.QueryContext(ctx, `SELECT bucket_key FROM usage_buckets ORDER BY bucket_key`)
+	if err != nil {
+		return nil, fmt.Errorf("query stored usage bucket keys: %w", err)
+	}
+	var vanished []string
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			rows.Close()
+			return nil, fmt.Errorf("decode stored usage bucket key: %w", err)
+		}
+		if _, found := current[key]; !found {
+			vanished = append(vanished, key)
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return nil, fmt.Errorf("close stored usage bucket keys: %w", err)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate stored usage bucket keys: %w", err)
+	}
+	zero := func() AggregateValue {
+		return AggregateValue{Value: new(uint64), State: AvailabilityComplete}
+	}
+	retracted := make([]UsageBucket, 0, len(vanished))
+	for _, key := range vanished {
+		var payload []byte
+		if err := db.sql.QueryRowContext(ctx, `SELECT payload_json FROM usage_buckets WHERE bucket_key = ?`, key).Scan(&payload); err != nil {
+			return nil, fmt.Errorf("read stored usage bucket: %w", err)
+		}
+		var stored bucketPayload
+		if err := json.Unmarshal(payload, &stored); err != nil {
+			return nil, fmt.Errorf("decode stored usage bucket: %w", err)
+		}
+		bucket := stored.Bucket
+		bucket.Revision = revision
+		// Known zero, not unknown: the usage this bucket once held is gone.
+		bucket.Tokens = TokenBreakdown{
+			InputUncached: zero(), InputCacheRead: zero(), InputCacheWrite: zero(),
+			InputCacheWrite5m: zero(), InputCacheWrite1h: zero(), Output: zero(), ReasoningOutput: zero(),
+		}
+		if bucket.Preview, err = previewBucket(bucket, previewer); err != nil {
+			return nil, err
+		}
+		retracted = append(retracted, bucket)
+	}
+	return retracted, nil
 }
 
 // NextUsageBucketRevision returns a monotonic revision after every stored

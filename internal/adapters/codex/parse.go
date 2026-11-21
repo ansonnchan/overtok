@@ -13,8 +13,10 @@ import (
 	"github.com/ansonnchan/tokenholic/internal/normalize"
 )
 
-// AdapterVersion identifies the Codex-to-normalized mapping contract.
-const AdapterVersion = "1"
+// AdapterVersion identifies the Codex-to-normalized mapping contract. Version
+// 2 reads per-request usage and identifies each request by its session, turn,
+// and running total, so a replayed history is recognized as a copy.
+const AdapterVersion = "2"
 
 // Result contains valid observations and safe warning codes from one rollout.
 type Result struct {
@@ -28,11 +30,28 @@ type record struct {
 	Payload   struct {
 		Type      string `json:"type"`
 		Model     string `json:"model"`
+		ID        string `json:"id"`
 		SessionID string `json:"session_id"`
+		TurnID    string `json:"turn_id"`
 		Info      struct {
-			Total tokenUsage `json:"total_token_usage"`
+			Total tokenUsage  `json:"total_token_usage"`
+			Last  *tokenUsage `json:"last_token_usage"`
 		} `json:"info"`
 	} `json:"payload"`
+}
+
+// rollout is the attribution state carried through one file.
+type rollout struct {
+	// session is shared by a conversation and every thread forked from it.
+	session string
+	// thread is this file's own identity, used only to keep the running
+	// counters of legacy rollouts apart.
+	thread string
+	model  string
+	turn   string
+	// previousTotal detects an event that repeats the running total: it
+	// reports no new usage.
+	previousTotal string
 }
 
 type tokenUsage struct {
@@ -42,8 +61,18 @@ type tokenUsage struct {
 	ReasoningOutputTokens *uint64 `json:"reasoning_output_tokens"`
 }
 
-// Parse follows turn context and token events in source order. logicalFileID
-// isolates cumulative state when the rollout does not expose a session ID.
+// Parse follows session, turn, and token events in source order. logicalFileID
+// stands in for the session when the rollout does not name one.
+//
+// A token event normally carries both the usage of the request that just
+// finished and the session's running total. The request usage is emitted
+// directly as an incremental observation whose identity is the session, turn,
+// and running total. That identity is what makes replays safe: a forked or
+// resumed rollout copies its parent's history under new timestamps, and each
+// copy maps to the same identity as its original, so deduplication keeps one.
+//
+// Rollouts that predate per-request usage carry only the running total. Those
+// are emitted as cumulative snapshots for the collector to reduce.
 func Parse(reader io.Reader, surface normalize.Surface, sourceVersion, logicalFileID string) (Result, error) {
 	lines, err := jsonl.Read(reader, 0)
 	if err != nil {
@@ -53,8 +82,8 @@ func Parse(reader io.Reader, surface normalize.Surface, sourceVersion, logicalFi
 	for _, code := range lines.Warnings {
 		result.Warnings = append(result.Warnings, normalize.Warning{Code: code})
 	}
-	var activeModel string
-	sessionID := logicalFileID
+	state := rollout{session: logicalFileID, thread: logicalFileID}
+	named := false
 	for _, line := range lines.Records {
 		var parsed record
 		if err := json.Unmarshal(line.Data, &parsed); err != nil {
@@ -62,18 +91,34 @@ func Parse(reader io.Reader, surface normalize.Surface, sourceVersion, logicalFi
 			continue
 		}
 		switch parsed.Type {
+		case "session_meta":
+			// Only the first header describes this file. A fork follows it with
+			// its parent's header, which must not rename the thread.
+			if named {
+				continue
+			}
+			named = true
+			if parsed.Payload.ID != "" {
+				state.thread = parsed.Payload.ID
+				state.session = parsed.Payload.ID
+			}
+			if parsed.Payload.SessionID != "" {
+				state.session = parsed.Payload.SessionID
+			}
 		case "turn_context":
 			// Token events omit the model, so the active turn context makes later
 			// attribution inferred rather than directly reported.
-			activeModel = parsed.Payload.Model
-			if parsed.Payload.SessionID != "" {
-				sessionID = parsed.Payload.SessionID
+			state.model = parsed.Payload.Model
+			state.turn = parsed.Payload.TurnID
+			if !named && parsed.Payload.SessionID != "" {
+				// Legacy rollouts name the session on the turn context.
+				state.session, state.thread = parsed.Payload.SessionID, parsed.Payload.SessionID
 			}
 		case "event_msg":
 			if parsed.Payload.Type != "token_count" {
 				continue
 			}
-			observation, warning, ok := usageObservation(parsed, activeModel, sessionID, surface, sourceVersion)
+			observation, warning, ok := state.usageObservation(parsed, surface, sourceVersion)
 			if warning.Code != "" {
 				result.Warnings = append(result.Warnings, warning)
 			}
@@ -85,13 +130,27 @@ func Parse(reader io.Reader, surface normalize.Surface, sourceVersion, logicalFi
 	return result, nil
 }
 
-func usageObservation(parsed record, model, session string, surface normalize.Surface, sourceVersion string) (normalize.Observation, normalize.Warning, bool) {
-	usage := parsed.Payload.Info.Total
-	if usage.InputTokens == nil && usage.CachedInputTokens == nil && usage.OutputTokens == nil && usage.ReasoningOutputTokens == nil {
+func (state *rollout) usageObservation(parsed record, surface normalize.Surface, sourceVersion string) (normalize.Observation, normalize.Warning, bool) {
+	total, last := parsed.Payload.Info.Total, parsed.Payload.Info.Last
+	if total.empty() && (last == nil || last.empty()) {
 		return normalize.Observation{}, normalize.Warning{Code: "unsupported_record"}, false
 	}
 	if parsed.Timestamp.IsZero() {
 		return normalize.Observation{}, normalize.Warning{Code: "unsupported_record"}, false
+	}
+	usage, session, semantics := total, state.thread, normalize.CountCumulative
+	identity := ""
+	if last != nil && !last.empty() {
+		if !total.empty() {
+			if state.previousTotal == total.key() {
+				// The running total did not move, so this event repeats the
+				// previous request instead of reporting a new one.
+				return normalize.Observation{}, normalize.Warning{}, false
+			}
+			state.previousTotal = total.key()
+		}
+		usage, session, semantics = *last, state.session, normalize.CountIncremental
+		identity = requestID(state.session, state.turn, total, *last, parsed.Timestamp)
 	}
 	uncached, valid := uncachedInput(usage.InputTokens, usage.CachedInputTokens)
 	if !valid {
@@ -101,24 +160,39 @@ func usageObservation(parsed record, model, session string, surface normalize.Su
 		InputUncached: uncached, InputCacheRead: usage.CachedInputTokens,
 		Output: usage.OutputTokens, ReasoningOutput: usage.ReasoningOutputTokens,
 	}
+	if identity == "" {
+		identity = recordID(session, parsed.Timestamp, state.model, tokens)
+	}
 	resolution := normalize.ModelInferred
 	warnings := []normalize.Warning{{Code: "model_inferred"}}
-	if model == "" {
+	if state.model == "" {
 		resolution = normalize.ModelUnknown
 		warnings = []normalize.Warning{{Code: "model_unavailable"}}
 	}
-	sessionLocal := optionalString(session)
 	observation := normalize.Observation{
 		Source: normalize.SourceCodex, Surface: surface, SourceVersion: sourceVersion,
-		SourceRecordID: recordID(session, parsed.Timestamp, model, tokens), SessionIDLocal: sessionLocal, OccurredAt: parsed.Timestamp,
-		ObservedModelID: model, ModelResolution: resolution, Tokens: tokens,
-		CountSemantics: normalize.CountCumulative, Measurement: normalize.MeasurementReported,
+		SourceRecordID: identity, SessionIDLocal: optionalString(session), OccurredAt: parsed.Timestamp,
+		ObservedModelID: state.model, ModelResolution: resolution, Tokens: tokens,
+		CountSemantics: semantics, Measurement: normalize.MeasurementReported,
 		AdapterVersion: AdapterVersion, NormalizationVersion: normalize.SchemaVersion, Warnings: warnings,
 	}
 	if err := observation.Validate(); err != nil {
 		return normalize.Observation{}, normalize.Warning{Code: "invalid_normalized_record"}, false
 	}
 	return observation, normalize.Warning{}, true
+}
+
+func (usage tokenUsage) empty() bool {
+	return usage.InputTokens == nil && usage.CachedInputTokens == nil && usage.OutputTokens == nil && usage.ReasoningOutputTokens == nil
+}
+
+// key renders the counters for comparison by value. An absent counter is
+// distinct from zero, and a non-empty usage never renders as the empty string.
+func (usage tokenUsage) key() string {
+	return strings.Join([]string{
+		pointerValue(usage.InputTokens), pointerValue(usage.CachedInputTokens),
+		pointerValue(usage.OutputTokens), pointerValue(usage.ReasoningOutputTokens),
+	}, ",")
 }
 
 func uncachedInput(total, cached *uint64) (*uint64, bool) {
@@ -136,6 +210,24 @@ func uncachedInput(total, cached *uint64) (*uint64, bool) {
 	}
 	value := *total - *cached
 	return &value, true
+}
+
+// requestID identifies one model request by where it sits in its session:
+// the turn it belongs to and the running total after it. Neither the event's
+// timestamp nor the file it was read from takes part, because a replay
+// rewrites the first and changes the second. Only a rollout without a running
+// total falls back to the timestamp.
+func requestID(session, turn string, total, last tokenUsage, timestamp time.Time) string {
+	parts := []string{"codex-request-v2", session, turn}
+	if total.empty() {
+		parts = append(parts, "at", timestamp.UTC().Format(time.RFC3339Nano),
+			pointerValue(last.InputTokens), pointerValue(last.CachedInputTokens),
+			pointerValue(last.OutputTokens), pointerValue(last.ReasoningOutputTokens))
+	} else {
+		parts = append(parts, "total", total.key())
+	}
+	sum := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
+	return "codex-request-" + hex.EncodeToString(sum[:16])
 }
 
 func recordID(session string, timestamp time.Time, model string, tokens normalize.TokenCounts) string {
