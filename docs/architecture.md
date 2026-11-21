@@ -120,6 +120,8 @@ Adapters emit observations; they do not calculate leaderboard ranks or perform u
 
 The implemented adapters parse supported Claude and Codex JSONL natively. They recover from malformed complete records, defer actively written final lines, preserve nullable categories, and emit stable local identities.
 
+Codex reports each request's usage beside the session's running total. The adapter emits the request usage and identifies it by session, turn, and running total, never by timestamp or file. A forked or resumed rollout replays its parent's history under new timestamps; those copies map to their originals' identities and are deduplicated across files, with the earliest copy supplying the time. Only rollouts without per-request usage are reduced from running totals.
+
 The retained ccusage compatibility contract pins version 20.0.51 and its
 offline daily JSON commands. Release tooling validates the manifest, diagnostics
 can probe an installed version, and CI validates synthetic report fixtures.
@@ -185,7 +187,10 @@ A bucket's revision increments only when its uploadable content changes. A
 newer local revision replaces its earlier absolute value and the outbox retains
 only that newest pending payload. An unchanged bucket keeps its revision and
 its acknowledgement, so a refresh does not upload history again; only its
-local preview is refreshed in place. Replaying a revision is therefore safe. The sync client reads
+local preview is refreshed in place. Replaying a revision is therefore safe.
+A stored bucket that the current observations no longer produce is retracted:
+it is replaced by a known zero and uploaded, so usage a corrected adapter stops
+counting does not linger locally or on the server. The sync client reads
 only this committed outbox, sends at most 100 allowlisted buckets per request,
 and marks only the exact acknowledged revision as durable remotely. A late
 acknowledgement cannot clear a newer local replacement.
@@ -549,6 +554,7 @@ M0 established these local rules:
 - Claude Desktop coding roots are discovered narrowly and parsed through native compatible-record adapters.
 - Default Codex CLI and Desktop evidence is represented once as `shared_local`; a distinct `CODEX_HOME` permits separate CLI and Desktop roots.
 - Cross-root deduplication happens before cumulative snapshots become deltas.
+- Codex usage is read per request when the rollout reports it; replayed history is deduplicated by session, turn, and running total.
 - Source capabilities distinguish reported, derived, inferred, and unsupported fields.
 - Missing model or token metadata remains unknown rather than becoming zero or a guessed alias.
 

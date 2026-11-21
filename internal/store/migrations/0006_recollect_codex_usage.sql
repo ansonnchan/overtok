@@ -1,0 +1,12 @@
+-- Earlier Codex adapter revisions reduced running totals after ordering
+-- same-timestamp snapshots by record identity, and counted the history a
+-- forked rollout replays from its parent. Both inflated usage, and the stored
+-- rows cannot be told apart from correct ones. The adapter now identifies each
+-- request directly, under a different identity, so a rescan would add to these
+-- rows instead of replacing them.
+--
+-- Stored Codex observations are therefore discarded and collected again from
+-- the rollout files on the next scan. Usage whose rollout file no longer
+-- exists is not recovered. Buckets are left in place: the rebuild that follows
+-- replaces changed ones and retracts any that no longer have usage.
+DELETE FROM observations WHERE source = 'codex';

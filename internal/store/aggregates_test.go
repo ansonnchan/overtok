@@ -154,6 +154,90 @@ func TestUnchangedBucketKeepsItsRevisionAndStaysAcknowledged(t *testing.T) {
 	}
 }
 
+// Buckets are absolute. When the observations behind one disappear, the
+// bucket must be replaced by zero locally and re-uploaded, or the server would
+// keep counting usage the client no longer reports.
+func TestRebuildRetractsBucketsThatNoLongerHaveUsage(t *testing.T) {
+	t.Parallel()
+	db := openStoreForTest(t)
+	kept := sampleBatch()
+	removed := sampleBatch()
+	removed.Observations[0].SourceRecordID = "synthetic-record-to-remove"
+	removed.Observations[0].OccurredAt = kept.Observations[0].OccurredAt.Add(5 * time.Minute)
+	removed.Observations[0].Tokens = normalize.TokenCounts{InputUncached: func() *uint64 { v := uint64(900); return &v }()}
+	for _, batch := range []ObservationBatch{kept, removed} {
+		if _, err := db.CommitObservations(t.Context(), batch); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if result, err := db.RebuildUsageBuckets(t.Context(), 1, syntheticPreviewer(t)); err != nil || result.Applied != 2 {
+		t.Fatalf("first rebuild = %#v, %v", result, err)
+	}
+	outbox, err := db.PendingOutbox(t.Context())
+	if err != nil || len(outbox) != 2 {
+		t.Fatalf("outbox = %d records, %v", len(outbox), err)
+	}
+	var acknowledgements []OutboxAcknowledgement
+	for _, record := range outbox {
+		acknowledgements = append(acknowledgements, OutboxAcknowledgement{BucketKey: record.BucketKey, Revision: record.Revision})
+	}
+	if _, err := db.AcknowledgeOutbox(t.Context(), acknowledgements); err != nil {
+		t.Fatal(err)
+	}
+	now := removed.Observations[0].OccurredAt.Add(time.Hour)
+	before, err := db.QueryUsage(t.Context(), PeriodAllTime, now, time.UTC)
+	if err != nil || before.Tokens.InputUncached.Value == nil || *before.Tokens.InputUncached.Value != 900 {
+		t.Fatalf("usage before removal = %#v, %v", before.Tokens.InputUncached, err)
+	}
+
+	// A corrected adapter stops producing one record.
+	if _, err := db.sql.ExecContext(t.Context(), `DELETE FROM observations WHERE identity = ?`, observationIdentity(removed.Observations[0])); err != nil {
+		t.Fatal(err)
+	}
+	result, err := db.RebuildUsageBuckets(t.Context(), 2, syntheticPreviewer(t))
+	if err != nil || result.Applied != 1 || result.Ignored != 1 {
+		t.Fatalf("rebuild after removal = %#v, %v; want one retraction and one unchanged bucket", result, err)
+	}
+	outbox, err = db.PendingOutbox(t.Context())
+	if err != nil || len(outbox) != 1 || outbox[0].Revision != 2 {
+		t.Fatalf("outbox after removal = %#v, %v; want the retraction pending at revision 2", outbox, err)
+	}
+	var uploaded struct {
+		Bucket struct {
+			Tokens map[string]struct {
+				Value *uint64 `json:"value"`
+				State string  `json:"state"`
+			} `json:"tokens"`
+		} `json:"bucket"`
+	}
+	if err := json.Unmarshal(outbox[0].Payload, &uploaded); err != nil {
+		t.Fatal(err)
+	}
+	if len(uploaded.Bucket.Tokens) != 7 {
+		t.Fatalf("retraction token categories = %d, want 7", len(uploaded.Bucket.Tokens))
+	}
+	for category, value := range uploaded.Bucket.Tokens {
+		if value.Value == nil || *value.Value != 0 || value.State != string(AvailabilityComplete) {
+			t.Fatalf("retraction %s = %v/%s, want a known zero", category, value.Value, value.State)
+		}
+	}
+	after, err := db.QueryUsage(t.Context(), PeriodAllTime, now, time.UTC)
+	if err != nil || after.Tokens.InputUncached.Value == nil || *after.Tokens.InputUncached.Value != 0 {
+		t.Fatalf("usage after removal = %#v, %v; want the removed 900 tokens gone", after.Tokens.InputUncached, err)
+	}
+
+	// Retracting again changes nothing and uploads nothing new.
+	if _, err := db.AcknowledgeOutbox(t.Context(), []OutboxAcknowledgement{{BucketKey: outbox[0].BucketKey, Revision: 2}}); err != nil {
+		t.Fatal(err)
+	}
+	if result, err := db.RebuildUsageBuckets(t.Context(), 3, syntheticPreviewer(t)); err != nil || result.Applied != 0 || result.Ignored != 2 {
+		t.Fatalf("repeated rebuild = %#v, %v; want nothing applied", result, err)
+	}
+	if count, err := db.PendingOutboxCount(t.Context()); err != nil || count != 0 {
+		t.Fatalf("pending after repeated rebuild = %d, %v", count, err)
+	}
+}
+
 func TestBucketEstimateUsesCacheWriteLifetimes(t *testing.T) {
 	t.Parallel()
 	start := time.Date(2026, 11, 17, 20, 1, 0, 0, time.UTC)

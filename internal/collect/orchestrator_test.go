@@ -121,6 +121,47 @@ func TestOrchestratorRescanKeepsClaudeCacheWriteTotals(t *testing.T) {
 	}
 }
 
+func TestOrchestratorRescanKeepsCodexForkTotals(t *testing.T) {
+	t.Parallel()
+	root := filepath.Join(t.TempDir(), "codex")
+	copyFixture(t, filepath.Join("codex-cli", "fork-parent.jsonl"), filepath.Join(root, "parent.jsonl"))
+	copyFixture(t, filepath.Join("codex-cli", "fork-child.jsonl"), filepath.Join(root, "child.jsonl"))
+	db := openCollectionStore(t)
+	orchestrator := Orchestrator{
+		Discovery: adapters.Discoverer{Roots: []adapters.RootSpec{
+			testRoot(adapters.RootCodexCLI, normalize.SourceCodex, normalize.SurfaceCLI, root),
+		}},
+		Collector: Collector{SourceVersion: "synthetic-v1"}, Store: db,
+		Now: func() time.Time { return time.Date(2026, 11, 21, 20, 0, 0, 0, time.UTC) },
+	}
+	for scan, wantInserted := range []int64{5, 0} {
+		result, err := orchestrator.Scan(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result.InsertedObservations != wantInserted || len(result.Warnings) != 0 {
+			t.Fatalf("scan %d changed %d observations with warnings %#v, want %d and none", scan, result.InsertedObservations, result.Warnings, wantInserted)
+		}
+		observations, err := db.Observations(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Five distinct requests across both files: 180 uncached input, 620
+		// cache read, 70 output.
+		var total uint64
+		for _, observation := range observations {
+			known, err := observation.Tokens.KnownTotal()
+			if err != nil || known == nil {
+				t.Fatalf("KnownTotal() = %v, %v", known, err)
+			}
+			total += *known
+		}
+		if len(observations) != 5 || total != 180+620+70 {
+			t.Fatalf("scan %d stored %d observations totalling %d tokens, want 5 and 870", scan, len(observations), total)
+		}
+	}
+}
+
 func TestOrchestratorPersistsValidSourcesWhenAnotherIsPartial(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

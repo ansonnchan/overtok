@@ -25,7 +25,11 @@ Deduplication must happen before cumulative reduction. Reducing two overlapping 
 
 ## Duplicate conflicts
 
-The source plus stable source-record identifier forms the duplicate key. Exact duplicates collapse silently. Conflicting copies emit `duplicate_conflict` and use a deterministic winner selected by:
+The source plus stable source-record identifier forms the duplicate key. Exact duplicates collapse silently.
+
+Copies that agree on model, usage, and measurement but were recorded at different times are the same event read twice, for example a Codex fork replaying its parent's history. They are not a conflict. The earliest copy wins, whatever order the files were read in, because the event happened when it was first recorded.
+
+Copies that disagree on usage emit `duplicate_conflict` and use a deterministic winner selected by:
 
 1. number of known token categories;
 2. non-overlapping token magnitude;
@@ -47,6 +51,10 @@ adapter health and returned to the caller.
 
 ## Cumulative counters
 
+Only sources without per-request usage emit cumulative snapshots; current Codex rollouts report each request directly and skip this step.
+
 Cumulative state is isolated by source and local session identity. If a session identifier is unavailable, the adapter supplies a logical-file identity so unrelated files do not share state.
+
+Snapshots are reduced in time order. Snapshots that share a timestamp are ordered by ascending magnitude, which is their source order because a running total only grows. Ordering them by record identity instead would make rising totals look like resets and count each one in full.
 
 A decreased known counter starts a new segment and emits `counter_reset`; the current snapshot becomes the first increment in that segment. A missing category remains unknown for that observation, but the reducer remembers the last known value so a later reappearance is compared with the correct snapshot.
