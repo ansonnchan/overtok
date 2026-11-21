@@ -8,6 +8,8 @@ Every token category is a pointer. A non-nil pointer to `0` means the source rep
 
 Reasoning output is subset metadata when a source exposes it. It is already included in output and is therefore excluded from `KnownTotal`.
 
+Cache writes follow the same subset rule. `InputCacheWrite` is the total written at every cache lifetime and is the only cache-write value in `KnownTotal`. `InputCacheWrite5m` and `InputCacheWrite1h` split that total when the source reports a time-to-live. A nil lifetime means the time-to-live is unknown, not that nothing was written at it; `CacheWriteUnknownTTL` returns the part of the total no lifetime accounts for. Validation rejects lifetimes without a total or lifetimes that sum above it.
+
 ## Model identity
 
 `ObservedModelID` is the identifier present in or attributable from source evidence. It is intentionally separate from the future canonical model identifier, provider, and pricing key.

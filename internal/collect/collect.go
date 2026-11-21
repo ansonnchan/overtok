@@ -225,6 +225,13 @@ func usageQuality(tokens normalize.TokenCounts) (int, uint64) {
 		}
 		total += *value
 	}
+	// A reported cache-write lifetime makes a copy more complete without
+	// changing its total, which already includes every lifetime.
+	for _, value := range []*uint64{tokens.InputCacheWrite5m, tokens.InputCacheWrite1h} {
+		if value != nil {
+			known++
+		}
+	}
 	return known, total
 }
 
@@ -255,6 +262,7 @@ func safeSignature(observation normalize.Observation) string {
 	return strings.Join([]string{
 		string(observation.Surface), observation.ObservedModelID, tokenValue(observation.Tokens.InputUncached),
 		tokenValue(observation.Tokens.InputCacheRead), tokenValue(observation.Tokens.InputCacheWrite),
+		tokenValue(observation.Tokens.InputCacheWrite5m), tokenValue(observation.Tokens.InputCacheWrite1h),
 		tokenValue(observation.Tokens.Output), tokenValue(observation.Tokens.ReasoningOutput),
 	}, "\x00")
 }

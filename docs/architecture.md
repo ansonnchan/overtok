@@ -138,6 +138,8 @@ The canonical layer separates:
 
 It also converts source-specific token semantics into non-overlapping billable categories where possible. Unknown categories remain nullable. Reasoning tokens recorded as part of output remain subset metadata.
 
+Cache writes keep a combined total plus optional 5-minute and 1-hour lifetimes. A source that reports only the combined value leaves the lifetimes unknown. Claude lines that carry no model usage, the `<synthetic>` model and API error notices, are excluded by the adapter before normalization.
+
 ### Local persistence
 
 SQLite runs in WAL mode and stores:
@@ -333,8 +335,8 @@ not prove the applicable tier.
 Unknown models retain token totals and display unavailable cost. Historical values do not change silently when the upstream catalog changes.
 
 The bundled registry currently covers only a handful of models, prices all
-cache writes at the 5-minute rate, and requires the client and server catalogs
-to agree exactly. M6 replaces it; see "Planned target design".
+cache writes at the 5-minute rate even though observations now record the
+lifetime, and requires the client and server catalogs to agree exactly. M6 replaces it; see "Planned target design".
 
 ## Deployment
 

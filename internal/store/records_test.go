@@ -225,6 +225,63 @@ func TestObservationSchemaConstraintsRejectInvalidState(t *testing.T) {
 	}
 }
 
+func TestCommitObservationsReplacesUsageOnlyForANewAdapterRevision(t *testing.T) {
+	t.Parallel()
+	value := func(v uint64) *uint64 { return &v }
+	db := openStoreForTest(t)
+
+	// An earlier adapter revision knew only the combined cache-write total.
+	batch := sampleBatch()
+	batch.Observations[0].Tokens = normalize.TokenCounts{InputCacheWrite: value(300), Output: value(20)}
+	if _, err := db.CommitObservations(t.Context(), batch); err != nil {
+		t.Fatal(err)
+	}
+
+	// The same revision reporting different values is a rescan, not a repair.
+	same := sampleBatch()
+	same.Observations[0].Tokens = normalize.TokenCounts{InputCacheWrite: value(999), Output: value(999)}
+	if result, err := db.CommitObservations(t.Context(), same); err != nil || result.InsertedObservations != 0 {
+		t.Fatalf("same-revision commit = %#v, %v; want no change", result, err)
+	}
+	if stored := onlyObservation(t, db); *stored.Tokens.InputCacheWrite != 300 || stored.Tokens.InputCacheWrite1h != nil {
+		t.Fatalf("same-revision rescan changed tokens: %#v", stored.Tokens)
+	}
+
+	upgraded := sampleBatch()
+	upgraded.Observations[0].AdapterVersion = "adapter-v2"
+	upgraded.Observations[0].ObservedModelID = "claude-renamed"
+	upgraded.Observations[0].Tokens = normalize.TokenCounts{
+		InputCacheWrite: value(300), InputCacheWrite5m: value(100), InputCacheWrite1h: value(200), Output: value(20),
+	}
+	for attempt, wantChanged := range []int64{1, 0} {
+		result, err := db.CommitObservations(t.Context(), upgraded)
+		if err != nil || result.InsertedObservations != wantChanged {
+			t.Fatalf("upgrade attempt %d = %#v, %v; want %d changed", attempt, result, err, wantChanged)
+		}
+	}
+	stored := onlyObservation(t, db)
+	if *stored.Tokens.InputCacheWrite != 300 || stored.Tokens.InputCacheWrite5m == nil || *stored.Tokens.InputCacheWrite5m != 100 ||
+		stored.Tokens.InputCacheWrite1h == nil || *stored.Tokens.InputCacheWrite1h != 200 || stored.AdapterVersion != "adapter-v2" {
+		t.Fatalf("upgraded observation = %#v", stored)
+	}
+	// Attribution is bucket identity and must not move with a usage repair.
+	if stored.ObservedModelID != "claude-observed" {
+		t.Fatalf("observed model = %q, want the first stored value", stored.ObservedModelID)
+	}
+}
+
+func onlyObservation(t *testing.T, db *DB) StoredObservation {
+	t.Helper()
+	observations, err := db.Observations(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(observations) != 1 {
+		t.Fatalf("observation count = %d, want 1", len(observations))
+	}
+	return observations[0]
+}
+
 func sampleBatch() ObservationBatch {
 	zero := uint64(0)
 	maximum := uint64(math.MaxUint64)

@@ -119,3 +119,58 @@ func validObservation() Observation {
 		NormalizationVersion: SchemaVersion,
 	}
 }
+
+func TestCacheWriteLifetimesValidateAgainstTheCombinedTotal(t *testing.T) {
+	t.Parallel()
+
+	value := func(v uint64) *uint64 { return &v }
+	tests := []struct {
+		name        string
+		tokens      TokenCounts
+		wantErr     string
+		wantUnknown *uint64
+	}{
+		{name: "combined only has an unknown time-to-live", tokens: TokenCounts{InputCacheWrite: value(40)}, wantUnknown: value(40)},
+		{name: "complete split", tokens: TokenCounts{InputCacheWrite: value(30), InputCacheWrite5m: value(10), InputCacheWrite1h: value(20)}, wantUnknown: value(0)},
+		{name: "one lifetime", tokens: TokenCounts{InputCacheWrite: value(30), InputCacheWrite1h: value(20)}, wantUnknown: value(10)},
+		{name: "no cache-write evidence", tokens: TokenCounts{Output: value(1)}},
+		{name: "split without total", tokens: TokenCounts{Output: value(1), InputCacheWrite5m: value(1)}, wantErr: "require the combined total"},
+		{name: "split above total", tokens: TokenCounts{InputCacheWrite: value(5), InputCacheWrite5m: value(3), InputCacheWrite1h: value(3)}, wantErr: "cannot exceed"},
+		{name: "split overflow", tokens: TokenCounts{InputCacheWrite: value(5), InputCacheWrite5m: value(math.MaxUint64), InputCacheWrite1h: value(1)}, wantErr: "overflow"},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			observation := validObservation()
+			observation.Tokens = tt.tokens
+			err := observation.Validate()
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("Validate() error = %v, want substring %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Validate() error = %v", err)
+			}
+			got := tt.tokens.CacheWriteUnknownTTL()
+			if (got == nil) != (tt.wantUnknown == nil) || got != nil && *got != *tt.wantUnknown {
+				t.Fatalf("CacheWriteUnknownTTL() = %v, want %v", got, tt.wantUnknown)
+			}
+		})
+	}
+}
+
+func TestKnownTotalCountsCacheWritesOnce(t *testing.T) {
+	t.Parallel()
+
+	write, fiveMinute, oneHour, output := uint64(30), uint64(10), uint64(20), uint64(5)
+	total, err := (TokenCounts{InputCacheWrite: &write, InputCacheWrite5m: &fiveMinute, InputCacheWrite1h: &oneHour, Output: &output}).KnownTotal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total == nil || *total != 35 {
+		t.Fatalf("KnownTotal() = %v, want 35", total)
+	}
+}

@@ -69,6 +69,59 @@ func TestOrchestratorRepeatedAndReversedScansAreIdentical(t *testing.T) {
 	}
 }
 
+func TestOrchestratorRescanKeepsClaudeCacheWriteTotals(t *testing.T) {
+	t.Parallel()
+	root := filepath.Join(t.TempDir(), "claude")
+	copyFixture(t, filepath.Join("claude-code", "cache-write-lifetimes.jsonl"), filepath.Join(root, "lifetimes.jsonl"))
+	copyFixture(t, filepath.Join("claude-code", "local-notices.jsonl"), filepath.Join(root, "notices.jsonl"))
+	db := openCollectionStore(t)
+	orchestrator := Orchestrator{
+		Discovery: adapters.Discoverer{Roots: []adapters.RootSpec{
+			testRoot(adapters.RootClaudeCLI, normalize.SourceClaude, normalize.SurfaceCLI, root),
+		}},
+		Collector: Collector{SourceVersion: "synthetic-v1"}, Store: db,
+		Now: func() time.Time { return time.Date(2026, 11, 20, 20, 0, 0, 0, time.UTC) },
+	}
+	for scan, wantInserted := range []int64{8, 0} {
+		result, err := orchestrator.Scan(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result.InsertedObservations != wantInserted {
+			t.Fatalf("scan %d changed %d observations, want %d", scan, result.InsertedObservations, wantInserted)
+		}
+		observations, err := db.Observations(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Hand-computed from both fixtures: six lifetime records plus the two
+		// real usage lines that sit beside the excluded local notices.
+		var total, write, fiveMinute, oneHour, unknownTTL uint64
+		for _, observation := range observations {
+			if observation.ObservedModelID != "claude-sonnet-synthetic" {
+				t.Fatalf("scan %d stored model %q", scan, observation.ObservedModelID)
+			}
+			known, err := observation.Tokens.KnownTotal()
+			if err != nil || known == nil {
+				t.Fatalf("KnownTotal() = %v, %v", known, err)
+			}
+			total += *known
+			write += *observation.Tokens.InputCacheWrite
+			unknownTTL += *observation.Tokens.CacheWriteUnknownTTL()
+			if observation.Tokens.InputCacheWrite5m != nil {
+				fiveMinute += *observation.Tokens.InputCacheWrite5m
+			}
+			if observation.Tokens.InputCacheWrite1h != nil {
+				oneHour += *observation.Tokens.InputCacheWrite1h
+			}
+		}
+		if len(observations) != 8 || total != 482+33 || write != 407 || fiveMinute != 107 || oneHour != 230 || unknownTTL != 70 {
+			t.Fatalf("scan %d totals = %d records, %d tokens, cache write %d/%d/%d/%d",
+				scan, len(observations), total, write, fiveMinute, oneHour, unknownTTL)
+		}
+	}
+}
+
 func TestOrchestratorPersistsValidSourcesWhenAnotherIsPartial(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

@@ -24,6 +24,8 @@ func TestParseCompatibilityFixtures(t *testing.T) {
 		{name: "desktop agent", file: "claude-desktop/agent/basic.jsonl", surface: normalize.SurfaceDesktopAgent, wantRecords: 1},
 		{name: "desktop cowork", file: "claude-desktop/cowork/basic.jsonl", surface: normalize.SurfaceDesktopCowork, wantRecords: 1},
 		{name: "malformed recovery", file: "claude-code/malformed-middle.jsonl", surface: normalize.SurfaceCLI, wantRecords: 2, wantWarnings: 1},
+		{name: "cache-write lifetimes", file: "claude-code/cache-write-lifetimes.jsonl", surface: normalize.SurfaceCLI, wantRecords: 6, wantWarnings: 1},
+		{name: "local notices", file: "claude-code/local-notices.jsonl", surface: normalize.SurfaceCLI, wantRecords: 2},
 	}
 	for _, tt := range tests {
 		tt := tt
@@ -56,4 +58,154 @@ func TestParseDefersPartialTail(t *testing.T) {
 	if len(result.Observations) != 0 || len(result.Warnings) != 1 || result.Warnings[0].Code != "partial_tail" {
 		t.Fatalf("Parse() = %#v", result)
 	}
+}
+
+func TestParseCacheWriteLifetimesMatchHandComputedValues(t *testing.T) {
+	t.Parallel()
+
+	result := parseFixture(t, "claude-code/cache-write-lifetimes.jsonl")
+	// Each row is one fixture line in order: total, 5m, 1h, and the portion
+	// whose time-to-live the record does not report. -1 means unavailable.
+	want := []struct {
+		name                         string
+		total, fiveMinute, oneHour   int64
+		unknownTTL                   uint64
+		wantInconsistentSplitWarning bool
+	}{
+		{name: "split equals combined", total: 300, fiveMinute: 100, oneHour: 200},
+		{name: "combined only", total: 40, fiveMinute: -1, oneHour: -1, unknownTTL: 40},
+		{name: "split without combined", total: 7, fiveMinute: 7, oneHour: 0},
+		{name: "zero combined", total: 0, fiveMinute: 0, oneHour: 0},
+		{name: "one lifetime reported", total: 50, fiveMinute: -1, oneHour: 30, unknownTTL: 20},
+		{name: "split exceeds combined", total: 10, fiveMinute: -1, oneHour: -1, unknownTTL: 10, wantInconsistentSplitWarning: true},
+	}
+	if len(result.Observations) != len(want) {
+		t.Fatalf("observations = %d, want %d", len(result.Observations), len(want))
+	}
+	var total, fiveMinute, oneHour, unknownTTL uint64
+	for index, tt := range want {
+		tokens := result.Observations[index].Tokens
+		if got := optional(tokens.InputCacheWrite); got != tt.total {
+			t.Errorf("%s: cache write = %d, want %d", tt.name, got, tt.total)
+		}
+		if got := optional(tokens.InputCacheWrite5m); got != tt.fiveMinute {
+			t.Errorf("%s: 5m cache write = %d, want %d", tt.name, got, tt.fiveMinute)
+		}
+		if got := optional(tokens.InputCacheWrite1h); got != tt.oneHour {
+			t.Errorf("%s: 1h cache write = %d, want %d", tt.name, got, tt.oneHour)
+		}
+		remainder := tokens.CacheWriteUnknownTTL()
+		if remainder == nil || *remainder != tt.unknownTTL {
+			t.Errorf("%s: unknown time-to-live = %v, want %d", tt.name, remainder, tt.unknownTTL)
+		}
+		if got := hasWarning(result.Observations[index].Warnings, "cache_write_split_inconsistent"); got != tt.wantInconsistentSplitWarning {
+			t.Errorf("%s: inconsistent-split warning = %t, want %t", tt.name, got, tt.wantInconsistentSplitWarning)
+		}
+		total += *tokens.InputCacheWrite
+		unknownTTL += *remainder
+		if tokens.InputCacheWrite5m != nil {
+			fiveMinute += *tokens.InputCacheWrite5m
+		}
+		if tokens.InputCacheWrite1h != nil {
+			oneHour += *tokens.InputCacheWrite1h
+		}
+	}
+	if total != 407 || fiveMinute != 107 || oneHour != 230 || unknownTTL != 70 {
+		t.Fatalf("cache-write totals = %d/%d/%d/%d, want 407/107/230/70", total, fiveMinute, oneHour, unknownTTL)
+	}
+	if got := knownTotal(t, result.Observations); got != 482 {
+		t.Fatalf("total tokens = %d, want 482", got)
+	}
+}
+
+func TestParseExcludesLocalNotices(t *testing.T) {
+	t.Parallel()
+
+	result := parseFixture(t, "claude-code/local-notices.jsonl")
+	if len(result.Warnings) != 0 {
+		t.Fatalf("warnings = %#v, want none", result.Warnings)
+	}
+	for _, observation := range result.Observations {
+		if observation.ObservedModelID != "claude-sonnet-synthetic" {
+			t.Fatalf("observed model = %q, want only the real model", observation.ObservedModelID)
+		}
+	}
+	// Lines 1 and 5 are usage; the synthetic model and both error notices,
+	// including one that names a real model with non-zero counts, are not.
+	if got := knownTotal(t, result.Observations); got != 12+3+8+6+4 {
+		t.Fatalf("total tokens = %d, want 33", got)
+	}
+}
+
+func TestCacheWriteMapping(t *testing.T) {
+	t.Parallel()
+
+	value := func(v uint64) *uint64 { return &v }
+	maximum := value(^uint64(0))
+	tests := []struct {
+		name                       string
+		combined                   *uint64
+		split                      *cacheCreation
+		total, fiveMinute, oneHour int64
+		consistent                 bool
+	}{
+		{name: "nothing reported", total: -1, fiveMinute: -1, oneHour: -1, consistent: true},
+		{name: "empty split object", combined: value(9), split: &cacheCreation{}, total: 9, fiveMinute: -1, oneHour: -1, consistent: true},
+		{name: "split below combined", combined: value(9), split: &cacheCreation{Ephemeral5m: value(2), Ephemeral1h: value(3)}, total: 9, fiveMinute: 2, oneHour: 3, consistent: true},
+		{name: "split overflow", combined: value(9), split: &cacheCreation{Ephemeral5m: maximum, Ephemeral1h: value(1)}, total: 9, fiveMinute: -1, oneHour: -1},
+		{name: "one lifetime without combined", split: &cacheCreation{Ephemeral1h: value(4)}, total: 4, fiveMinute: -1, oneHour: 4, consistent: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			total, fiveMinute, oneHour, consistent := cacheWrite(tt.combined, tt.split)
+			if optional(total) != tt.total || optional(fiveMinute) != tt.fiveMinute || optional(oneHour) != tt.oneHour || consistent != tt.consistent {
+				t.Fatalf("cacheWrite() = %d/%d/%d/%t, want %d/%d/%d/%t",
+					optional(total), optional(fiveMinute), optional(oneHour), consistent, tt.total, tt.fiveMinute, tt.oneHour, tt.consistent)
+			}
+		})
+	}
+}
+
+func parseFixture(t *testing.T, name string) Result {
+	t.Helper()
+	file, err := os.Open(filepath.Join("..", "..", "..", "fixtures", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	result, err := Parse(file, normalize.SurfaceCLI, "synthetic-v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return result
+}
+
+func knownTotal(t *testing.T, observations []normalize.Observation) uint64 {
+	t.Helper()
+	var sum uint64
+	for _, observation := range observations {
+		total, err := observation.Tokens.KnownTotal()
+		if err != nil || total == nil {
+			t.Fatalf("KnownTotal() = %v, %v", total, err)
+		}
+		sum += *total
+	}
+	return sum
+}
+
+// optional renders an unavailable category as -1 so tables can tell it from zero.
+func optional(value *uint64) int64 {
+	if value == nil {
+		return -1
+	}
+	return int64(*value)
+}
+
+func hasWarning(warnings []normalize.Warning, code string) bool {
+	for _, warning := range warnings {
+		if warning.Code == code {
+			return true
+		}
+	}
+	return false
 }

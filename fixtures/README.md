@@ -8,7 +8,7 @@ Only synthetic or explicitly approved sanitized source records belong here. Fixt
 
 | Directory | Contract exercised |
 | --- | --- |
-| `claude-code` | Claude Code incremental assistant usage, duplicates, and malformed-line recovery |
+| `claude-code` | Claude Code incremental assistant usage, duplicates, malformed-line recovery, cache-write lifetimes, and excluded local notices |
 | `claude-desktop/code` | Claude Desktop Code records and overlap with CLI-compatible evidence |
 | `claude-desktop/agent` | Claude Desktop local Agent records |
 | `claude-desktop/cowork` | Claude Desktop Cowork audit records |

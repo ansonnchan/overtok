@@ -59,16 +59,19 @@ func tokenDelta(current normalize.TokenCounts, previous *normalize.TokenCounts) 
 	}
 	reset := decreased(current.InputUncached, previous.InputUncached) ||
 		decreased(current.InputCacheRead, previous.InputCacheRead) || decreased(current.InputCacheWrite, previous.InputCacheWrite) ||
+		decreased(current.InputCacheWrite5m, previous.InputCacheWrite5m) || decreased(current.InputCacheWrite1h, previous.InputCacheWrite1h) ||
 		decreased(current.Output, previous.Output) || decreased(current.ReasoningOutput, previous.ReasoningOutput)
 	if reset {
 		return cloneTokenCounts(current), true
 	}
 	return normalize.TokenCounts{
-		InputUncached:   deltaValue(current.InputUncached, previous.InputUncached),
-		InputCacheRead:  deltaValue(current.InputCacheRead, previous.InputCacheRead),
-		InputCacheWrite: deltaValue(current.InputCacheWrite, previous.InputCacheWrite),
-		Output:          deltaValue(current.Output, previous.Output),
-		ReasoningOutput: deltaValue(current.ReasoningOutput, previous.ReasoningOutput),
+		InputUncached:     deltaValue(current.InputUncached, previous.InputUncached),
+		InputCacheRead:    deltaValue(current.InputCacheRead, previous.InputCacheRead),
+		InputCacheWrite:   deltaValue(current.InputCacheWrite, previous.InputCacheWrite),
+		InputCacheWrite5m: deltaValue(current.InputCacheWrite5m, previous.InputCacheWrite5m),
+		InputCacheWrite1h: deltaValue(current.InputCacheWrite1h, previous.InputCacheWrite1h),
+		Output:            deltaValue(current.Output, previous.Output),
+		ReasoningOutput:   deltaValue(current.ReasoningOutput, previous.ReasoningOutput),
 	}, false
 }
 
@@ -98,6 +101,12 @@ func mergeLastKnown(previous, current normalize.TokenCounts) normalize.TokenCoun
 	if current.InputCacheWrite != nil {
 		result.InputCacheWrite = cloneUint(current.InputCacheWrite)
 	}
+	if current.InputCacheWrite5m != nil {
+		result.InputCacheWrite5m = cloneUint(current.InputCacheWrite5m)
+	}
+	if current.InputCacheWrite1h != nil {
+		result.InputCacheWrite1h = cloneUint(current.InputCacheWrite1h)
+	}
 	if current.Output != nil {
 		result.Output = cloneUint(current.Output)
 	}
@@ -110,8 +119,9 @@ func mergeLastKnown(previous, current normalize.TokenCounts) normalize.TokenCoun
 func cloneTokenCounts(tokens normalize.TokenCounts) normalize.TokenCounts {
 	return normalize.TokenCounts{
 		InputUncached: cloneUint(tokens.InputUncached), InputCacheRead: cloneUint(tokens.InputCacheRead),
-		InputCacheWrite: cloneUint(tokens.InputCacheWrite), Output: cloneUint(tokens.Output),
-		ReasoningOutput: cloneUint(tokens.ReasoningOutput),
+		InputCacheWrite:   cloneUint(tokens.InputCacheWrite),
+		InputCacheWrite5m: cloneUint(tokens.InputCacheWrite5m), InputCacheWrite1h: cloneUint(tokens.InputCacheWrite1h),
+		Output: cloneUint(tokens.Output), ReasoningOutput: cloneUint(tokens.ReasoningOutput),
 	}
 }
 

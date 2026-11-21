@@ -45,13 +45,22 @@ same evidence is a no-op. Source-root, session, and last-record identifiers are
 also fingerprinted before SQL execution; the schema has no path or raw
 source-identifier fields.
 
+The one exception to the no-op is a record arriving from a different adapter
+revision. Its token categories and warnings replace the stored ones, so a
+corrected parser repairs history whose source files still exist. Records whose
+files are gone keep their earlier values; for cache writes that means a
+combined total with an unknown time-to-live. Model attribution, measurement,
+and normalization version are never replaced, because they identify the usage
+bucket and moving them would strand the old bucket.
+
 `CommitScan` extends the same invariant across every source completed by one
 application scan: either all observation/checkpoint/health batches commit, or
 none do.
 
 Token categories use nullable decimal text. This preserves unavailable versus
 reported zero and supports the complete `uint64` range that SQLite's signed
-integer storage cannot represent. Model resolution, observed and canonical
+integer storage cannot represent. Cache writes store the combined total plus
+nullable 5-minute and 1-hour lifetimes. Model resolution, observed and canonical
 identifiers, pricing keys, measurement quality, counter semantics, versions,
 capabilities, and safe warnings remain separate fields.
 

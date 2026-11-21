@@ -36,6 +36,9 @@ func (o Observation) Validate() error {
 	if o.Tokens.Output != nil && o.Tokens.ReasoningOutput != nil && *o.Tokens.ReasoningOutput > *o.Tokens.Output {
 		return errors.New("reasoning output cannot exceed output")
 	}
+	if err := o.Tokens.validateCacheWrite(); err != nil {
+		return err
+	}
 	for _, warning := range o.Warnings {
 		if warning.Code == "" {
 			return errors.New("warning code is required")
@@ -90,6 +93,50 @@ func (t TokenCounts) KnownTotal() (*uint64, error) {
 		return nil, nil
 	}
 	return &total, nil
+}
+
+// CacheWriteUnknownTTL returns the cache-write tokens whose lifetime the source
+// did not report: the combined total minus every known lifetime. It is nil
+// when the total itself is unavailable.
+func (t TokenCounts) CacheWriteUnknownTTL() *uint64 {
+	if t.InputCacheWrite == nil {
+		return nil
+	}
+	remainder := *t.InputCacheWrite
+	for _, known := range []*uint64{t.InputCacheWrite5m, t.InputCacheWrite1h} {
+		if known == nil {
+			continue
+		}
+		if *known > remainder {
+			remainder = 0
+			break
+		}
+		remainder -= *known
+	}
+	return &remainder
+}
+
+func (t TokenCounts) validateCacheWrite() error {
+	if t.InputCacheWrite5m == nil && t.InputCacheWrite1h == nil {
+		return nil
+	}
+	if t.InputCacheWrite == nil {
+		return errors.New("cache-write lifetimes require the combined total")
+	}
+	var split uint64
+	for _, known := range []*uint64{t.InputCacheWrite5m, t.InputCacheWrite1h} {
+		if known == nil {
+			continue
+		}
+		if math.MaxUint64-split < *known {
+			return errors.New("cache-write lifetimes overflow uint64")
+		}
+		split += *known
+	}
+	if split > *t.InputCacheWrite {
+		return errors.New("cache-write lifetimes cannot exceed the combined total")
+	}
+	return nil
 }
 
 func (t TokenCounts) anyKnown() bool {
